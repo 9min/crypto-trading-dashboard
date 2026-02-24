@@ -1,0 +1,23 @@
+export const BINANCE_WS_BASE_URL = 'wss://stream.binance.com:9443/stream';
+export const BINANCE_REST_BASE_URL = 'https://api.binance.com/api/v3';
+
+export const DEFAULT_SYMBOL = 'BTCUSDT';
+export const DEFAULT_INTERVAL = '1m';
+
+export const MAX_CANDLES = 2000;
+export const MAX_TRADES = 200;
+export const MAX_DEPTH_LEVELS = 50;
+export const TRADE_FIELDS_PER_ENTRY = 4; // timestamp, price, quantity, isBuyerMaker
+
+export const RECONNECT_MAX_DELAY_MS = 30000;
+export const RECONNECT_BASE_DELAY_MS = 1000;
+export const HEARTBEAT_TIMEOUT_MS = 30000;
+export const WS_MAX_RECONNECT_ATTEMPTS = 10;
+
+export const COLORS = {
+  BUY: '#00C087',
+  SELL: '#F6465D',
+  CONNECTED: '#00C087',
+  RECONNECTING: '#F0B90B',
+  DISCONNECTED: '#F6465D',
+} as const;
