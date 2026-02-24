@@ -138,6 +138,9 @@ export const useDepthStore = create<DepthStore>()((set) => ({
     finalUpdateId: number,
   ): void => {
     set((state) => {
+      // Guard against stale or duplicate updates
+      if (finalUpdateId <= state.lastUpdateId) return state;
+
       const updatedBids = applyLevelUpdates(state.bids, bidUpdates);
       const updatedAsks = applyLevelUpdates(state.asks, askUpdates);
 

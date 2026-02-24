@@ -59,12 +59,13 @@ export function getMiniTickerStream(symbol: string): string {
 }
 
 /**
- * Builds a combined stream URL that includes kline, depth, and trade streams
- * for a single symbol. This is the primary URL used by the dashboard.
+ * Builds a combined stream URL that includes kline, depth, trade, and
+ * mini ticker streams for a single symbol. This is the primary URL used
+ * by the dashboard.
  *
  * @example
  * buildCombinedStreamUrl('BTCUSDT', '1m')
- * // => 'wss://stream.binance.com:9443/stream?streams=btcusdt@kline_1m/btcusdt@depth@100ms/btcusdt@trade'
+ * // => 'wss://stream.binance.com:9443/stream?streams=btcusdt@kline_1m/btcusdt@depth@100ms/btcusdt@trade/btcusdt@miniTicker'
  */
 export function buildCombinedStreamUrl(symbol: string, interval: string): string {
   const streams = [

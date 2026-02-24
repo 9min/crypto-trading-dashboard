@@ -1,15 +1,15 @@
-interface DebouncedFunction<T extends (...args: Parameters<T>) => void> {
-  (...args: Parameters<T>): void;
+interface DebouncedFunction<Args extends unknown[]> {
+  (...args: Args): void;
   cancel: () => void;
 }
 
-export function debounce<T extends (...args: Parameters<T>) => void>(
-  fn: T,
+export function debounce<Args extends unknown[]>(
+  fn: (...args: Args) => void,
   delay: number,
-): DebouncedFunction<T> {
+): DebouncedFunction<Args> {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  const debounced = (...args: Parameters<T>): void => {
+  const debounced = (...args: Args): void => {
     if (timeoutId !== null) {
       clearTimeout(timeoutId);
     }
