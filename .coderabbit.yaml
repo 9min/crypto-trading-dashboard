@@ -1,0 +1,25 @@
+language: ko-KR
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        Only comment on critical and major issues such as:
+        - Security vulnerabilities (XSS, injection, credential exposure)
+        - Logic errors and bugs that cause incorrect behavior
+        - Performance problems (memory leaks, unnecessary re-renders, missing cleanup)
+        - Type safety violations (any type usage, missing null checks)
+        - WebSocket lifecycle issues (missing unsubscribe, connection leaks)
+        - Canvas resource leaks (missing cancelAnimationFrame, ResizeObserver disconnect)
+        Do NOT comment on:
+        - Minor style or formatting issues
+        - Trivial naming suggestions
+        - Optional improvements or nice-to-haves
+        - Comment or documentation additions
+  auto_review:
+    enabled: true
+    drafts: false

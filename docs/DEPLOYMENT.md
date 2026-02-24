@@ -67,13 +67,13 @@
 
 ### 1.2 데이터 흐름 요약
 
-| 데이터 종류 | 흐름 | 서버 경유 여부 |
-|------------|------|--------------|
-| 실시간 시세 (kline, depth, trade) | Binance WebSocket → 브라우저 | 경유 없음 (직접 연결) |
-| 히스토리 캔들/오더북 스냅샷 | Binance REST API → 브라우저 | 경유 없음 (직접 fetch) |
-| 사용자 인증 | Supabase Auth → 브라우저 | Supabase 경유 |
-| 레이아웃/관심 종목 저장 | 브라우저 → Supabase DB | Supabase 경유 (극소량 트래픽) |
-| 정적 페이지/자산 | Vercel CDN → 브라우저 | Vercel CDN 경유 (초기 로딩 시 1회) |
+| 데이터 종류                       | 흐름                         | 서버 경유 여부                     |
+| --------------------------------- | ---------------------------- | ---------------------------------- |
+| 실시간 시세 (kline, depth, trade) | Binance WebSocket → 브라우저 | 경유 없음 (직접 연결)              |
+| 히스토리 캔들/오더북 스냅샷       | Binance REST API → 브라우저  | 경유 없음 (직접 fetch)             |
+| 사용자 인증                       | Supabase Auth → 브라우저     | Supabase 경유                      |
+| 레이아웃/관심 종목 저장           | 브라우저 → Supabase DB       | Supabase 경유 (극소량 트래픽)      |
+| 정적 페이지/자산                  | Vercel CDN → 브라우저        | Vercel CDN 경유 (초기 로딩 시 1회) |
 
 ---
 
@@ -98,14 +98,14 @@
 
 Vercel은 Next.js 프로젝트를 자동 감지하여 아래 설정을 기본 적용한다. 확인 후 필요 시 수정한다.
 
-| 설정 항목 | 값 | 비고 |
-|-----------|-----|------|
-| Framework Preset | **Next.js** | 자동 감지됨 |
-| Build Command | `pnpm build` | package.json의 build 스크립트 사용 |
-| Output Directory | `.next` | Next.js 기본값 |
-| Install Command | `pnpm install` | pnpm 사용 시 명시 필요 |
-| Root Directory | `./ ` | 모노레포가 아니면 기본값 유지 |
-| Node.js Version | `20.x` | Settings → General에서 변경 가능 |
+| 설정 항목        | 값             | 비고                               |
+| ---------------- | -------------- | ---------------------------------- |
+| Framework Preset | **Next.js**    | 자동 감지됨                        |
+| Build Command    | `pnpm build`   | package.json의 build 스크립트 사용 |
+| Output Directory | `.next`        | Next.js 기본값                     |
+| Install Command  | `pnpm install` | pnpm 사용 시 명시 필요             |
+| Root Directory   | `./`           | 모노레포가 아니면 기본값 유지      |
+| Node.js Version  | `20.x`         | Settings → General에서 변경 가능   |
 
 > **참고**: pnpm을 패키지 매니저로 사용하는 경우, Vercel은 `pnpm-lock.yaml` 파일을 감지하여 자동으로 pnpm을 사용한다. 별도의 설정이 불필요하다.
 
@@ -119,10 +119,10 @@ Vercel은 Next.js 프로젝트를 자동 감지하여 아래 설정을 기본 �
 
 본 프로젝트에서 필요한 환경 변수는 다음과 같다.
 
-| 변수명 | 설명 | 예시 값 | 클라이언트 노출 |
-|--------|------|---------|---------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL | `https://abcdefgh.supabase.co` | 노출됨 (NEXT_PUBLIC_ 접두어) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 익명 키 (공개 키) | `eyJhbGciOiJIUzI1NiIs...` | 노출됨 (RLS가 보호) |
+| 변수명                          | 설명                       | 예시 값                        | 클라이언트 노출              |
+| ------------------------------- | -------------------------- | ------------------------------ | ---------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase 프로젝트 URL      | `https://abcdefgh.supabase.co` | 노출됨 (NEXT*PUBLIC* 접두어) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 익명 키 (공개 키) | `eyJhbGciOiJIUzI1NiIs...`      | 노출됨 (RLS가 보호)          |
 
 > **보안 참고**: `NEXT_PUBLIC_` 접두어가 붙은 변수는 클라이언트 번들에 포함되어 브라우저에서 접근 가능하다. Supabase Anon Key는 공개되어도 안전하다. RLS(Row Level Security) 정책이 데이터를 보호하기 때문이다. 단, **Service Role Key는 절대로 `NEXT_PUBLIC_` 변수에 설정하지 않는다.**
 
@@ -145,11 +145,11 @@ Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 Vercel은 환경 변수를 배포 환경별로 분리하여 관리할 수 있다.
 
-| 환경 | 적용 시점 | 용도 |
-|------|-----------|------|
-| **Production** | `main` 브랜치 배포 | 프로덕션 Supabase 프로젝트 연결 |
-| **Preview** | PR 및 기타 브랜치 배포 | 개발용 Supabase 프로젝트 연결 (권장) |
-| **Development** | `vercel dev` 로컬 실행 | 로컬 개발 환경 |
+| 환경            | 적용 시점              | 용도                                 |
+| --------------- | ---------------------- | ------------------------------------ |
+| **Production**  | `main` 브랜치 배포     | 프로덕션 Supabase 프로젝트 연결      |
+| **Preview**     | PR 및 기타 브랜치 배포 | 개발용 Supabase 프로젝트 연결 (권장) |
+| **Development** | `vercel dev` 로컬 실행 | 로컬 개발 환경                       |
 
 **권장 설정**:
 
@@ -168,11 +168,11 @@ vercel env pull .env.local
 
 배포 완료 시 Vercel이 자동으로 부여하는 도메인 형식:
 
-| 도메인 유형 | 형식 | 예시 |
-|------------|------|------|
-| 프로젝트 도메인 | `{project-name}.vercel.app` | `crypto-trading-dashboard.vercel.app` |
-| 배포별 도메인 | `{project-name}-{hash}.vercel.app` | `crypto-trading-dashboard-abc123.vercel.app` |
-| Preview 도메인 | `{project-name}-git-{branch}-{user}.vercel.app` | `crypto-trading-dashboard-git-feature-x-user.vercel.app` |
+| 도메인 유형     | 형식                                            | 예시                                                     |
+| --------------- | ----------------------------------------------- | -------------------------------------------------------- |
+| 프로젝트 도메인 | `{project-name}.vercel.app`                     | `crypto-trading-dashboard.vercel.app`                    |
+| 배포별 도메인   | `{project-name}-{hash}.vercel.app`              | `crypto-trading-dashboard-abc123.vercel.app`             |
+| Preview 도메인  | `{project-name}-git-{branch}-{user}.vercel.app` | `crypto-trading-dashboard-git-feature-x-user.vercel.app` |
 
 기본 도메인만으로도 프로덕션 서비스를 운영할 수 있다. HTTPS가 자동으로 적용된다.
 
@@ -201,17 +201,76 @@ CNAME 레코드: cname.vercel-dns.com
 
 ## 3. CI/CD 파이프라인
 
-### 3.1 자동 배포 흐름
+### 3.0 GitHub Actions CI
+
+모든 PR과 `main`/`develop` 브랜치 push에서 GitHub Actions CI가 자동 실행된다. CI가 통과해야 PR 병합이 가능하다.
+
+#### 워크플로우 파일
+
+`.github/workflows/ci.yml`에 정의되어 있다.
+
+#### CI 실행 단계
+
+```text
+lint-typecheck-test (Job 1)
+├── Checkout
+├── Setup pnpm + Node.js (.nvmrc 버전)
+├── pnpm install --frozen-lockfile
+├── pnpm lint          (ESLint --max-warnings=0)
+├── pnpm type-check    (tsc --noEmit)
+└── pnpm test          (Vitest 단위 테스트)
+
+build (Job 2, Job 1 통과 후 실행)
+├── Checkout
+├── Setup pnpm + Node.js
+├── pnpm install --frozen-lockfile
+└── pnpm build         (next build)
+```
+
+#### CI 트리거 조건
+
+| Git 이벤트                                  | 트리거  |
+| ------------------------------------------- | ------- |
+| `main` 또는 `develop` 브랜치에 push         | CI 실행 |
+| `main` 또는 `develop` 대상 PR 생성/업데이트 | CI 실행 |
+
+#### Concurrency 설정
+
+동일 브랜치에서 여러 CI가 동시에 실행되면 이전 실행을 자동 취소한다. 이를 통해 GitHub Actions 분 수를 절약한다.
+
+### 3.0.1 CodeRabbit AI 코드 리뷰
+
+PR 생성 시 [CodeRabbit](https://coderabbit.ai)이 자동으로 코드 리뷰를 수행한다.
+
+#### 설정 파일
+
+프로젝트 루트의 `.coderabbit.yaml`에 정의되어 있다.
+
+```yaml
+language: ko-KR # 리뷰 언어: 한국어
+reviews:
+  auto_review:
+    enabled: true # PR 생성 시 자동 리뷰
+    drafts: false # Draft PR은 리뷰하지 않음
+  high_level_summary: true # 변경사항 요약 제공
+```
+
+#### 사전 요구사항
+
+- GitHub Apps에서 CodeRabbit 앱이 해당 리포지토리에 설치되어 있어야 한다.
+- 설치: https://github.com/apps/coderabbitai → **Configure** → 리포지토리 선택
+
+### 3.1 자동 배포 흐름 (Vercel)
 
 Vercel은 GitHub 리포지토리와 연동하여 별도의 CI/CD 설정 없이 자동 배포를 제공한다.
 
 #### 배포 트리거 규칙
 
-| Git 이벤트 | Vercel 배포 유형 | URL |
-|------------|-----------------|-----|
-| `main` 브랜치에 push | **Production** 배포 | `{project}.vercel.app` |
-| 기타 브랜치에 push | **Preview** 배포 | `{project}-git-{branch}-{user}.vercel.app` |
-| Pull Request 생성/업데이트 | **Preview** 배포 | PR 코멘트에 URL 자동 게시 |
+| Git 이벤트                 | Vercel 배포 유형    | URL                                        |
+| -------------------------- | ------------------- | ------------------------------------------ |
+| `main` 브랜치에 push       | **Production** 배포 | `{project}.vercel.app`                     |
+| 기타 브랜치에 push         | **Preview** 배포    | `{project}-git-{branch}-{user}.vercel.app` |
+| Pull Request 생성/업데이트 | **Preview** 배포    | PR 코멘트에 URL 자동 게시                  |
 
 #### 전체 배포 흐름 다이어그램
 
@@ -367,10 +426,10 @@ PR #42: "feat: 오더북 깊이 바 애니메이션 추가"
 
 Preview 배포에서 사용할 환경 변수는 Vercel 대시보드에서 **Preview** 스코프로 별도 설정할 수 있다.
 
-| 환경 | Supabase 프로젝트 | 용도 |
-|------|-------------------|------|
+| 환경       | Supabase 프로젝트          | 용도               |
+| ---------- | -------------------------- | ------------------ |
 | Production | `prod-project.supabase.co` | 실제 사용자 데이터 |
-| Preview | `dev-project.supabase.co` | 테스트/개발 데이터 |
+| Preview    | `dev-project.supabase.co`  | 테스트/개발 데이터 |
 
 > **권장**: Preview 환경에서는 개발용 Supabase 프로젝트를 연결하여, PR 테스트 중 프로덕션 데이터에 영향을 주지 않도록 한다.
 
@@ -384,11 +443,11 @@ Preview 배포에서 사용할 환경 변수는 Vercel 대시보드에서 **Prev
 
 개발 환경과 프로덕션 환경의 Supabase 프로젝트를 분리하는 것을 강력히 권장한다.
 
-| 환경 | Supabase 프로젝트 | 용도 |
-|------|-------------------|------|
-| 로컬 개발 | `crypto-dashboard-dev` | 개발 및 테스트 |
-| Preview (Vercel) | `crypto-dashboard-dev` | PR Preview 테스트 |
-| Production (Vercel) | `crypto-dashboard-prod` | 실제 운영 |
+| 환경                | Supabase 프로젝트       | 용도              |
+| ------------------- | ----------------------- | ----------------- |
+| 로컬 개발           | `crypto-dashboard-dev`  | 개발 및 테스트    |
+| Preview (Vercel)    | `crypto-dashboard-dev`  | PR Preview 테스트 |
+| Production (Vercel) | `crypto-dashboard-prod` | 실제 운영         |
 
 #### Supabase 프로젝트 생성 절차
 
@@ -396,13 +455,13 @@ Preview 배포에서 사용할 환경 변수는 Vercel 대시보드에서 **Prev
 2. **"New Project"** 클릭
 3. 다음 정보를 입력한다:
 
-| 항목 | 설정값 |
-|------|--------|
-| Organization | 본인의 Organization 선택 |
-| Name | `crypto-dashboard-prod` |
-| Database Password | 강력한 비밀번호 생성 및 안전하게 보관 |
-| Region | 사용자 대다수의 지역과 가까운 리전 선택 (예: `Northeast Asia (Tokyo)`) |
-| Pricing Plan | Free tier (시작 시) |
+| 항목              | 설정값                                                                 |
+| ----------------- | ---------------------------------------------------------------------- |
+| Organization      | 본인의 Organization 선택                                               |
+| Name              | `crypto-dashboard-prod`                                                |
+| Database Password | 강력한 비밀번호 생성 및 안전하게 보관                                  |
+| Region            | 사용자 대다수의 지역과 가까운 리전 선택 (예: `Northeast Asia (Tokyo)`) |
+| Pricing Plan      | Free tier (시작 시)                                                    |
 
 4. **"Create new project"** 클릭 후 프로젝트 생성을 기다린다 (약 1~2분).
 
@@ -410,11 +469,11 @@ Preview 배포에서 사용할 환경 변수는 Vercel 대시보드에서 **Prev
 
 프로젝트 생성 후, **Settings** → **API** 에서 다음 키를 확인한다:
 
-| 키 | 위치 | Vercel 환경 변수 |
-|----|------|-----------------|
-| Project URL | `Settings > API > Project URL` | `NEXT_PUBLIC_SUPABASE_URL` |
-| anon (public) key | `Settings > API > Project API keys > anon` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| service_role key | `Settings > API > Project API keys > service_role` | **절대 클라이언트에 노출하지 않음** |
+| 키                | 위치                                               | Vercel 환경 변수                    |
+| ----------------- | -------------------------------------------------- | ----------------------------------- |
+| Project URL       | `Settings > API > Project URL`                     | `NEXT_PUBLIC_SUPABASE_URL`          |
+| anon (public) key | `Settings > API > Project API keys > anon`         | `NEXT_PUBLIC_SUPABASE_ANON_KEY`     |
+| service_role key  | `Settings > API > Project API keys > service_role` | **절대 클라이언트에 노출하지 않음** |
 
 #### OAuth Redirect URL 설정
 
@@ -534,18 +593,18 @@ FROM pg_tables
 WHERE schemaname = 'public';
 ```
 
-| RLS 상태 | 의미 |
-|----------|------|
-| RLS 활성화 + 정책 있음 | 정책에 맞는 데이터만 접근 가능 (정상) |
-| RLS 활성화 + 정책 없음 | 모든 접근 차단 (안전하지만 사용 불가) |
-| RLS 비활성화 | **위험!** anon key로 모든 데이터 접근 가능 |
+| RLS 상태               | 의미                                       |
+| ---------------------- | ------------------------------------------ |
+| RLS 활성화 + 정책 있음 | 정책에 맞는 데이터만 접근 가능 (정상)      |
+| RLS 활성화 + 정책 없음 | 모든 접근 차단 (안전하지만 사용 불가)      |
+| RLS 비활성화           | **위험!** anon key로 모든 데이터 접근 가능 |
 
 #### Anon Key vs Service Role Key
 
-| 키 | 노출 가능 여부 | 용도 | 권한 |
-|----|--------------|------|------|
-| `anon` (공개 키) | 클라이언트에 노출 가능 | 브라우저에서 Supabase 접근 | RLS 정책에 따라 제한됨 |
-| `service_role` (비밀 키) | **절대 노출 금지** | 서버 사이드에서만 사용 | RLS 우회, 모든 데이터 접근 |
+| 키                       | 노출 가능 여부         | 용도                       | 권한                       |
+| ------------------------ | ---------------------- | -------------------------- | -------------------------- |
+| `anon` (공개 키)         | 클라이언트에 노출 가능 | 브라우저에서 Supabase 접근 | RLS 정책에 따라 제한됨     |
+| `service_role` (비밀 키) | **절대 노출 금지**     | 서버 사이드에서만 사용     | RLS 우회, 모든 데이터 접근 |
 
 > **핵심 원칙**: 본 프로젝트는 클라이언트 전용 아키텍처이므로 `service_role` 키를 사용할 필요가 없다. 만약 어드민 기능이 필요하다면, Supabase Dashboard에서 직접 수행하거나 별도의 서버 사이드 스크립트를 사용한다.
 
@@ -590,22 +649,16 @@ export default function DashboardPage() {
 // 캔들스틱 차트 (Lightweight Charts) - 동적 import
 import dynamic from 'next/dynamic';
 
-const CandlestickChart = dynamic(
-  () => import('@/components/widgets/CandlestickChart'),
-  {
-    loading: () => <ChartSkeleton />,
-    ssr: false, // Canvas 기반이므로 서버 사이드 렌더링 불필요
-  }
-);
+const CandlestickChart = dynamic(() => import('@/components/widgets/CandlestickChart'), {
+  loading: () => <ChartSkeleton />,
+  ssr: false, // Canvas 기반이므로 서버 사이드 렌더링 불필요
+});
 
 // 오더북 Canvas 렌더러 - 동적 import
-const OrderBookWidget = dynamic(
-  () => import('@/components/widgets/OrderBookWidget'),
-  {
-    loading: () => <OrderBookSkeleton />,
-    ssr: false,
-  }
-);
+const OrderBookWidget = dynamic(() => import('@/components/widgets/OrderBookWidget'), {
+  loading: () => <OrderBookSkeleton />,
+  ssr: false,
+});
 ```
 
 #### Image 최적화
@@ -621,7 +674,7 @@ import Image from 'next/image';
   width={120}
   height={40}
   priority // LCP 요소는 priority 설정
-/>
+/>;
 ```
 
 #### Font 최적화
@@ -714,11 +767,11 @@ export async function GET() {
 
 #### 목표
 
-| 메트릭 | 목표 | 설명 |
-|--------|------|------|
+| 메트릭              | 목표        | 설명                               |
+| ------------------- | ----------- | ---------------------------------- |
 | 초기 JS 번들 (gzip) | **< 150KB** | 첫 페이지 로딩에 필요한 JavaScript |
-| First Load JS | **< 200KB** | Next.js 프레임워크 + 페이지 코드 |
-| Largest Page Bundle | **< 300KB** | 모든 위젯 포함 시 |
+| First Load JS       | **< 200KB** | Next.js 프레임워크 + 페이지 코드   |
+| Largest Page Bundle | **< 300KB** | 모든 위젯 포함 시                  |
 
 #### 코드 스플리팅 전략
 
@@ -809,13 +862,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ##### 모니터링 지표
 
-| 지표 | 설명 | 목표 |
-|------|------|------|
+| 지표                           | 설명                                  | 목표    |
+| ------------------------------ | ------------------------------------- | ------- |
 | LCP (Largest Contentful Paint) | 가장 큰 콘텐츠가 화면에 표시되는 시간 | < 2.0초 |
-| FCP (First Contentful Paint) | 첫 번째 콘텐츠가 표시되는 시간 | < 1.0초 |
-| CLS (Cumulative Layout Shift) | 레이아웃 이동 누적 점수 | < 0.1 |
-| FID (First Input Delay) | 첫 사용자 입력에 대한 응답 지연 | < 100ms |
-| TTFB (Time to First Byte) | 서버 응답까지의 시간 | < 200ms |
+| FCP (First Contentful Paint)   | 첫 번째 콘텐츠가 표시되는 시간        | < 1.0초 |
+| CLS (Cumulative Layout Shift)  | 레이아웃 이동 누적 점수               | < 0.1   |
+| FID (First Input Delay)        | 첫 사용자 입력에 대한 응답 지연       | < 100ms |
+| TTFB (Time to First Byte)      | 서버 응답까지의 시간                  | < 200ms |
 
 #### Speed Insights 설정 (선택 사항)
 
@@ -903,19 +956,17 @@ Sentry.init({
   replaysOnErrorSampleRate: 1.0,
   replaysSessionSampleRate: 0.01, // 1% 세션만 기록
 
-  integrations: [
-    Sentry.replayIntegration(),
-  ],
+  integrations: [Sentry.replayIntegration()],
 });
 ```
 
 Sentry 무료 티어 한도:
 
-| 항목 | 무료 티어 한도 |
-|------|--------------|
-| 에러 이벤트 | 5,000건/월 |
-| 성능 트랜잭션 | 10,000건/월 |
-| 세션 리플레이 | 50건/월 |
+| 항목          | 무료 티어 한도 |
+| ------------- | -------------- |
+| 에러 이벤트   | 5,000건/월     |
+| 성능 트랜잭션 | 10,000건/월    |
+| 세션 리플레이 | 50건/월        |
 
 ---
 
@@ -1034,11 +1085,11 @@ vercel promote dpl_xyz789
 
 ### 8.4 롤백 시 주의 사항
 
-| 항목 | 설명 |
-|------|------|
-| 환경 변수 | 롤백 시 현재 설정된 환경 변수가 적용됨 (배포 당시의 환경 변수가 아님) |
-| DB 마이그레이션 | 코드를 롤백해도 데이터베이스 스키마는 롤백되지 않음. 하위 호환성 유지 필수. |
-| 캐시 | 롤백 후 일부 사용자에게 CDN 캐시된 이전 자산이 표시될 수 있음. 보통 수 분 내 갱신. |
+| 항목            | 설명                                                                               |
+| --------------- | ---------------------------------------------------------------------------------- |
+| 환경 변수       | 롤백 시 현재 설정된 환경 변수가 적용됨 (배포 당시의 환경 변수가 아님)              |
+| DB 마이그레이션 | 코드를 롤백해도 데이터베이스 스키마는 롤백되지 않음. 하위 호환성 유지 필수.        |
+| 캐시            | 롤백 후 일부 사용자에게 CDN 캐시된 이전 자산이 표시될 수 있음. 보통 수 분 내 갱신. |
 
 ### 8.5 롤백 프로세스 다이어그램
 
@@ -1064,44 +1115,44 @@ vercel promote dpl_xyz789
 
 ### 9.1 Vercel 무료 티어 (Hobby Plan) 한도
 
-| 항목 | 무료 한도 | 초과 시 |
-|------|----------|--------|
-| 대역폭 (Bandwidth) | **100 GB/월** | 서비스 중단 (다음 달까지 대기 또는 유료 전환) |
-| Serverless Function 실행 | **100 GB-Hours/월** | 서비스 중단 |
-| Edge Function 실행 | **500,000 호출/월** | 서비스 중단 |
-| 빌드 실행 시간 | **6,000분/월** | 빌드 큐 대기 |
-| 동시 빌드 | **1개** | 큐 대기 |
-| 배포 수 | **100회/일** | 배포 불가 |
-| 팀원 수 | **1명** | 유료 전환 필요 |
-| 도메인 수 | **50개** | 추가 불가 |
-| Analytics | **2,500 이벤트/월** | 이벤트 수집 중단 |
+| 항목                     | 무료 한도           | 초과 시                                       |
+| ------------------------ | ------------------- | --------------------------------------------- |
+| 대역폭 (Bandwidth)       | **100 GB/월**       | 서비스 중단 (다음 달까지 대기 또는 유료 전환) |
+| Serverless Function 실행 | **100 GB-Hours/월** | 서비스 중단                                   |
+| Edge Function 실행       | **500,000 호출/월** | 서비스 중단                                   |
+| 빌드 실행 시간           | **6,000분/월**      | 빌드 큐 대기                                  |
+| 동시 빌드                | **1개**             | 큐 대기                                       |
+| 배포 수                  | **100회/일**        | 배포 불가                                     |
+| 팀원 수                  | **1명**             | 유료 전환 필요                                |
+| 도메인 수                | **50개**            | 추가 불가                                     |
+| Analytics                | **2,500 이벤트/월** | 이벤트 수집 중단                              |
 
 > **본 프로젝트에서의 예상 사용량**: 정적 자산만 서빙하고 실시간 데이터는 브라우저에서 직접 처리하므로, 대역폭 사용량은 매우 낮다. 월 500 UV 기준 약 1~5 GB/월 예상.
 
 ### 9.2 Supabase 무료 티어 (Free Plan) 한도
 
-| 항목 | 무료 한도 | 초과 시 |
-|------|----------|--------|
-| 데이터베이스 크기 | **500 MB** | 쓰기 차단 |
-| 파일 스토리지 | **1 GB** | 업로드 차단 |
-| 대역폭 (DB + Storage) | **5 GB/월** | 서비스 중단 |
-| Auth 활성 사용자 | **50,000 MAU** | 인증 실패 |
-| Edge Functions | **500,000 호출/월** | 호출 실패 |
-| 실시간 메시지 | **2,000,000 건/월** | 메시지 전달 중단 |
-| 프로젝트 수 | **2개** | 추가 불가 |
-| 데이터베이스 자동 일시 중지 | **7일 비활동 시** | 다음 요청 시 자동 재시작 (수 초 지연) |
+| 항목                        | 무료 한도           | 초과 시                               |
+| --------------------------- | ------------------- | ------------------------------------- |
+| 데이터베이스 크기           | **500 MB**          | 쓰기 차단                             |
+| 파일 스토리지               | **1 GB**            | 업로드 차단                           |
+| 대역폭 (DB + Storage)       | **5 GB/월**         | 서비스 중단                           |
+| Auth 활성 사용자            | **50,000 MAU**      | 인증 실패                             |
+| Edge Functions              | **500,000 호출/월** | 호출 실패                             |
+| 실시간 메시지               | **2,000,000 건/월** | 메시지 전달 중단                      |
+| 프로젝트 수                 | **2개**             | 추가 불가                             |
+| 데이터베이스 자동 일시 중지 | **7일 비활동 시**   | 다음 요청 시 자동 재시작 (수 초 지연) |
 
 > **주의**: Supabase 무료 티어에서는 7일 동안 데이터베이스 활동이 없으면 프로젝트가 자동으로 일시 중지(pause)된다. 포트폴리오 프로젝트의 경우 정기적으로 방문하거나, 간단한 헬스 체크 스크립트를 실행하여 일시 중지를 방지할 수 있다.
 
 ### 9.3 월간 비용 전망표
 
-| 시나리오 | Vercel 비용 | Supabase 비용 | 총 비용 | 비고 |
-|----------|------------|--------------|---------|------|
-| **개발 단계** (트래픽 없음) | $0 | $0 | **$0** | 무료 티어 내 |
-| **포트폴리오** (월 500 UV) | $0 | $0 | **$0** | 대역폭 약 2 GB/월, DB 약 10 MB |
-| **성장기** (월 5,000 UV) | $0 | $0 | **$0** | 대역폭 약 20 GB/월, 여전히 무료 범위 |
-| **활성** (월 20,000 UV) | $0~$20 | $0 | **$0~$20** | 대역폭 80 GB/월 접근, Pro 전환 검토 |
-| **대규모** (월 50,000+ UV) | $20/월 | $25/월 | **$45/월** | Pro Plan 전환 필요 |
+| 시나리오                    | Vercel 비용 | Supabase 비용 | 총 비용    | 비고                                 |
+| --------------------------- | ----------- | ------------- | ---------- | ------------------------------------ |
+| **개발 단계** (트래픽 없음) | $0          | $0            | **$0**     | 무료 티어 내                         |
+| **포트폴리오** (월 500 UV)  | $0          | $0            | **$0**     | 대역폭 약 2 GB/월, DB 약 10 MB       |
+| **성장기** (월 5,000 UV)    | $0          | $0            | **$0**     | 대역폭 약 20 GB/월, 여전히 무료 범위 |
+| **활성** (월 20,000 UV)     | $0~$20      | $0            | **$0~$20** | 대역폭 80 GB/월 접근, Pro 전환 검토  |
+| **대규모** (월 50,000+ UV)  | $20/월      | $25/월        | **$45/월** | Pro Plan 전환 필요                   |
 
 > **핵심**: 실시간 데이터를 브라우저에서 직접 수신하는 아키텍처 덕분에, 서버 트래픽 비용이 발생하지 않는다. 사용자 수가 늘어도 Vercel/Supabase의 서버 측 비용 증가는 극히 미미하다. 비용의 대부분은 초기 정적 자산 서빙 대역폭이다.
 
@@ -1177,4 +1228,4 @@ vercel --prod
 
 ---
 
-*본 문서는 Real-time Crypto Trading Dashboard의 배포 가이드이다. 프로젝트의 아키텍처 변경 시 이 문서도 함께 업데이트한다.*
+_본 문서는 Real-time Crypto Trading Dashboard의 배포 가이드이다. 프로젝트의 아키텍처 변경 시 이 문서도 함께 업데이트한다._

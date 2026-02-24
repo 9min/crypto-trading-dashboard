@@ -1,18 +1,20 @@
 # Real-time Crypto Trading Dashboard - 시스템 아키텍처
 
-**문서 버전**: v1.0
-**작성일**: 2026-02-25
-**프로젝트 상태**: 기획 단계
+**문서 버전**: v2.0
+**최종 수정일**: 2026-02-25
+**프로젝트 상태**: M0 + M1 구현 완료 (프로젝트 셋업 + 데이터 레이어)
+
+---
 
 ## 1. 시스템 아키텍처 개요
 
 ### 1.1 아키텍처 원칙
 
-본 시스템은 **서버 트래픽 비용 Zero**를 핵심 원칙으로, 모든 실시간 데이터를 브라우저에서 거래소 WebSocket에 직접 연결하여 수신한다. 백엔드 프록시 서버가 존재하지 않으며, Supabase는 오직 사용자 설정(레이아웃, 관심 종목)의 영속화에만 사용된다.
+본 시스템은 **서버 트래픽 비용 Zero**를 핵심 원칙으로, 모든 실시간 데이터를 브라우저에서 바이낸스 WebSocket에 직접 연결하여 수신한다. 백엔드 프록시 서버가 존재하지 않으며, Supabase는 오직 사용자 설정(레이아웃, 관심 종목)의 영속화에만 사용된다.
 
 ### 1.2 고수준 아키텍처 다이어그램
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        BROWSER (Client-Only)                        │
 │                                                                     │
@@ -21,27 +23,28 @@
 │  │  ┌─────────────┐ ┌──────────────┐ ┌────────────────────────┐ │  │
 │  │  │ React DOM   │ │ Lightweight  │ │  Custom Canvas 2D      │ │  │
 │  │  │ (UI Chrome) │ │ Charts       │ │  (OrderBook, Trades)   │ │  │
-│  │  │ Toolbar,    │ │ (Candlestick)│ │  rAF + dirty flag      │ │  │
+│  │  │ Header,     │ │ (Candlestick)│ │  rAF + dirty flag      │ │  │
 │  │  │ Grid Shell, │ │              │ │                        │ │  │
-│  │  │ Modals      │ │              │ │                        │ │  │
+│  │  │ ThemeToggle │ │              │ │                        │ │  │
 │  │  └──────┬──────┘ └──────┬───────┘ └───────────┬────────────┘ │  │
 │  └─────────┼───────────────┼─────────────────────┼──────────────┘  │
 │            │               │                     │                  │
 │  ┌─────────┼───────────────┼─────────────────────┼──────────────┐  │
 │  │         ▼               ▼                     ▼               │  │
-│  │                    State Layer (Zustand)                       │  │
+│  │                    State Layer (Zustand v5)                    │  │
 │  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌───────────┐ │  │
-│  │  │ UIStore    │ │ KlineStore │ │ DepthStore │ │ TradeStore│ │  │
+│  │  │ uiStore    │ │ klineStore │ │ depthStore │ │tradeStore │ │  │
 │  │  └────────────┘ └─────┬──────┘ └─────┬──────┘ └─────┬─────┘ │  │
 │  │  ┌────────────┐       │              │              │        │  │
-│  │  │ AuthStore  │       │              │              │        │  │
+│  │  │ authStore  │       │              │              │        │  │
 │  │  └────────────┘       │              │              │        │  │
 │  └───────────────────────┼──────────────┼──────────────┼────────┘  │
 │                          │              │              │            │
 │  ┌───────────────────────┼──────────────┼──────────────┼────────┐  │
-│  │                  Data Processing Layer                        │  │
+│  │              Data Orchestration Layer                         │  │
 │  │            ┌──────────┴──────────────┴──────────────┘        │  │
-│  │            │     Message Router (stream type 분기)            │  │
+│  │            │     useWebSocket Hook (생명주기 오케스트레이터)     │  │
+│  │            │       ↕ createMessageRouter (이벤트 타입별 분기)   │  │
 │  │            └──────────┬──────────────────────────────        │  │
 │  └───────────────────────┼──────────────────────────────────────┘  │
 │                          │                                         │
@@ -50,9 +53,10 @@
 │  │            ┌──────────┴──────────────┐                       │  │
 │  │            │  WebSocketManager       │                       │  │
 │  │            │  (Singleton)            │                       │  │
-│  │            │  - 연결/재연결 관리        │                       │  │
-│  │            │  - Combined Stream      │                       │  │
-│  │            │  - 지수 백오프            │                       │  │
+│  │            │  - Combined Stream 연결  │                       │  │
+│  │            │  - 지수 백오프 재연결      │                       │  │
+│  │            │  - 하트비트 감지           │                       │  │
+│  │            │  - Page Visibility API   │                       │  │
 │  │            └──────────┬──────────────┘                       │  │
 │  └───────────────────────┼──────────────────────────────────────┘  │
 └──────────────────────────┼──────────────────────────────────────────┘
@@ -70,108 +74,117 @@
 
 ### 1.3 레이어 분리 원칙
 
-| 레이어 | 책임 | 기술 |
-|--------|------|------|
-| **Presentation** | 화면 렌더링, 사용자 인터랙션 | React DOM, Lightweight Charts, Canvas 2D |
-| **State** | 애플리케이션 상태 관리, 구독 기반 업데이트 | Zustand (도메인별 분리 스토어) |
-| **Data Processing** | 메시지 파싱, 라우팅, 데이터 정규화 | TypeScript 순수 함수 |
-| **Network** | WebSocket 연결 관리, REST API 호출 | WebSocket API, Fetch API |
+| 레이어                 | 책임                                   | 구현 모듈                                                           |
+| ---------------------- | -------------------------------------- | ------------------------------------------------------------------- |
+| **Presentation**       | 화면 렌더링, 사용자 인터랙션           | React DOM, Lightweight Charts, Canvas 2D                            |
+| **State**              | 도메인별 상태 관리, selector 기반 구독 | Zustand v5 (uiStore, klineStore, depthStore, tradeStore, authStore) |
+| **Data Orchestration** | WebSocket ↔ Store 연결, 메시지 라우팅  | `useWebSocket` 훅, `createMessageRouter`                            |
+| **Network**            | WebSocket 연결 관리, REST API 호출     | `WebSocketManager` 싱글톤, `fetchWithRetry`                         |
 
 ---
 
 ## 2. WebSocket 데이터 파이프라인
 
-### 2.1 WebSocketManager 싱글톤 설계
+### 2.1 WebSocketManager 싱글톤
+
+`src/lib/websocket/WebSocketManager.ts`에 구현된 싱글톤 클래스로, 애플리케이션 전체에서 단일 WebSocket 연결을 관리한다.
 
 ```typescript
-interface WebSocketManagerConfig {
-  maxReconnectAttempts: number;     // 10
-  baseReconnectDelay: number;       // 1000ms
-  maxReconnectDelay: number;        // 30000ms
-  heartbeatTimeout: number;         // 30000ms
-  messageRateLimit: number;         // 5 messages/sec (Binance limit)
-}
+// 싱글톤 접근
+const manager = WebSocketManager.getInstance();
 
-type ConnectionState =
-  | { status: 'idle' }
-  | { status: 'connecting' }
-  | { status: 'connected'; connectedAt: number }
-  | { status: 'reconnecting'; attempt: number; nextRetryAt: number }
-  | { status: 'failed'; error: string; lastAttemptAt: number };
-
-interface WebSocketManager {
-  // 연결 관리
-  connect(): void;
-  disconnect(): void;
-  getConnectionState(): ConnectionState;
-
-  // 구독 관리
-  subscribe(streams: string[]): void;
-  unsubscribe(streams: string[]): void;
-  getActiveStreams(): Set<string>;
-
-  // 이벤트 리스너
-  onMessage(handler: (stream: string, data: unknown) => void): () => void;
-  onStateChange(handler: (state: ConnectionState) => void): () => void;
-}
+// 공개 API
+manager.connect(url: string): void;              // Combined Stream URL로 연결
+manager.disconnect(): void;                       // 연결 해제 + 상태 idle로 초기화
+manager.subscribe(callback): () => void;          // 메시지 구독 → unsubscribe 함수 반환
+manager.onStateChange(callback): () => void;      // 연결 상태 변경 구독
+manager.getState(): ConnectionState;              // 현재 연결 상태 조회
 ```
+
+**핵심 설계 결정**:
+
+- `private constructor()`: 외부에서 인스턴스 생성 차단
+- `static getInstance()`: 지연 초기화 싱글톤
+- `static resetInstance()`: 테스트 전용 인스턴스 리셋
+- 메시지 구독자와 상태 구독자를 `Set`으로 관리하여 O(1) 추가/삭제
+- SSR 안전: `typeof window !== 'undefined'` 가드로 서버 측 실행 방지
+- 구독자 콜백을 `try/catch`로 감싸 하나의 에러가 다른 구독자에게 전파되지 않도록 격리
 
 ### 2.2 Binance Combined Stream URL 구성
 
-단일 WebSocket 연결로 최대 1024개 스트림을 구독할 수 있는 Combined Stream을 활용한다.
-
-```
-wss://stream.binance.com:9443/stream?streams=btcusdt@kline_1m/btcusdt@depth@100ms/btcusdt@trade/btcusdt@miniTicker
-```
-
-**URL 구성 전략**:
-- 심볼 변경 시 URL 전체를 재구성하지 않고, WebSocket `SUBSCRIBE` / `UNSUBSCRIBE` 메서드 프레임을 전송하여 동적으로 스트림을 추가/제거한다.
-- 이 방식으로 심볼 전환 시 WebSocket 연결 자체를 유지하면서 스트림만 교체한다.
+`src/lib/binance/streamUrls.ts`에서 URL을 생성한다. 단일 WebSocket 연결로 kline, depth, trade 3개 스트림을 동시에 구독한다.
 
 ```typescript
-// 동적 구독 관리 (연결 유지)
-const subscribeMessage = {
-  method: 'SUBSCRIBE',
-  params: ['ethusdt@kline_1m', 'ethusdt@depth@100ms', 'ethusdt@trade'],
-  id: Date.now(),
-};
+// buildCombinedStreamUrl('BTCUSDT', '1m') 호출 시 생성되는 URL:
+// wss://stream.binance.com:9443/stream?streams=btcusdt@kline_1m/btcusdt@depth@100ms/btcusdt@trade
 
-const unsubscribeMessage = {
-  method: 'UNSUBSCRIBE',
-  params: ['btcusdt@kline_1m', 'btcusdt@depth@100ms', 'btcusdt@trade'],
-  id: Date.now(),
-};
+export function buildCombinedStreamUrl(symbol: string, interval: string): string {
+  const streams = [
+    getKlineStream(symbol, interval), // btcusdt@kline_1m
+    getDepthStream(symbol), // btcusdt@depth@100ms
+    getTradeStream(symbol), // btcusdt@trade
+  ];
+  return buildStreamUrl(streams);
+}
 ```
+
+**현재 구현**: 심볼/인터벌 변경 시 기존 WebSocket 연결을 닫고 새 URL로 재연결하는 방식을 사용한다. Combined Stream URL 자체를 재구성하여 `manager.connect(newUrl)`을 호출한다.
 
 ### 2.3 메시지 라우팅
 
+`src/lib/websocket/messageRouter.ts`에서 Combined Stream 메시지를 파싱하고 이벤트 타입별로 핸들러에 분배한다.
+
+```text
+WebSocket.onmessage
+  │
+  ▼
+parseCombinedStreamMessage(rawJSON)     ← JSON.parse + data 필드 추출
+  │
+  ▼
+{ stream: "btcusdt@kline_1m", data: { e: "kline", ... } }
+  │                                      ↓
+  │                               data.e 판별 유니온
+  │
+  ▼
+createMessageRouter({                    ← switch(message.e) 분기
+  onKline:  → handleKline(),            ← 'kline' → klineStore
+  onDepth:  → handleDepth(),            ← 'depthUpdate' → depthStore
+  onTrade:  → handleTrade(),            ← 'trade' → tradeStore
+})
+```
+
+**판별 유니온(Discriminated Union)** 기반 라우팅:
+
 ```typescript
-// Combined Stream 메시지 구조
-interface CombinedStreamMessage {
-  stream: string;  // e.g., "btcusdt@kline_1m"
-  data: unknown;
-}
+// WebSocketStreamMessage = BinanceKlineEvent | BinanceDepthEvent | BinanceTradeEvent | BinanceMiniTickerEvent
+// e 필드가 판별자: 'kline' | 'depthUpdate' | 'trade' | '24hrMiniTicker'
 
-// 메시지 라우터
-function routeMessage(message: CombinedStreamMessage): void {
-  const { stream, data } = message;
-
-  if (stream.includes('@kline_')) {
-    klineStore.getState().processKline(data as BinanceKlineEvent);
-  } else if (stream.includes('@depth')) {
-    depthStore.getState().processDepthDiff(data as BinanceDepthEvent);
-  } else if (stream.includes('@trade')) {
-    tradeStore.getState().processTrade(data as BinanceTradeEvent);
-  } else if (stream.includes('@miniTicker')) {
-    watchlistStore.getState().processMiniTicker(data as BinanceMiniTickerEvent);
-  }
+export function createMessageRouter(handlers: MessageHandlers) {
+  return (message: WebSocketStreamMessage): void => {
+    switch (message.e) {
+      case 'kline':
+        handlers.onKline?.(message);
+        break;
+      case 'depthUpdate':
+        handlers.onDepth?.(message);
+        break;
+      case 'trade':
+        handlers.onTrade?.(message);
+        break;
+      case '24hrMiniTicker':
+        handlers.onMiniTicker?.(message);
+        break;
+    }
+  };
 }
 ```
 
 ### 2.4 연결 생명주기 상태 머신
 
-```
-                    connect()
+`ConnectionState` 판별 유니온 타입으로 5가지 상태를 추적한다 (`src/types/chart.ts`).
+
+```text
+                    connect(url)
   ┌────────┐  ─────────────────▶  ┌──────────────┐
   │  IDLE  │                      │  CONNECTING   │
   └────────┘  ◀─────────────────  └──────┬───────┘
@@ -180,227 +193,381 @@ function routeMessage(message: CombinedStreamMessage): void {
                                          ▼
                                   ┌──────────────┐
                          ┌───────│  CONNECTED    │◀──────────────┐
+                         │       │ connectedAt   │               │
                          │       └──────┬───────┘               │
                          │              │                        │
-                   disconnect()   onclose/onerror          onopen │
+                   disconnect()   onclose                  onopen │
                          │              │                        │
                          ▼              ▼                        │
                     ┌────────┐   ┌──────────────┐    재연결 성공  │
                     │  IDLE  │   │ RECONNECTING │───────────────┘
-                    └────────┘   └──────┬───────┘
+                    └────────┘   │ attempt: n   │
+                                 └──────┬───────┘
                                         │
-                                  max retries 초과
+                                  attempt >= 10 (최대)
                                         │
                                         ▼
                                   ┌──────────┐
                                   │  FAILED  │
+                                  │  error   │
                                   └──────────┘
+```
+
+각 상태의 타입 정의:
+
+```typescript
+type ConnectionState =
+  | { status: 'idle' }
+  | { status: 'connecting' }
+  | { status: 'connected'; connectedAt: number }
+  | { status: 'reconnecting'; attempt: number }
+  | { status: 'failed'; error: string };
 ```
 
 ### 2.5 지수 백오프 재연결 전략
 
-```typescript
-function calculateReconnectDelay(attempt: number): number {
-  const base = 1000;  // 1초
-  const max = 30000;  // 30초
-  const delay = Math.min(base * Math.pow(2, attempt), max);
-  // 지터(Jitter) 추가: ±20% 랜덤화로 Thundering Herd 방지
-  const jitter = delay * 0.2 * (Math.random() - 0.5);
-  return delay + jitter;
-}
+`WebSocketManager.getReconnectDelay()`에 구현:
 
-// 재연결 시퀀스: 1초 → 2초 → 4초 → 8초 → 16초 → 30초 → 30초 → ...
+```typescript
+private getReconnectDelay(attempt: number): number {
+  return Math.min(
+    RECONNECT_BASE_DELAY_MS * Math.pow(2, attempt - 1),
+    RECONNECT_MAX_DELAY_MS,
+  );
+}
+// 재연결 시퀀스: 1s → 2s → 4s → 8s → 16s → 30s → 30s → ... (최대 10회)
 ```
+
+| 상수                        | 값       | 역할                  |
+| --------------------------- | -------- | --------------------- |
+| `RECONNECT_BASE_DELAY_MS`   | 1,000ms  | 첫 재연결 대기 시간   |
+| `RECONNECT_MAX_DELAY_MS`    | 30,000ms | 최대 재연결 대기 시간 |
+| `WS_MAX_RECONNECT_ATTEMPTS` | 10       | 최대 재연결 시도 횟수 |
 
 ### 2.6 하트비트 감지
 
+30초간 메시지를 수신하지 못하면 연결이 끊어진 것으로 간주한다.
+
 ```typescript
-// 30초간 메시지 미수신 시 연결 끊김으로 간주
-let heartbeatTimer: ReturnType<typeof setTimeout>;
-
-function resetHeartbeat(): void {
-  clearTimeout(heartbeatTimer);
-  heartbeatTimer = setTimeout(() => {
-    // 연결이 끊어진 것으로 간주 → 재연결 시도
-    reconnect();
-  }, 30_000);
+// WebSocketManager 내부 구현
+private resetHeartbeat(): void {
+  this.clearHeartbeat();
+  this.heartbeatTimeoutId = setTimeout(() => {
+    // 타임아웃 → 기존 WebSocket 강제 종료 → handleClose에서 reconnect 트리거
+    if (this.ws) {
+      this.ws.close();
+    }
+  }, HEARTBEAT_TIMEOUT_MS);  // 30,000ms
 }
-
-// 모든 onmessage에서 resetHeartbeat() 호출
 ```
+
+- 모든 `handleMessage`에서 `resetHeartbeat()` 호출
+- `handleOpen`에서도 `resetHeartbeat()` 호출
+- 타임아웃 발생 시 `ws.close()`를 호출하여 `handleClose` → `scheduleReconnect` 흐름으로 재연결
 
 ### 2.7 Page Visibility API 연동
 
 ```typescript
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    // 탭 비활성: 렌더링 중단, 데이터는 계속 수신
-    pauseRendering();
+// WebSocketManager 내부 구현
+private handleVisibilityChange(): void {
+  if (document.visibilityState === 'hidden') {
+    // 탭 비활성: 하트비트 타이머 일시 중지
+    // (브라우저가 타이머를 throttle하므로 오탐 방지)
+    this.clearHeartbeat();
   } else {
-    // 탭 활성화: 오더북 스냅샷 재요청 → 데이터 정합성 복구 → 렌더링 재개
-    refreshOrderBookSnapshot();
-    resumeRendering();
+    // 탭 활성화
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      // 연결 유지 중 → 하트비트 모니터링 재개
+      this.resetHeartbeat();
+    } else if (this.currentUrl && this.state.status !== 'connecting') {
+      // 연결 끊어짐 → 즉시 재연결 (attempt 카운터 초기화)
+      this.reconnectAttempt = 0;
+      this.cleanup();
+      this.setState({ status: 'connecting' });
+      this.createWebSocket(this.currentUrl);
+    }
   }
-});
+}
 ```
 
-**핵심**: WebSocket 연결 자체는 비활성 탭에서도 유지한다. 끊었다가 재연결하면 스냅샷 재요청과 시퀀스 동기화 비용이 더 크기 때문이다. 오직 **렌더링만 중단**하여 CPU를 절약한다.
+**핵심 결정**: WebSocket 연결 자체는 비활성 탭에서도 유지한다. 오직 하트비트 타이머만 중지하여 브라우저의 타이머 throttle로 인한 오탐(false-positive timeout)을 방지한다.
 
 ---
 
-## 3. 상태 관리 아키텍처 (Zustand)
+## 3. 상태 관리 아키텍처 (Zustand v5)
 
 ### 3.1 Store 분리 전략
 
-도메인별로 스토어를 분리하여, 하나의 데이터 스트림 업데이트가 관련 없는 컴포넌트의 리렌더를 트리거하지 않도록 한다.
+도메인별로 5개의 독립 스토어로 분리하여, 하나의 데이터 스트림 업데이트가 관련 없는 컴포넌트의 리렌더를 트리거하지 않도록 한다.
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
-│                    Zustand Stores                        │
-│                                                         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐ │
-│  │ KlineStore│ │DepthStore│ │TradeStore│ │WatchStore │ │
-│  │           │ │          │ │          │ │           │ │
-│  │ candles[] │ │ bids[]   │ │ ringBuf  │ │ symbols[] │ │
-│  │ symbol    │ │ asks[]   │ │ head/tail│ │ prices{}  │ │
-│  │ interval  │ │ isDirty  │ │ isDirty  │ │           │ │
-│  └──────────┘ └──────────┘ └──────────┘ └───────────┘ │
-│                                                         │
-│  ┌──────────┐ ┌──────────┐                             │
-│  │ UIStore  │ │AuthStore │                             │
-│  │          │ │          │                             │
-│  │ theme    │ │ user     │                             │
-│  │ layout   │ │ session  │                             │
-│  │ symbol   │ │          │                             │
-│  └──────────┘ └──────────┘                             │
+│                    Zustand Stores (v5)                    │
+│                                                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐  │
+│  │klineStore│ │depthStore│ │tradeStore│ │  uiStore  │  │
+│  │          │ │          │ │          │ │           │  │
+│  │ candles[]│ │ bids[]   │ │ trades[] │ │ theme     │  │
+│  │ interval │ │ asks[]   │ │ lastPrice│ │ symbol    │  │
+│  │ isLoading│ │ isDirty  │ │ direction│ │ connState │  │
+│  │          │ │ updateId │ │          │ │ layout    │  │
+│  └──────────┘ └──────────┘ └──────────┘ └───────────┘  │
+│                                                          │
+│  ┌──────────┐                                           │
+│  │authStore │                                           │
+│  │ user     │                                           │
+│  │ isLoading│                                           │
+│  └──────────┘                                           │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 각 Store 인터페이스
+### 3.2 각 Store 인터페이스 (실제 구현)
+
+#### klineStore (`src/stores/klineStore.ts`)
+
+캔들스틱 차트 데이터를 관리한다. 최대 2,000개 캔들을 FIFO 방식으로 유지한다.
 
 ```typescript
-// ── KlineStore ──
-interface KlineStore {
-  candles: CandleData[];
-  symbol: string;
-  interval: KlineInterval;
+interface KlineStoreState {
+  candles: CandleData[]; // oldest-first 정렬
+  interval: KlineInterval; // 기본값: '1m'
   isLoading: boolean;
-
-  // Actions
-  processKline(event: BinanceKlineEvent): void;
-  setHistoricalCandles(candles: CandleData[]): void;
-  changeSymbol(symbol: string): void;
-  changeInterval(interval: KlineInterval): void;
 }
 
-// ── DepthStore ──
-interface DepthStore {
-  bids: PriceLevel[];           // 매수 호가 (가격 내림차순)
-  asks: PriceLevel[];           // 매도 호가 (가격 오름차순)
-  lastUpdateId: number;
-  isDirty: boolean;             // Canvas redraw 플래그
+interface KlineStoreActions {
+  setCandles: (candles: CandleData[]) => void; // REST API 초기 데이터 설정 (slice로 MAX_CANDLES 적용)
+  addCandle: (candle: CandleData) => void; // 마감된 캔들 append + FIFO
+  updateLastCandle: (candle: CandleData) => void; // 미완성 캔들 실시간 갱신
+  setInterval: (interval: KlineInterval) => void;
+  setLoading: (isLoading: boolean) => void;
+  reset: () => void;
+}
+```
 
-  // Actions
-  processDepthDiff(event: BinanceDepthEvent): void;
-  setSnapshot(snapshot: DepthSnapshot): void;
-  markClean(): void;            // rAF에서 렌더링 후 호출
+**FIFO 전략**: `addCandle`에서 `[...state.candles, newCandle]` 후 `slice(-MAX_CANDLES)`로 오래된 캔들부터 제거. `Array.unshift`를 사용하지 않아 O(1) 삽입 비용.
+
+#### depthStore (`src/stores/depthStore.ts`)
+
+오더북 상태를 관리한다. 증분 업데이트(incremental update)를 지원하며, Canvas 렌더러와의 연동을 위한 `isDirty` 플래그를 제공한다.
+
+```typescript
+interface DepthStoreState {
+  bids: PriceLevel[]; // 가격 내림차순 (최고 매수가 먼저)
+  asks: PriceLevel[]; // 가격 오름차순 (최저 매도가 먼저)
+  lastUpdateId: number; // 시퀀스 추적용
+  isDirty: boolean; // Canvas redraw 시그널
 }
 
-// ── TradeStore ──
-interface TradeStore {
-  buffer: Float64Array;          // 링 버퍼 (200 * 4 fields)
-  head: number;
-  count: number;
-  isDirty: boolean;
+interface DepthStoreActions {
+  setBids: (bids: PriceLevel[]) => void;
+  setAsks: (asks: PriceLevel[]) => void;
+  setSnapshot: (bids, asks, lastUpdateId) => void; // REST 스냅샷 초기화
+  applyDepthUpdate: (bidUpdates, askUpdates, finalUpdateId) => void; // WS 증분 적용
+  markClean: () => void; // rAF 렌더링 후 호출
+  reset: () => void;
+}
+```
 
-  // Actions
-  processTrade(event: BinanceTradeEvent): void;
-  markClean(): void;
+**증분 업데이트 알고리즘** (`applyLevelUpdates`):
+
+1. 기존 레벨을 `Map<price, quantity>`로 변환 (O(n))
+2. 업데이트 순회: quantity === 0이면 `map.delete`, 아니면 `map.set` (O(m))
+3. Map → 배열 변환 → 정렬 → `slice(0, MAX_DEPTH_LEVELS)` (매수/매도 각 50레벨)
+
+#### tradeStore (`src/stores/tradeStore.ts`)
+
+체결 내역을 newest-first 배열로 관리하며, 최근 가격과 가격 방향을 추적한다.
+
+```typescript
+interface TradeStoreState {
+  trades: TradeEntry[]; // newest-first
+  lastPrice: number; // 최근 체결가 (0이면 미수신)
+  lastPriceDirection: PriceDirection; // 'up' | 'down' | 'neutral'
 }
 
-// ── UIStore ──
-interface UIStore {
-  activeSymbol: string;
+interface TradeStoreActions {
+  addTrade: (trade: TradeEntry) => void; // prepend + MAX_TRADES(200) 초과 시 slice
+  setTrades: (trades: TradeEntry[]) => void; // REST 초기 데이터
+  reset: () => void;
+}
+```
+
+**가격 방향 계산**: `computePriceDirection(newPrice, previousPrice)`로 'up', 'down', 'neutral' 판별. 최초 거래(previousPrice === 0)는 항상 'neutral'.
+
+#### uiStore (`src/stores/uiStore.ts`)
+
+전역 UI 상태를 관리한다.
+
+```typescript
+interface UiStoreState {
   theme: 'dark' | 'light';
-  layouts: Record<string, LayoutItem[]>;
-  connectionState: ConnectionState;
-
-  // Actions
-  setActiveSymbol(symbol: string): void;
-  setTheme(theme: 'dark' | 'light'): void;
-  updateLayout(breakpoint: string, layout: LayoutItem[]): void;
-  setConnectionState(state: ConnectionState): void;
+  symbol: string; // 기본값: 'BTCUSDT'
+  connectionState: ConnectionState; // 판별 유니온
+  layout: LayoutItem[];
 }
 
-// ── AuthStore ──
-interface AuthStore {
-  user: User | null;
-  session: Session | null;
+interface UiStoreActions {
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
+  setSymbol: (symbol: string) => void;
+  setConnectionState: (state: ConnectionState) => void;
+  setLayout: (layout: LayoutItem[]) => void;
+}
+```
+
+#### authStore (`src/stores/authStore.ts`)
+
+사용자 인증 상태를 관리한다 (Supabase 연동 예정).
+
+```typescript
+interface AuthStoreState {
+  user: UserProfile | null;
   isLoading: boolean;
-
-  // Actions
-  signInWithGoogle(): Promise<void>;
-  signInWithGitHub(): Promise<void>;
-  signOut(): Promise<void>;
-  loadSession(): Promise<void>;
 }
 ```
 
-### 3.3 Selector 기반 구독 패턴
+### 3.3 Selector 기반 구독 패턴 (실제 사용 예)
+
+`useWebSocket` 훅에서의 실제 구독 패턴:
 
 ```typescript
-// ✅ 올바른 패턴: 필요한 값만 구독
-function OrderBookWidget() {
-  const bids = useDepthStore((state) => state.bids);
-  const asks = useDepthStore((state) => state.asks);
-  // bids/asks가 변경될 때만 리렌더 (isDirty 변경에는 반응하지 않음)
-}
+// ✅ 실제 코드: 필요한 액션/값만 개별 구독 (리렌더 최소화)
+const storeSymbol = useUiStore((state) => state.symbol);
+const setConnectionState = useUiStore((state) => state.setConnectionState);
+const connectionState = useUiStore((state) => state.connectionState);
 
-// ✅ 올바른 패턴: 파생 데이터를 selector 내에서 계산
-function BestBidPrice() {
-  const bestBid = useDepthStore((state) => state.bids[0]?.price ?? 0);
-  // 최고 매수 호가가 변경될 때만 리렌더
-}
+const storeInterval = useKlineStore((state) => state.interval);
+const setCandles = useKlineStore((state) => state.setCandles);
+const addCandle = useKlineStore((state) => state.addCandle);
+const updateLastCandle = useKlineStore((state) => state.updateLastCandle);
 
-// ❌ 잘못된 패턴: 전체 스토어 구독
-function BadComponent() {
-  const store = useDepthStore();  // 모든 상태 변경에 리렌더 발생
-}
+const applyDepthUpdate = useDepthStore((state) => state.applyDepthUpdate);
+const addTrade = useTradeStore((state) => state.addTrade);
 ```
 
-### 3.4 트랜지언트 업데이트 (React 리렌더 우회)
-
-Canvas로 렌더링하는 오더북과 체결 내역은 **React 리렌더가 필요 없다**. Zustand `subscribe`로 스토어 변경을 직접 감지하고, Canvas 렌더링 루프에서 데이터를 직접 읽는다.
-
 ```typescript
-// Canvas 렌더러에서 직접 스토어 구독 (React 렌더 사이클 우회)
-useEffect(() => {
-  const unsubscribe = depthStore.subscribe(
-    (state) => state.isDirty,
-    (isDirty) => {
-      if (isDirty) {
-        // dirty flag만 설정, 실제 렌더링은 rAF 루프에서 수행
-        requestRedraw();
-      }
-    }
-  );
-  return unsubscribe;
-}, []);
+// ❌ 금지: 스토어 전체 구독
+const store = useDepthStore(); // 모든 상태 변경에 리렌더
+const { bids, asks } = useDepthStore(); // 구조분해도 전체 구독과 동일
 ```
 
 ---
 
-## 4. 렌더링 아키텍처
+## 4. useWebSocket: 데이터 오케스트레이션 훅
 
-### 4.1 3계층 렌더링 전략
+`src/hooks/useWebSocket.ts`는 WebSocket 생명주기를 관리하는 핵심 훅이다. 심볼/인터벌에 따라 연결을 생성하고, 메시지를 파싱하여 적절한 스토어로 라우팅한다.
 
+### 4.1 데이터 흐름
+
+```text
+useWebSocket({ symbol?, interval? })
+  │
+  ├── 1. 기존 스토어 리셋 (resetKlineStore, resetDepthStore, resetTradeStore)
+  │
+  ├── 2. createMessageRouter 생성
+  │       ├── onKline  → handleKline  → addCandle / updateLastCandle
+  │       ├── onDepth  → handleDepth  → applyDepthUpdate
+  │       └── onTrade  → handleTrade  → addTrade
+  │
+  ├── 3. manager.subscribe(router)         ← WebSocket 메시지 구독
+  ├── 4. manager.onStateChange(callback)   ← 연결 상태 → uiStore 동기화
+  ├── 5. manager.connect(url)              ← Combined Stream 연결
+  │
+  ├── 6. fetchKlines(symbol, interval)     ← REST API로 히스토리 캔들 fetch
+  │       └── setCandles(candles)           ← 초기 차트 데이터 설정
+  │
+  └── cleanup (언마운트 또는 의존성 변경 시)
+        ├── unsubscribeMessages()
+        ├── unsubscribeState()
+        └── manager.disconnect()
 ```
+
+### 4.2 메시지 핸들러 상세
+
+```typescript
+// Kline 핸들러: k.x (캔들 마감 여부)로 분기
+const handleKline = useCallback(
+  (event: BinanceKlineEvent): void => {
+    const candle = {
+      time: k.t / 1000, // ms → s (TradingView 형식)
+      open: parseFloat(k.o),
+      high: parseFloat(k.h),
+      low: parseFloat(k.l),
+      close: parseFloat(k.c),
+      volume: parseFloat(k.v),
+    };
+
+    if (k.x) {
+      addCandle(candle); // 마감 → 새 캔들 추가
+    } else {
+      updateLastCandle(candle); // 미완성 → 마지막 캔들 실시간 갱신
+    }
+  },
+  [addCandle, updateLastCandle],
+);
+
+// Depth 핸들러: string 튜플 → PriceLevel 파싱
+const handleDepth = useCallback(
+  (event: BinanceDepthEvent): void => {
+    const bidUpdates = event.b.map(parseDepthLevel); // [string, string] → { price, quantity }
+    const askUpdates = event.a.map(parseDepthLevel);
+    applyDepthUpdate(bidUpdates, askUpdates, event.u);
+  },
+  [applyDepthUpdate],
+);
+
+// Trade 핸들러: 필드 추출 + 타입 변환
+const handleTrade = useCallback(
+  (event: BinanceTradeEvent): void => {
+    addTrade({
+      id: event.t,
+      price: parseFloat(event.p),
+      quantity: parseFloat(event.q),
+      time: event.T,
+      isBuyerMaker: event.m,
+    });
+  },
+  [addTrade],
+);
+```
+
+### 4.3 Stale Closure 방지
+
+`isActiveRef` 패턴으로 비동기 작업(REST fetch)이 완료된 시점에 컴포넌트가 이미 언마운트되었는지 확인한다:
+
+```typescript
+const isActiveRef = useRef(true);
+
+useEffect(() => {
+  isActiveRef.current = true;
+
+  fetchKlines(symbol, interval)
+    .then((candles) => {
+      if (isActiveRef.current) {   // 아직 활성 상태인 경우에만 상태 업데이트
+        setCandles(candles);
+      }
+    });
+
+  return () => {
+    isActiveRef.current = false;   // cleanup에서 비활성 마킹
+  };
+}, [symbol, interval, ...]);
+```
+
+---
+
+## 5. 렌더링 아키텍처
+
+### 5.1 3계층 렌더링 전략
+
+```text
 ┌──────────────────────────────────────────────────────────────────┐
 │                     렌더링 계층 분리                               │
 │                                                                  │
 │  Layer 1: React DOM ─────────────────────────────────────────── │
-│  │ 역할: UI 크롬 (툴바, 사이드바, 그리드 셸, 모달, 토스트)         │
+│  │ 역할: UI 크롬 (헤더, 테마 토글, 연결 상태, 그리드 셸)            │
 │  │ 갱신 빈도: 낮음 (사용자 인터랙션 기반)                          │
+│  │ 구현: DashboardShell, DashboardHeader, ConnectionStatus      │
 │  │ 최적화: React.memo, Zustand selector, useCallback            │
 │  └─────────────────────────────────────────────────────────────  │
 │                                                                  │
@@ -408,584 +575,415 @@ useEffect(() => {
 │  │ 역할: 캔들스틱 차트 렌더링                                      │
 │  │ 갱신 빈도: 중간 (캔들 업데이트 시, ~1회/초)                     │
 │  │ 최적화: 라이브러리 내부 Canvas 렌더링, update()/addData() API   │
+│  │ 상태: M2에서 구현 예정                                          │
 │  └─────────────────────────────────────────────────────────────  │
 │                                                                  │
 │  Layer 3: Custom Canvas 2D ─────────────────────────────────── │
 │  │ 역할: 오더북, 체결 내역 렌더링                                  │
 │  │ 갱신 빈도: 높음 (초당 10~100회 데이터 수신)                     │
 │  │ 최적화: rAF + dirty flag, DOM 완전 우회, 프레임 예산 4ms 이내   │
+│  │ 상태: M2에서 구현 예정 (depthStore.isDirty 인프라 준비 완료)     │
 │  └─────────────────────────────────────────────────────────────  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 requestAnimationFrame 렌더링 루프
+### 5.2 데이터 수신-렌더링 분리 패턴 (설계)
 
-```typescript
-class CanvasRenderer {
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
-  private animationFrameId: number | null = null;
-  private isDirty = false;
-
-  start(): void {
-    const loop = (): void => {
-      if (this.isDirty) {
-        const start = performance.now();
-        this.draw();
-        this.isDirty = false;
-        const elapsed = performance.now() - start;
-
-        if (elapsed > 4) {
-          console.warn(`[Canvas] Frame budget exceeded: ${elapsed.toFixed(2)}ms`);
-        }
-      }
-      this.animationFrameId = requestAnimationFrame(loop);
-    };
-    this.animationFrameId = requestAnimationFrame(loop);
-  }
-
-  stop(): void {
-    if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-  }
-
-  markDirty(): void {
-    this.isDirty = true;
-  }
-
-  private draw(): void {
-    // 구체적 렌더링 로직은 서브클래스에서 구현
-  }
-}
-```
-
-### 4.3 데이터 수신-렌더링 분리 (Decoupling)
-
-```
+```text
 시간축 →  0ms    4ms    8ms   12ms   16.67ms (1 frame)
           │      │      │      │      │
   데이터   ■──■───■──────■──────────────    (4건의 depth 업데이트)
   수신     │  │   │      │
            ▼  ▼   ▼      ▼
-  상태     ●──●───●──────●──────────────    (4회 state 업데이트)
+  상태     ●──●───●──────●──────────────    (4회 state 업데이트, isDirty = true)
   갱신     │                    │
            └── dirty=true ──────┤
                                 ▼
   Canvas                       ████          (1회 Canvas redraw)
   렌더링                        │
                                 ▼
-                           dirty=false
+                           isDirty=false (markClean)
 
   → 16.67ms 동안 4건의 데이터 업데이트가 발생했지만,
     Canvas redraw는 단 1회만 실행됨 (자연스러운 배치 처리)
 ```
 
-### 4.4 devicePixelRatio 처리
+이 패턴의 인프라는 `depthStore.isDirty` / `depthStore.markClean()`으로 이미 준비되어 있다.
+
+---
+
+## 6. 메모리 관리 아키텍처
+
+### 6.1 데이터 용량 제한 정책
+
+| 데이터 타입 | 스토어     | 자료구조       | 최대 용량           | 폐기 전략                                     |
+| ----------- | ---------- | -------------- | ------------------- | --------------------------------------------- |
+| 캔들 데이터 | klineStore | `CandleData[]` | 2,000개             | FIFO (`slice(-MAX_CANDLES)`)                  |
+| 오더북      | depthStore | `PriceLevel[]` | 매수/매도 각 50레벨 | 정렬 후 `slice(0, MAX_DEPTH_LEVELS)`          |
+| 체결 내역   | tradeStore | `TradeEntry[]` | 200건               | newest-first prepend + `slice(0, MAX_TRADES)` |
+
+모든 상한값은 `src/utils/constants.ts`에 상수로 정의:
 
 ```typescript
-function setupHighDPICanvas(
-  canvas: HTMLCanvasElement,
-  width: number,
-  height: number
-): CanvasRenderingContext2D {
-  const dpr = window.devicePixelRatio || 1;
+export const MAX_CANDLES = 2000;
+export const MAX_TRADES = 200;
+export const MAX_DEPTH_LEVELS = 50;
+```
 
-  // Canvas 물리적 크기 (픽셀)
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
+### 6.2 링 버퍼 (Ring Buffer)
 
-  // CSS 논리적 크기
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
+`src/utils/ringBuffer.ts`에 `Float64Array` 기반 범용 링 버퍼를 구현했다. 현재 Canvas 렌더러에서 사용할 수 있도록 준비된 상태이다.
 
-  const ctx = canvas.getContext('2d')!;
-  ctx.scale(dpr, dpr);
+```typescript
+export class RingBuffer {
+  private buffer: Float64Array; // capacity × fieldsPerEntry 크기의 고정 배열
+  private head: number; // 다음 쓰기 위치
+  private count: number; // 현재 저장된 항목 수
 
-  return ctx;
+  constructor(capacity: number, fieldsPerEntry: number);
+
+  push(entry: number[]): void; // O(1) 순환 쓰기
+  getAt(index: number): number[] | null; // O(1) 인덱스 접근 (oldest-first)
+  toArray(): number[][]; // 전체 데이터를 일반 배열로 변환
+  get length(): number;
+  get capacity(): number;
+  clear(): void;
 }
 ```
 
-### 4.5 ResizeObserver 통합
+**특성**:
+
+- `Float64Array` 사용으로 GC 압박 최소화
+- O(1) 삽입 (헤드 포인터 이동, 모듈러 연산)
+- O(1) 인덱스 접근 (오프셋 계산)
+- 용량 초과 시 자동 순환 덮어쓰기 (별도 삭제 비용 없음)
+
+### 6.3 메모리 누수 방지 체크리스트
+
+`useWebSocket` 훅의 cleanup 패턴:
 
 ```typescript
 useEffect(() => {
-  const observer = new ResizeObserver(
-    debounce((entries: ResizeObserverEntry[]) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        setupHighDPICanvas(canvasRef.current!, width, height);
-        renderer.markDirty();  // 리사이즈 후 즉시 재렌더링
-      }
-    }, 200)
-  );
+  // ... 리소스 할당
 
-  observer.observe(containerRef.current!);
-  return () => observer.disconnect();
-}, []);
+  return () => {
+    isActiveRef.current = false; // ✅ stale closure 방지
+    unsubscribeMessages(); // ✅ WebSocket 메시지 구독 해제
+    unsubscribeState(); // ✅ 상태 변경 구독 해제
+    manager.disconnect(); // ✅ WebSocket 연결 종료
+  };
+}, [dependencies]);
+```
+
+`WebSocketManager.cleanup()` 내부:
+
+```text
+✅ clearTimeout(reconnectTimeoutId)          — 재연결 타이머 해제
+✅ clearTimeout(heartbeatTimeoutId)          — 하트비트 타이머 해제
+✅ ws.removeEventListener (open, close, error, message)  — 이벤트 리스너 제거
+✅ ws.close()                                 — WebSocket 연결 종료
+✅ document.removeEventListener('visibilitychange', ...) — resetInstance에서 처리
 ```
 
 ---
 
-## 5. 메모리 관리 아키텍처
+## 7. 타입 시스템
 
-### 5.1 데이터 용량 제한 정책
+### 7.1 Binance API 타입 계층
 
-| 데이터 타입 | 자료구조 | 최대 용량 | 폐기 전략 |
-|------------|---------|----------|----------|
-| 캔들 데이터 | `CandleData[]` | 2,000개 | FIFO (shift) |
-| 오더북 | `PriceLevel[]` | 매수/매도 각 50레벨 | depth 초과분 절삭 |
-| 체결 내역 | `Float64Array` 링 버퍼 | 200건 (200 × 4 fields) | 순환 덮어쓰기 |
-| 관심 종목 | `WatchlistItem[]` | 20개 | 사용자 수동 관리 |
+`src/types/binance.ts`에 14개의 타입을 정의했다.
 
-### 5.2 링 버퍼 (Ring Buffer) 설계
+```text
+WebSocket 타입:
+  BinanceCombinedStreamMessage<T>     ← Combined Stream 래퍼 { stream, data }
+  ├── BinanceKlineEvent               ← e: 'kline'
+  │   └── BinanceKlineData            ← OHLCV + 메타데이터
+  ├── BinanceDepthEvent               ← e: 'depthUpdate'
+  │   └── DepthLevel                  ← [price: string, quantity: string]
+  ├── BinanceTradeEvent               ← e: 'trade'
+  └── BinanceMiniTickerEvent          ← e: '24hrMiniTicker'
+
+  WebSocketStreamMessage = BinanceKlineEvent | BinanceDepthEvent
+                         | BinanceTradeEvent | BinanceMiniTickerEvent
+
+REST API 타입:
+  BinanceKlineRaw                     ← 12-element tuple
+  BinanceDepthSnapshot                ← { lastUpdateId, bids, asks }
+  BinanceExchangeInfo                 ← { symbols, rateLimits, ... }
+  ├── BinanceSymbolInfo               ← 심볼 상세 정보
+  │   └── BinanceSymbolFilter         ← PRICE_FILTER, LOT_SIZE 등
+  └── BinanceRateLimit                ← 요율 제한 규칙
+```
+
+### 7.2 내부 타입 계층
+
+`src/types/chart.ts`에 차트/거래 관련 타입을 정의했다.
 
 ```typescript
-class TradeRingBuffer {
-  private buffer: Float64Array;
-  private head = 0;
-  private count = 0;
-  private readonly capacity: number;
-  private readonly fieldsPerEntry = 4; // [timestamp, price, quantity, isBuyerMaker]
+// const assertion + 유니온 타입 파생
+const KLINE_INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d'] as const;
+type KlineInterval = (typeof KLINE_INTERVALS)[number];
 
-  constructor(capacity: number) {
-    this.capacity = capacity;
-    this.buffer = new Float64Array(capacity * this.fieldsPerEntry);
+// 데이터 인터페이스 (모든 값은 number로 사전 파싱)
+interface CandleData { time, open, high, low, close, volume }
+interface PriceLevel { price, quantity }
+interface TradeEntry { id, price, quantity, time, isBuyerMaker }
+
+// 판별 유니온
+type ConnectionState = { status: 'idle' } | { status: 'connecting' } | ...
+```
+
+`src/types/widget.ts`에 위젯 시스템 타입을 정의했다:
+
+```typescript
+const WIDGET_TYPES = ['candlestick', 'orderbook', 'trades', 'watchlist'] as const;
+type WidgetType = (typeof WIDGET_TYPES)[number];
+
+interface WidgetConfig {
+  id;
+  type;
+  title;
+}
+interface LayoutItem extends WidgetConfig {
+  x;
+  y;
+  w;
+  h;
+}
+type DashboardLayout = LayoutItem[];
+```
+
+---
+
+## 8. REST API 클라이언트
+
+`src/lib/binance/restApi.ts`에 3개의 엔드포인트 래퍼를 구현했다.
+
+### 8.1 fetchWithRetry 패턴
+
+모든 REST 호출은 지수 백오프 재시도(최대 3회)를 적용한다:
+
+```typescript
+async function fetchWithRetry<T>(url: string, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return (await response.json()) as T;
+    } catch (error) {
+      if (attempt === maxRetries - 1) throw error;
+      await new Promise(
+        (resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt)), // 1s → 2s → 4s
+      );
+    }
   }
-
-  push(timestamp: number, price: number, quantity: number, isBuyerMaker: number): void {
-    const offset = this.head * this.fieldsPerEntry;
-    this.buffer[offset] = timestamp;
-    this.buffer[offset + 1] = price;
-    this.buffer[offset + 2] = quantity;
-    this.buffer[offset + 3] = isBuyerMaker;
-
-    this.head = (this.head + 1) % this.capacity;
-    if (this.count < this.capacity) this.count++;
-  }
-
-  // O(1) 접근, GC 압박 Zero, 배열 조작 없음
-  getEntry(index: number): [number, number, number, number] {
-    const actualIndex = ((this.head - 1 - index + this.capacity) % this.capacity);
-    const offset = actualIndex * this.fieldsPerEntry;
-    return [
-      this.buffer[offset],
-      this.buffer[offset + 1],
-      this.buffer[offset + 2],
-      this.buffer[offset + 3],
-    ];
-  }
+  throw new Error('Unreachable');
 }
 ```
 
-### 5.3 메모리 누수 방지 체크리스트
+### 8.2 엔드포인트
 
-```
-✅ 모든 useEffect에 cleanup 함수 반환
-✅ WebSocket 구독 → 언마운트 시 unsubscribe
-✅ addEventListener → 언마운트 시 removeEventListener
-✅ setTimeout/setInterval → 언마운트 시 clear
-✅ requestAnimationFrame → 언마운트 시 cancelAnimationFrame
-✅ Lightweight Charts → 언마운트 시 chart.remove()
-✅ ResizeObserver → 언마운트 시 observer.disconnect()
-✅ Zustand subscribe → 언마운트 시 unsubscribe 함수 호출
-```
+| 함수                                    | 엔드포인트             | 용도                                    |
+| --------------------------------------- | ---------------------- | --------------------------------------- |
+| `fetchKlines(symbol, interval, limit?)` | `/api/v3/klines`       | 히스토리 캔들 데이터 (ms → s 변환 포함) |
+| `fetchDepthSnapshot(symbol, limit?)`    | `/api/v3/depth`        | 오더북 초기 스냅샷                      |
+| `fetchExchangeInfo()`                   | `/api/v3/exchangeInfo` | 심볼 메타데이터                         |
 
 ---
 
-## 6. 컴포넌트 아키텍처
+## 9. 디렉토리 구조 (현재 구현)
 
-### 6.1 위젯 시스템 설계
-
-```
-┌─ DashboardPage ────────────────────────────────────────────┐
-│                                                            │
-│  ┌─ DashboardHeader ─────────────────────────────────────┐ │
-│  │ SymbolSelector │ ConnectionStatus │ ThemeToggle │ Auth │ │
-│  └───────────────────────────────────────────────────────┘ │
-│                                                            │
-│  ┌─ WidgetGrid (React Grid Layout) ─────────────────────┐ │
-│  │                                                       │ │
-│  │  ┌─ WidgetContainer ──┐  ┌─ WidgetContainer ───────┐ │ │
-│  │  │ ┌─ WidgetHeader ─┐ │  │ ┌─ WidgetHeader ──────┐ │ │ │
-│  │  │ │ Title │ × Close │ │  │ │ Title │ Settings │ × │ │ │ │
-│  │  │ └────────────────┘ │  │ └─────────────────────┘ │ │ │
-│  │  │ ┌─ ErrorBoundary ┐ │  │ ┌─ ErrorBoundary ────┐ │ │ │
-│  │  │ │                 │ │  │ │                     │ │ │ │
-│  │  │ │ CandlestickChart│ │  │ │  OrderBookCanvas   │ │ │ │
-│  │  │ │ (LW Charts)    │ │  │ │  (Custom Canvas)   │ │ │ │
-│  │  │ │                 │ │  │ │                     │ │ │ │
-│  │  │ └─────────────────┘ │  │ └─────────────────────┘ │ │ │
-│  │  └────────────────────┘  └─────────────────────────┘ │ │
-│  │                                                       │ │
-│  │  ┌─ WidgetContainer ──┐  ┌─ WidgetContainer ───────┐ │ │
-│  │  │ TradeHistoryCanvas │  │ WatchlistWidget          │ │ │
-│  │  └────────────────────┘  └─────────────────────────┘ │ │
-│  └───────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────┘
-```
-
-### 6.2 위젯 생명주기
-
-```
-mount
-  │
-  ├──▶ ErrorBoundary 래핑
-  ├──▶ Zustand store 구독 (selector 기반)
-  ├──▶ WebSocket 스트림 구독
-  ├──▶ Canvas 초기화 (devicePixelRatio 설정)
-  ├──▶ ResizeObserver 등록
-  ├──▶ rAF 렌더링 루프 시작
-  │
-  ▼ (실행 중)
-  │
-  ├──▶ 데이터 수신 → store 업데이트 → dirty flag → rAF redraw
-  ├──▶ 리사이즈 → Canvas 재설정 → redraw
-  ├──▶ 심볼 변경 → 기존 구독 해제 → 새 구독 → 스냅샷 fetch
-  │
-unmount
-  │
-  ├──▶ rAF 루프 중단 (cancelAnimationFrame)
-  ├──▶ WebSocket 스트림 unsubscribe
-  ├──▶ ResizeObserver disconnect
-  ├──▶ Zustand unsubscribe
-  ├──▶ Chart instance remove (Lightweight Charts)
-  └──▶ Canvas 리소스 해제
-```
-
-### 6.3 위젯 등록 시스템
-
-```typescript
-// 위젯 타입 → 컴포넌트 매핑
-const WIDGET_REGISTRY: Record<WidgetType, WidgetRegistration> = {
-  candlestick: {
-    component: lazy(() => import('@/components/widgets/CandlestickChartWidget')),
-    defaultSize: { w: 8, h: 4 },
-    minSize: { w: 4, h: 3 },
-    title: 'Candlestick Chart',
-    streams: (symbol) => [`${symbol}@kline_1m`],
-  },
-  orderbook: {
-    component: lazy(() => import('@/components/widgets/OrderBookWidget')),
-    defaultSize: { w: 4, h: 4 },
-    minSize: { w: 3, h: 3 },
-    title: 'Order Book',
-    streams: (symbol) => [`${symbol}@depth@100ms`],
-  },
-  trades: {
-    component: lazy(() => import('@/components/widgets/TradeHistoryWidget')),
-    defaultSize: { w: 4, h: 4 },
-    minSize: { w: 3, h: 2 },
-    title: 'Recent Trades',
-    streams: (symbol) => [`${symbol}@trade`],
-  },
-  watchlist: {
-    component: lazy(() => import('@/components/widgets/WatchlistWidget')),
-    defaultSize: { w: 4, h: 2 },
-    minSize: { w: 3, h: 2 },
-    title: 'Watchlist',
-    streams: (symbols) => symbols.map((s) => `${s}@miniTicker`),
-  },
-};
-```
-
----
-
-## 7. Supabase 연동 구조
-
-### 7.1 인증 흐름
-
-```
-┌──────────┐    ┌────────────┐    ┌──────────────┐    ┌──────────┐
-│  사용자   │───▶│ AuthButton │───▶│ Supabase Auth│───▶│ OAuth    │
-│ (브라우저) │    │ (클릭)     │    │ signInWith   │    │ Provider │
-└──────────┘    └────────────┘    │ OAuth()      │    │ (Google/ │
-                                  └──────┬───────┘    │  GitHub) │
-                                         │            └─────┬────┘
-                                         │                  │
-                                         │  ◀── redirect ───┘
-                                         │     (with code)
-                                         ▼
-                                  ┌──────────────┐
-                                  │ Session 생성  │
-                                  │ JWT 토큰 저장 │
-                                  │ Auto-refresh  │
-                                  └──────┬───────┘
-                                         │
-                                         ▼
-                                  ┌──────────────┐
-                                  │ AuthStore    │
-                                  │ user/session │
-                                  │ 상태 갱신     │
-                                  └──────────────┘
-```
-
-### 7.2 데이터베이스 스키마
-
-```sql
--- 사용자 대시보드 레이아웃
-CREATE TABLE user_layouts (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  name TEXT NOT NULL DEFAULT 'Default',
-  layout JSONB NOT NULL,           -- React Grid Layout 직렬화 데이터
-  active_symbol TEXT DEFAULT 'btcusdt',
-  settings JSONB DEFAULT '{}',     -- 위젯별 설정 (타임프레임, 오더북 depth 등)
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- 사용자 관심 종목
-CREATE TABLE user_watchlists (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  symbols TEXT[] NOT NULL DEFAULT '{}',  -- ['btcusdt', 'ethusdt', ...]
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- 인덱스
-CREATE INDEX idx_user_layouts_user_id ON user_layouts(user_id);
-CREATE INDEX idx_user_watchlists_user_id ON user_watchlists(user_id);
-```
-
-### 7.3 RLS (Row Level Security) 정책
-
-```sql
--- user_layouts RLS
-ALTER TABLE user_layouts ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can CRUD own layouts"
-  ON user_layouts FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- user_watchlists RLS
-ALTER TABLE user_watchlists ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can CRUD own watchlists"
-  ON user_watchlists FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-```
-
-### 7.4 localStorage 폴백 및 마이그레이션
-
-```typescript
-// 비로그인 → 로그인 시 마이그레이션 흐름
-async function migrateLocalToCloud(userId: string): Promise<void> {
-  const localLayout = localStorage.getItem('dashboard-layout');
-  const localWatchlist = localStorage.getItem('watchlist');
-
-  if (localLayout) {
-    await supabase.from('user_layouts').upsert({
-      user_id: userId,
-      layout: JSON.parse(localLayout),
-      is_active: true,
-    });
-    localStorage.removeItem('dashboard-layout');
-  }
-
-  if (localWatchlist) {
-    await supabase.from('user_watchlists').upsert({
-      user_id: userId,
-      symbols: JSON.parse(localWatchlist),
-    });
-    localStorage.removeItem('watchlist');
-  }
-}
-```
-
----
-
-## 8. 디렉토리 구조
-
-```
+```text
 src/
 ├── app/                          # Next.js App Router
-│   ├── layout.tsx                # Root layout (ThemeProvider, AuthProvider)
-│   ├── page.tsx                  # Dashboard main page
-│   ├── globals.css               # Global styles
-│   └── providers.tsx             # Client-side providers wrapper
+│   ├── layout.tsx                # 루트 레이아웃 (Inter + JetBrains Mono 폰트, Providers)
+│   ├── page.tsx                  # 메인 대시보드 페이지 (DashboardShell 렌더)
+│   ├── globals.css               # 디자인 시스템 (CSS Custom Properties, Tailwind v4 테마)
+│   └── providers.tsx             # 클라이언트 컴포넌트 (테마 → document.documentElement 동기화)
 │
 ├── components/
 │   ├── layout/
-│   │   ├── DashboardHeader.tsx   # 상단 헤더 바
-│   │   ├── WidgetGrid.tsx        # React Grid Layout 컨테이너
-│   │   └── WidgetContainer.tsx   # 개별 위젯 래퍼 (헤더, 에러바운더리)
+│   │   ├── DashboardShell.tsx    # 메인 레이아웃 셸 (memo)
+│   │   ├── DashboardHeader.tsx   # 상단 헤더 바 (심볼, 연결 상태, 테마)
+│   │   └── ConnectionStatus.tsx  # 5-상태 연결 인디케이터 (색상 도트 + 레이블)
 │   │
-│   ├── widgets/
-│   │   ├── CandlestickChartWidget.tsx
-│   │   ├── OrderBookWidget.tsx
-│   │   ├── TradeHistoryWidget.tsx
-│   │   └── WatchlistWidget.tsx
+│   ├── widgets/                  # M2에서 구현 예정
 │   │
 │   └── ui/
-│       ├── SymbolSelector.tsx
-│       ├── ConnectionStatus.tsx
-│       ├── ThemeToggle.tsx
-│       ├── AuthButton.tsx
-│       ├── ProfileDropdown.tsx
-│       ├── Toast.tsx
-│       └── ErrorFallback.tsx
+│       ├── ThemeToggle.tsx       # 다크/라이트 토글 (SVG 아이콘)
+│       └── ErrorFallback.tsx     # Error Boundary 폴백 UI (재시도 버튼)
 │
 ├── hooks/
-│   ├── useWebSocket.ts           # WebSocket 구독 관리 훅
-│   ├── useCanvasRenderer.ts      # Canvas rAF 루프 관리 훅
-│   ├── useResizeObserver.ts      # ResizeObserver 래퍼 훅
-│   ├── useLocalStorage.ts        # localStorage 래퍼 훅
-│   └── useAuth.ts                # Supabase Auth 래퍼 훅
+│   └── useWebSocket.ts           # WebSocket 생명주기 오케스트레이터
 │
 ├── stores/
-│   ├── klineStore.ts
-│   ├── depthStore.ts
-│   ├── tradeStore.ts
-│   ├── watchlistStore.ts
-│   ├── uiStore.ts
-│   └── authStore.ts
+│   ├── klineStore.ts             # 캔들 데이터 (2,000개 FIFO)
+│   ├── depthStore.ts             # 오더북 (50레벨, isDirty 플래그)
+│   ├── tradeStore.ts             # 체결 내역 (200건, 가격 방향 추적)
+│   ├── uiStore.ts                # 테마, 심볼, 연결 상태, 레이아웃
+│   └── authStore.ts              # 인증 상태 (Supabase 연동 예정)
 │
 ├── lib/
 │   ├── websocket/
-│   │   ├── WebSocketManager.ts   # 싱글톤 연결 관리자
-│   │   ├── messageRouter.ts      # 메시지 타입별 라우팅
-│   │   └── reconnectStrategy.ts  # 지수 백오프 로직
+│   │   ├── WebSocketManager.ts   # 싱글톤 (연결, 재연결, 하트비트, Visibility API)
+│   │   └── messageRouter.ts      # 판별 유니온 기반 메시지 라우팅 + JSON 파서
 │   │
-│   ├── canvas/
-│   │   ├── OrderBookRenderer.ts  # 오더북 Canvas 렌더러
-│   │   ├── TradeRenderer.ts      # 체결 내역 Canvas 렌더러
-│   │   └── canvasUtils.ts        # DPI 설정, 텍스트 측정 등
+│   ├── binance/
+│   │   ├── streamUrls.ts         # Combined Stream URL 빌더
+│   │   └── restApi.ts            # REST API 클라이언트 (fetchWithRetry)
 │   │
-│   ├── supabase/
-│   │   ├── client.ts             # Supabase 클라이언트 초기화
-│   │   ├── layoutService.ts      # 레이아웃 CRUD
-│   │   └── watchlistService.ts   # 관심 종목 CRUD
+│   ├── canvas/                   # M2에서 구현 예정
 │   │
-│   └── binance/
-│       ├── restApi.ts            # REST API 호출 (히스토리 데이터)
-│       └── streamUrls.ts         # 스트림 URL 생성 유틸
+│   └── supabase/
+│       └── client.ts             # Supabase 클라이언트 (환경변수 미설정 시 null)
 │
 ├── types/
-│   ├── binance.ts                # Binance API 응답 타입
-│   ├── chart.ts                  # 차트 관련 타입
-│   ├── widget.ts                 # 위젯 시스템 타입
-│   └── store.ts                  # Zustand 스토어 타입
+│   ├── binance.ts                # Binance API 타입 14개 (WS + REST)
+│   ├── chart.ts                  # CandleData, PriceLevel, TradeEntry, ConnectionState
+│   └── widget.ts                 # WidgetType, WidgetConfig, LayoutItem, DashboardLayout
 │
-└── utils/
-    ├── formatPrice.ts            # 가격 포맷팅
-    ├── formatTime.ts             # 시간 포맷팅
-    ├── debounce.ts               # 디바운스 유틸
-    ├── ringBuffer.ts             # 링 버퍼 구현
-    └── constants.ts              # 상수 정의
-```
-
----
-
-## 9. 데이터 무결성
-
-### 9.1 오더북 시퀀스 추적
-
-```typescript
-// Binance 오더북 동기화 프로토콜
-// 1. REST로 스냅샷 요청: GET /api/v3/depth?symbol=BTCUSDT&limit=1000
-// 2. 스냅샷의 lastUpdateId 기록
-// 3. WebSocket diff 이벤트 수신:
-//    - U <= lastUpdateId+1 <= u 인 첫 이벤트부터 적용
-//    - 이전 이벤트의 u+1 === 현재 이벤트의 U 인지 검증
-//    - 갭 발생 시 스냅샷 재요청
-
-interface DepthSyncState {
-  lastUpdateId: number;
-  isInitialized: boolean;
-  pendingDiffs: BinanceDepthEvent[];  // 스냅샷 도착 전 버퍼링
-}
-
-function processDepthEvent(
-  state: DepthSyncState,
-  event: BinanceDepthEvent
-): 'apply' | 'skip' | 'resync' {
-  if (!state.isInitialized) {
-    state.pendingDiffs.push(event);
-    return 'skip';
-  }
-
-  if (event.u <= state.lastUpdateId) {
-    return 'skip';  // 이미 반영된 이벤트
-  }
-
-  if (event.U > state.lastUpdateId + 1) {
-    return 'resync';  // 시퀀스 갭 → 스냅샷 재요청
-  }
-
-  state.lastUpdateId = event.u;
-  return 'apply';
-}
-```
-
-### 9.2 캔들 마감 처리
-
-```typescript
-function processKlineEvent(event: BinanceKlineEvent): void {
-  const candle: CandleData = {
-    time: event.k.t / 1000,
-    open: parseFloat(event.k.o),
-    high: parseFloat(event.k.h),
-    low: parseFloat(event.k.l),
-    close: parseFloat(event.k.c),
-    volume: parseFloat(event.k.v),
-  };
-
-  if (event.k.x) {
-    // 캔들 마감: 확정된 캔들 추가
-    chartInstance.update(candle);  // 기존 미완성 캔들을 확정값으로 업데이트
-  } else {
-    // 미완성 캔들: 실시간 업데이트
-    chartInstance.update(candle);  // 현재 캔들 실시간 갱신
-  }
-}
+├── utils/
+│   ├── constants.ts              # 모든 설정 상수 (URL, 기본값, 제한값, 색상)
+│   ├── ringBuffer.ts             # Float64Array 기반 범용 링 버퍼
+│   ├── formatPrice.ts            # 가격/거래량/퍼센트 포맷팅
+│   ├── formatTime.ts             # 시간/날짜 포맷팅
+│   └── debounce.ts               # 제네릭 디바운스 유틸
+│
+└── test/
+    └── setup.ts                  # Vitest 테스트 셋업 (@testing-library/jest-dom)
 ```
 
 ---
 
 ## 10. 에러 처리 전략
 
-### 10.1 에러 처리 계층
+### 10.1 에러 처리 계층 (현재 구현 + 계획)
 
-```
+```text
 ┌────────────────────────────────────────────────┐
-│ Level 1: Widget Error Boundary                 │
+│ Level 1: Widget Error Boundary                 │  ← ErrorFallback.tsx 준비 완료
 │ - 개별 위젯 크래시 격리                          │
-│ - 에러 UI + "다시 시도" 버튼 표시                │
+│ - "다시 시도" 버튼 제공                          │
 │ - 다른 위젯은 정상 동작 유지                      │
 ├────────────────────────────────────────────────┤
-│ Level 2: WebSocket 에러 처리                    │
-│ - 연결 끊김 → 지수 백오프 자동 재연결             │
-│ - 상태 표시기 업데이트 (녹색/노란색/빨간색)        │
-│ - 비침입적 토스트 알림                           │
+│ Level 2: WebSocket 에러 처리                    │  ← WebSocketManager 구현 완료
+│ - 연결 끊김 → 지수 백오프 자동 재연결 (최대 10회)  │
+│ - ConnectionStatus 컴포넌트로 상태 시각화         │
+│ - 구독자 콜백 에러 격리 (try/catch)              │
 ├────────────────────────────────────────────────┤
-│ Level 3: API 에러 처리                          │
-│ - REST 요청 실패 → 최대 3회 재시도 (백오프)       │
-│ - 최종 실패 시 에러 상태 표시                     │
+│ Level 3: REST API 에러 처리                     │  ← fetchWithRetry 구현 완료
+│ - 최대 3회 재시도 (1s → 2s → 4s 백오프)          │
+│ - 최종 실패 시 console.error 로깅               │
 ├────────────────────────────────────────────────┤
-│ Level 4: 네트워크 에러 처리                      │
-│ - navigator.onLine / online/offline 이벤트 감지  │
-│ - 오프라인 배너 표시                             │
-│ - 온라인 복귀 시 자동 복구                        │
-├────────────────────────────────────────────────┤
-│ Level 5: Global Error Boundary                 │
-│ - 전체 앱 크래시 방어 (최후의 보루)               │
-│ - 에러 리포팅 + 새로고침 안내                     │
+│ Level 4: 메시지 파싱 에러 처리                    │  ← parseCombinedStreamMessage
+│ - JSON 파싱 실패 시 null 반환 (무시)             │
+│ - 에러 로깅 후 다음 메시지 정상 처리              │
 └────────────────────────────────────────────────┘
 ```
 
-### 10.2 에러 복구 전략
+### 10.2 연결 상태 시각화
 
-| 에러 유형 | 감지 방법 | 복구 전략 |
-|----------|----------|----------|
-| WebSocket 연결 끊김 | `onclose`, `onerror` | 지수 백오프 재연결 (최대 10회) |
-| 오더북 시퀀스 갭 | `lastUpdateId` 불일치 | 스냅샷 재요청 |
-| REST API 실패 | HTTP status code | 3회 재시도 후 에러 표시 |
-| 위젯 렌더링 크래시 | Error Boundary `componentDidCatch` | 에러 UI 표시, 수동 재시도 |
-| 메모리 임계치 초과 | `performance.measureUserAgentSpecificMemory()` | 오래된 데이터 강제 정리, 사용자 알림 |
-| 네트워크 오프라인 | `navigator.onLine`, `offline` event | 오프라인 배너, 온라인 복귀 시 자동 재연결 |
+`ConnectionStatus` 컴포넌트가 5가지 상태를 시각적으로 표현한다:
+
+| 상태         | 색상                     | 레이블          | 애니메이션 |
+| ------------ | ------------------------ | --------------- | ---------- |
+| idle         | 회색 (`text-text-muted`) | 대기중          | 없음       |
+| connecting   | 노란색 (`text-warning`)  | 연결중...       | 점 깜빡임  |
+| connected    | 녹색 (`text-buy`)        | 연결됨          | 없음       |
+| reconnecting | 노란색 (`text-warning`)  | 재연결중 (n/10) | 점 깜빡임  |
+| failed       | 빨간색 (`text-sell`)     | 연결 실패       | 없음       |
+
+---
+
+## 11. 테스트 인프라
+
+### 11.1 테스트 환경
+
+| 도구                      | 버전 | 용도                                    |
+| ------------------------- | ---- | --------------------------------------- |
+| Vitest                    | -    | 테스트 러너 (globals: true, jsdom 환경) |
+| @testing-library/react    | -    | React 컴포넌트 테스트                   |
+| @testing-library/jest-dom | -    | DOM assertion 확장                      |
+
+### 11.2 현재 테스트 커버리지 (105개 테스트)
+
+| 파일                  | 테스트 수 | 검증 대상                                                        |
+| --------------------- | --------- | ---------------------------------------------------------------- |
+| `ringBuffer.test.ts`  | 22        | push, getAt, toArray, 순환, 오버플로, clear                      |
+| `formatPrice.test.ts` | 28        | 가격/거래량/퍼센트 포맷팅 엣지 케이스                            |
+| `formatTime.test.ts`  | 7         | 시간/날짜/날짜시간 포맷팅                                        |
+| `depthStore.test.ts`  | 19        | 증분 업데이트, 정렬, isDirty 플래그, 스냅샷, reset               |
+| `tradeStore.test.ts`  | 14        | addTrade, 가격 방향, MAX_TRADES 초과, setTrades, reset           |
+| `klineStore.test.ts`  | 15        | addCandle FIFO, updateLastCandle, setCandles, setInterval, reset |
+
+---
+
+## 12. 디자인 시스템
+
+### 12.1 색상 토큰
+
+CSS Custom Properties로 정의하며, `[data-theme='light']` 속성으로 테마를 전환한다.
+
+| 토큰                   | 다크 테마 | 라이트 테마 | 용도                      |
+| ---------------------- | --------- | ----------- | ------------------------- |
+| `--color-buy`          | `#00C087` | `#00C087`   | 매수 가격, 연결됨 표시    |
+| `--color-sell`         | `#F6465D` | `#F6465D`   | 매도 가격, 연결 실패 표시 |
+| `--color-warning`      | `#F0B90B` | `#F0B90B`   | 재연결 중 표시            |
+| `--color-bg-primary`   | `#0B0E11` | `#FFFFFF`   | 메인 배경                 |
+| `--color-bg-secondary` | `#1E2329` | `#F5F5F5`   | 카드/위젯 배경            |
+| `--color-bg-tertiary`  | `#2B3139` | `#EAECEF`   | 입력/호버 배경            |
+
+### 12.2 타이포그래피
+
+| 폰트                       | 용도                    |
+| -------------------------- | ----------------------- |
+| Inter (sans-serif)         | UI 텍스트, 레이블, 버튼 |
+| JetBrains Mono (monospace) | 가격, 수량, 숫자 데이터 |
+
+### 12.3 Tailwind CSS v4 테마 확장
+
+`globals.css`에서 `@theme inline`으로 CSS Custom Properties를 Tailwind 유틸리티 클래스와 연결:
+
+```css
+@theme inline {
+  --color-bg-primary: var(--color-bg-primary);
+  --color-text-primary: var(--color-text-primary);
+  --color-buy: var(--color-buy);
+  --color-sell: var(--color-sell);
+  /* ... */
+}
+```
+
+---
+
+## 부록: 주요 상수 참조
+
+`src/utils/constants.ts`에서 관리:
+
+```typescript
+// 외부 서비스 URL
+BINANCE_WS_BASE_URL = 'wss://stream.binance.com:9443/stream';
+BINANCE_REST_BASE_URL = 'https://api.binance.com/api/v3';
+
+// 기본값
+DEFAULT_SYMBOL = 'BTCUSDT';
+DEFAULT_INTERVAL = '1m';
+
+// 데이터 용량 제한
+MAX_CANDLES = 2000; // 캔들스틱 최대 개수
+MAX_TRADES = 200; // 체결 내역 최대 개수
+MAX_DEPTH_LEVELS = 50; // 매수/매도 각 호가 레벨 수
+
+// WebSocket 재연결 설정
+RECONNECT_BASE_DELAY_MS = 1000; // 1초
+RECONNECT_MAX_DELAY_MS = 30000; // 30초
+HEARTBEAT_TIMEOUT_MS = 30000; // 30초
+WS_MAX_RECONNECT_ATTEMPTS = 10;
+
+// 색상 코딩
+COLORS.BUY = '#00C087';
+COLORS.SELL = '#F6465D';
+COLORS.CONNECTED = '#00C087';
+COLORS.RECONNECTING = '#F0B90B';
+COLORS.DISCONNECTED = '#F6465D';
+```

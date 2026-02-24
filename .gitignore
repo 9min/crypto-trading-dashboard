@@ -52,3 +52,6 @@ next-env.d.ts
 # Misc
 *.pem
 .turbo
+
+# Project init prompt (private)
+CRYPTO_TRADING_DASHBOARD_INIT_PROMPRT.md
