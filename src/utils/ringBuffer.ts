@@ -6,6 +6,12 @@ export class RingBuffer {
   private readonly _capacity: number;
 
   constructor(capacity: number, fieldsPerEntry: number) {
+    if (capacity <= 0 || fieldsPerEntry <= 0) {
+      throw new RangeError('capacity and fieldsPerEntry must be positive');
+    }
+    if (!Number.isInteger(capacity) || !Number.isInteger(fieldsPerEntry)) {
+      throw new RangeError('capacity and fieldsPerEntry must be integers');
+    }
     this._capacity = capacity;
     this.fieldsPerEntry = fieldsPerEntry;
     this.buffer = new Float64Array(capacity * fieldsPerEntry);
@@ -14,6 +20,11 @@ export class RingBuffer {
   }
 
   push(entry: number[]): void {
+    if (entry.length !== this.fieldsPerEntry) {
+      throw new RangeError(
+        `entry length (${entry.length}) must equal fieldsPerEntry (${this.fieldsPerEntry})`,
+      );
+    }
     const offset = this.head * this.fieldsPerEntry;
     for (let i = 0; i < this.fieldsPerEntry; i++) {
       this.buffer[offset + i] = entry[i];

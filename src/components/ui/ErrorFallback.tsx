@@ -25,6 +25,7 @@ export const ErrorFallback = memo(function ErrorFallback({
       {error?.message && <p className="text-foreground-secondary text-xs">{error.message}</p>}
       {onRetry && (
         <button
+          type="button"
           onClick={handleRetry}
           className="bg-accent text-background hover:bg-accent-hover mt-2 rounded-md px-3 py-1 text-xs font-medium transition-colors"
         >

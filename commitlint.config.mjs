@@ -23,7 +23,7 @@ const config = {
         'ci',
       ],
     ],
-    'scope-empty': [1, 'never'],
+    'scope-empty': [2, 'never'],
     'subject-case': [2, 'always', 'lower-case'],
   },
 };

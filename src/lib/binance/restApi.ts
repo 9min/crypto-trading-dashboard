@@ -15,17 +15,33 @@ import type { CandleData } from '@/types/chart';
 
 /**
  * Fetches a URL with exponential backoff retry.
- * Retries up to `maxRetries` times on failure, with delays of 1s, 2s, 4s, etc.
+ * Only retries on network errors and 5xx server errors.
+ * 4xx client errors are thrown immediately (not retryable).
  *
  * @throws The last error encountered after all retries are exhausted.
  */
 async function fetchWithRetry<T>(url: string, maxRetries = 3): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (!response.ok) {
+        // 4xx client errors are not retryable — throw immediately
+        if (response.status >= 400 && response.status < 500) {
+          throw new Error(`HTTP ${response.status}: Client error (not retryable)`);
+        }
+        // 5xx server errors are retryable
+        throw new Error(`HTTP ${response.status}`);
+      }
+
       return (await response.json()) as T;
     } catch (error) {
+      // Do not retry client errors (4xx)
+      if (error instanceof Error && error.message.includes('not retryable')) {
+        throw error;
+      }
       if (attempt === maxRetries - 1) throw error;
       await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
     }
@@ -52,11 +68,12 @@ export async function fetchKlines(
   interval: string,
   limit = 500,
 ): Promise<CandleData[]> {
-  const url = `${BINANCE_REST_BASE_URL}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const params = new URLSearchParams({ symbol, interval, limit: String(limit) });
+  const url = `${BINANCE_REST_BASE_URL}/klines?${params}`;
   const raw = await fetchWithRetry<BinanceKlineRaw[]>(url);
 
   return raw.map((k) => ({
-    time: k[0] / 1000, // Convert milliseconds to seconds for TradingView
+    time: Math.floor(k[0] / 1000), // Convert milliseconds to seconds for TradingView
     open: parseFloat(k[1]),
     high: parseFloat(k[2]),
     low: parseFloat(k[3]),
@@ -81,7 +98,8 @@ export async function fetchDepthSnapshot(
   symbol: string,
   limit = 1000,
 ): Promise<BinanceDepthSnapshot> {
-  const url = `${BINANCE_REST_BASE_URL}/depth?symbol=${symbol}&limit=${limit}`;
+  const params = new URLSearchParams({ symbol, limit: String(limit) });
+  const url = `${BINANCE_REST_BASE_URL}/depth?${params}`;
   return fetchWithRetry<BinanceDepthSnapshot>(url);
 }
 

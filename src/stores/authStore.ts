@@ -15,12 +15,12 @@ import { create } from 'zustand';
 interface UserProfile {
   /** Supabase user ID (UUID) */
   id: string;
-  /** User email address */
-  email: string;
-  /** Display name from OAuth provider */
-  name: string;
-  /** Profile avatar URL from OAuth provider */
-  avatarUrl: string;
+  /** User email address (null for phone-only auth) */
+  email: string | null;
+  /** Display name from OAuth provider (null if not provided) */
+  name: string | null;
+  /** Profile avatar URL from OAuth provider (null if not provided) */
+  avatarUrl: string | null;
 }
 
 interface AuthStoreState {

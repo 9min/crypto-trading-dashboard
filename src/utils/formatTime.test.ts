@@ -40,14 +40,13 @@ describe('formatTime', () => {
 });
 
 describe('formatDate', () => {
-  it('returns a string containing month abbreviation, day, and year', () => {
+  it('returns a string matching "Mon DD, YYYY" pattern', () => {
     const timestamp = 1705311045000; // 2024-01-15
     const result = formatDate(timestamp);
 
-    // en-US format: "Jan 15, 2024"
-    expect(result).toContain('2024');
-    expect(result).toContain('Jan');
-    expect(result).toContain('15');
+    // Structural pattern: abbreviated month, 1-2 digit day, 4-digit year
+    // Timezone-agnostic — the day may differ slightly across zones
+    expect(result).toMatch(/[A-Z][a-z]{2}\s\d{1,2},\s\d{4}/);
   });
 
   it('returns different dates for different days', () => {

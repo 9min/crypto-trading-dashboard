@@ -70,6 +70,7 @@ export class WebSocketManager {
   static resetInstance(): void {
     if (WebSocketManager.instance) {
       WebSocketManager.instance.disconnect();
+      WebSocketManager.instance.removeVisibilityListener();
       WebSocketManager.instance = null;
     }
   }
@@ -330,6 +331,11 @@ export class WebSocketManager {
    * is paused (browsers throttle timers for hidden tabs anyway).
    * When the tab becomes visible again, the heartbeat is restarted and
    * if the connection was lost, a reconnection is triggered immediately.
+   *
+   * Note: The 'failed' state is intentionally preserved across visibility
+   * changes. If all reconnection attempts were exhausted, the user must
+   * manually retry via the ConnectionStatus UI to prevent flooding the
+   * server with reconnection requests during outages.
    */
   private handleVisibilityChange(): void {
     if (typeof document === 'undefined') return;
@@ -343,13 +349,24 @@ export class WebSocketManager {
       if (this.ws?.readyState === WebSocket.OPEN) {
         // Connection is still alive — restart heartbeat monitoring
         this.resetHeartbeat();
-      } else if (this.currentUrl && this.state.status !== 'connecting') {
+      } else if (
+        this.currentUrl &&
+        this.state.status !== 'connecting' &&
+        this.state.status !== 'failed'
+      ) {
         // Connection was lost while tab was hidden — reconnect immediately
         this.reconnectAttempt = 0;
         this.cleanup();
         this.setState({ status: 'connecting' });
         this.createWebSocket(this.currentUrl);
       }
+    }
+  }
+
+  /** Removes the visibilitychange event listener from document. */
+  private removeVisibilityListener(): void {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.boundHandleVisibilityChange);
     }
   }
 

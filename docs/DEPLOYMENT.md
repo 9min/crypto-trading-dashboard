@@ -104,7 +104,7 @@ Vercel은 Next.js 프로젝트를 자동 감지하여 아래 설정을 기본 �
 | Build Command    | `pnpm build`   | package.json의 build 스크립트 사용 |
 | Output Directory | `.next`        | Next.js 기본값                     |
 | Install Command  | `pnpm install` | pnpm 사용 시 명시 필요             |
-| Root Directory   | `./ `          | 모노레포가 아니면 기본값 유지      |
+| Root Directory   | `./`           | 모노레포가 아니면 기본값 유지      |
 | Node.js Version  | `20.x`         | Settings → General에서 변경 가능   |
 
 > **참고**: pnpm을 패키지 매니저로 사용하는 경우, Vercel은 `pnpm-lock.yaml` 파일을 감지하여 자동으로 pnpm을 사용한다. 별도의 설정이 불필요하다.
@@ -211,7 +211,7 @@ CNAME 레코드: cname.vercel-dns.com
 
 #### CI 실행 단계
 
-```
+```text
 lint-typecheck-test (Job 1)
 ├── Checkout
 ├── Setup pnpm + Node.js (.nvmrc 버전)

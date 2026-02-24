@@ -4,6 +4,7 @@
 
 import { useDepthStore } from './depthStore';
 import type { PriceLevel } from '@/types/chart';
+import { MAX_DEPTH_LEVELS } from '@/utils/constants';
 
 // Helper to reset store state between tests
 function resetStore(): void {
@@ -138,9 +139,10 @@ describe('depthStore', () => {
       expect(state.asks[0].price).toBe(500);
     });
 
-    it('caps at MAX_DEPTH_LEVELS (50) for bids', () => {
-      // Create 55 bid levels
-      const initialBids: PriceLevel[] = Array.from({ length: 55 }, (_, i) => ({
+    it('caps at MAX_DEPTH_LEVELS for bids', () => {
+      const overflow = 5;
+      const total = MAX_DEPTH_LEVELS + overflow;
+      const initialBids: PriceLevel[] = Array.from({ length: total }, (_, i) => ({
         price: i + 1,
         quantity: 1,
       }));
@@ -148,15 +150,16 @@ describe('depthStore', () => {
       useDepthStore.getState().setSnapshot(initialBids, [], 1);
       const state = useDepthStore.getState();
 
-      expect(state.bids).toHaveLength(50);
+      expect(state.bids).toHaveLength(MAX_DEPTH_LEVELS);
       // Descending: highest prices kept
-      expect(state.bids[0].price).toBe(55);
-      expect(state.bids[49].price).toBe(6);
+      expect(state.bids[0].price).toBe(total);
+      expect(state.bids[MAX_DEPTH_LEVELS - 1].price).toBe(overflow + 1);
     });
 
-    it('caps at MAX_DEPTH_LEVELS (50) for asks', () => {
-      // Create 55 ask levels
-      const initialAsks: PriceLevel[] = Array.from({ length: 55 }, (_, i) => ({
+    it('caps at MAX_DEPTH_LEVELS for asks', () => {
+      const overflow = 5;
+      const total = MAX_DEPTH_LEVELS + overflow;
+      const initialAsks: PriceLevel[] = Array.from({ length: total }, (_, i) => ({
         price: i + 1,
         quantity: 1,
       }));
@@ -164,10 +167,10 @@ describe('depthStore', () => {
       useDepthStore.getState().setSnapshot([], initialAsks, 1);
       const state = useDepthStore.getState();
 
-      expect(state.asks).toHaveLength(50);
+      expect(state.asks).toHaveLength(MAX_DEPTH_LEVELS);
       // Ascending: lowest prices kept
       expect(state.asks[0].price).toBe(1);
-      expect(state.asks[49].price).toBe(50);
+      expect(state.asks[MAX_DEPTH_LEVELS - 1].price).toBe(MAX_DEPTH_LEVELS);
     });
 
     it('updates finalUpdateId', () => {

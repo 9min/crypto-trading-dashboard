@@ -89,6 +89,10 @@ export const useTradeStore = create<TradeStore>()((set) => ({
     });
   },
 
+  /**
+   * Bulk-set trades from an external source (e.g., REST API).
+   * Input must be newest-first (reverse Binance REST response before passing).
+   */
   setTrades: (trades: TradeEntry[]): void => {
     const capped = trades.slice(0, MAX_TRADES);
     const lastPrice = capped.length > 0 ? capped[0].price : 0;

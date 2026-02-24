@@ -15,6 +15,9 @@ import { BINANCE_WS_BASE_URL } from '@/utils/constants';
  * // => 'wss://stream.binance.com:9443/stream?streams=btcusdt@kline_1m/btcusdt@depth@100ms'
  */
 export function buildStreamUrl(streams: string[]): string {
+  if (streams.length === 0) {
+    throw new Error('buildStreamUrl: streams must not be empty');
+  }
   return `${BINANCE_WS_BASE_URL}?streams=${streams.join('/')}`;
 }
 
@@ -68,6 +71,7 @@ export function buildCombinedStreamUrl(symbol: string, interval: string): string
     getKlineStream(symbol, interval),
     getDepthStream(symbol),
     getTradeStream(symbol),
+    getMiniTickerStream(symbol),
   ];
   return buildStreamUrl(streams);
 }

@@ -20,7 +20,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useKlineStore } from '@/stores/klineStore';
 import { useDepthStore } from '@/stores/depthStore';
 import { useTradeStore } from '@/stores/tradeStore';
-import type { ConnectionState, PriceLevel } from '@/types/chart';
+import type { ConnectionState, PriceLevel, KlineInterval } from '@/types/chart';
 import type { BinanceKlineEvent, BinanceDepthEvent, BinanceTradeEvent } from '@/types/binance';
 
 // -----------------------------------------------------------------------------
@@ -31,7 +31,7 @@ interface UseWebSocketParams {
   /** Trading pair symbol (e.g., "BTCUSDT"). Falls back to uiStore value. */
   symbol?: string;
   /** Kline interval (e.g., "1m"). Falls back to klineStore value. */
-  interval?: string;
+  interval?: KlineInterval;
 }
 
 interface UseWebSocketReturn {

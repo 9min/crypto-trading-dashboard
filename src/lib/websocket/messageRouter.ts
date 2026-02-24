@@ -82,9 +82,9 @@ export function createMessageRouter(handlers: MessageHandlers) {
 export function parseCombinedStreamMessage(rawMessage: string): WebSocketStreamMessage | null {
   try {
     const parsed = JSON.parse(rawMessage) as BinanceCombinedStreamMessage<WebSocketStreamMessage>;
-    return parsed.data;
-  } catch {
-    console.error('[messageRouter] Failed to parse WebSocket message');
+    return parsed.data ?? null;
+  } catch (error) {
+    console.error('[messageRouter] Failed to parse WebSocket message', error);
     return null;
   }
 }
