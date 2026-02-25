@@ -65,6 +65,41 @@ export class RingBuffer {
     return result;
   }
 
+  /**
+   * Returns a single field value from the entry at the given index.
+   * Zero-allocation alternative to getAt() — no array is created.
+   *
+   * @param entryIndex - Logical index (0 = oldest, length-1 = newest)
+   * @param fieldIndex - Field offset within the entry (0-based)
+   * @returns The field value, or null if index is out of range
+   */
+  getField(entryIndex: number, fieldIndex: number): number | null {
+    if (entryIndex < 0 || entryIndex >= this.count) return null;
+    if (fieldIndex < 0 || fieldIndex >= this.fieldsPerEntry) return null;
+
+    const actualIndex = (this.head - this.count + entryIndex + this._capacity) % this._capacity;
+    return this.buffer[actualIndex * this.fieldsPerEntry + fieldIndex];
+  }
+
+  /**
+   * Reads an entire entry into a pre-allocated output array.
+   * Zero-allocation alternative to getAt() — caller reuses the same array.
+   *
+   * @param entryIndex - Logical index (0 = oldest, length-1 = newest)
+   * @param out - Pre-allocated array to write field values into
+   * @returns true if read succeeded, false if index is out of range
+   */
+  readInto(entryIndex: number, out: number[]): boolean {
+    if (entryIndex < 0 || entryIndex >= this.count) return false;
+
+    const actualIndex = (this.head - this.count + entryIndex + this._capacity) % this._capacity;
+    const offset = actualIndex * this.fieldsPerEntry;
+    for (let i = 0; i < this.fieldsPerEntry; i++) {
+      out[i] = this.buffer[offset + i];
+    }
+    return true;
+  }
+
   get length(): number {
     return this.count;
   }
