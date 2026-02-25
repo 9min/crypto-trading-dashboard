@@ -24,6 +24,7 @@ import { CandlestickWidget } from '@/components/widgets/CandlestickWidget';
 import { OrderBookWidget } from '@/components/widgets/OrderBookWidget';
 import { TradesFeedWidget } from '@/components/widgets/TradesFeedWidget';
 import { WatchlistWidget } from '@/components/widgets/WatchlistWidget';
+import { KimchiPremiumWidget } from '@/components/widgets/KimchiPremiumWidget';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -50,19 +51,22 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
     { i: 'candlestick', x: 0, y: 0, w: 8, h: 14 },
     { i: 'orderbook', x: 8, y: 0, w: 4, h: 14 },
     { i: 'watchlist', x: 0, y: 14, w: 3, h: 10 },
-    { i: 'trades', x: 3, y: 14, w: 9, h: 10 },
+    { i: 'trades', x: 3, y: 14, w: 6, h: 10 },
+    { i: 'premium', x: 9, y: 14, w: 3, h: 10 },
   ],
   md: [
     { i: 'candlestick', x: 0, y: 0, w: 10, h: 12 },
     { i: 'orderbook', x: 0, y: 12, w: 5, h: 12 },
     { i: 'trades', x: 5, y: 12, w: 5, h: 12 },
-    { i: 'watchlist', x: 0, y: 24, w: 10, h: 8 },
+    { i: 'watchlist', x: 0, y: 24, w: 5, h: 8 },
+    { i: 'premium', x: 5, y: 24, w: 5, h: 8 },
   ],
   sm: [
     { i: 'candlestick', x: 0, y: 0, w: 6, h: 10 },
     { i: 'orderbook', x: 0, y: 10, w: 6, h: 10 },
     { i: 'trades', x: 0, y: 20, w: 6, h: 10 },
     { i: 'watchlist', x: 0, y: 30, w: 6, h: 8 },
+    { i: 'premium', x: 0, y: 38, w: 6, h: 8 },
   ],
 };
 
@@ -83,6 +87,7 @@ export const DashboardGrid = memo(function DashboardGrid() {
       { key: 'orderbook', title: 'Order Book', component: <OrderBookWidget /> },
       { key: 'trades', title: 'Trades', component: <TradesFeedWidget /> },
       { key: 'watchlist', title: 'Watchlist', component: <WatchlistWidget /> },
+      { key: 'premium', title: 'Kimchi Premium', component: <KimchiPremiumWidget /> },
     ],
     [],
   );
