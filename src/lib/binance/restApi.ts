@@ -6,7 +6,12 @@
 // =============================================================================
 
 import { BINANCE_REST_BASE_URL } from '@/utils/constants';
-import type { BinanceKlineRaw, BinanceDepthSnapshot, BinanceExchangeInfo } from '@/types/binance';
+import type {
+  BinanceKlineRaw,
+  BinanceDepthSnapshot,
+  BinanceExchangeInfo,
+  Binance24hrTickerResponse,
+} from '@/types/binance';
 import type { CandleData } from '@/types/chart';
 
 // -----------------------------------------------------------------------------
@@ -116,4 +121,25 @@ export async function fetchDepthSnapshot(
 export async function fetchExchangeInfo(): Promise<BinanceExchangeInfo> {
   const url = `${BINANCE_REST_BASE_URL}/exchangeInfo`;
   return fetchWithRetry<BinanceExchangeInfo>(url);
+}
+
+// -----------------------------------------------------------------------------
+// 24hr Ticker
+// -----------------------------------------------------------------------------
+
+/**
+ * Fetches 24-hour price change statistics for the given symbols.
+ * Uses the Binance REST API `GET /api/v3/ticker/24hr` endpoint with
+ * the `symbols` query parameter for batch fetching.
+ *
+ * @param symbols - Array of trading pair symbols (e.g., ["BTCUSDT", "ETHUSDT"])
+ * @returns Array of 24hr ticker responses
+ */
+export async function fetch24hrTickers(symbols: string[]): Promise<Binance24hrTickerResponse[]> {
+  if (symbols.length === 0) return [];
+
+  const symbolsParam = JSON.stringify(symbols);
+  const params = new URLSearchParams({ symbols: symbolsParam });
+  const url = `${BINANCE_REST_BASE_URL}/ticker/24hr?${params}`;
+  return fetchWithRetry<Binance24hrTickerResponse[]>(url);
 }

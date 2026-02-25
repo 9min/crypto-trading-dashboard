@@ -116,8 +116,37 @@ type ConnectionState =
     };
 
 // -----------------------------------------------------------------------------
+// Watchlist Ticker
+// -----------------------------------------------------------------------------
+
+/**
+ * Real-time ticker data for a single watchlist symbol.
+ * Populated initially via REST API and updated via WebSocket miniTicker stream.
+ */
+interface WatchlistTicker {
+  /** Trading pair symbol (e.g., "BTCUSDT") */
+  symbol: string;
+  /** Current price (close price from miniTicker) */
+  price: number;
+  /** 24-hour price change percentage */
+  priceChangePercent: number;
+  /** 24-hour quote asset volume */
+  volume: number;
+  /** Timestamp of the last update (ms) */
+  lastUpdateTime: number;
+}
+
+// -----------------------------------------------------------------------------
 // Exports
 // -----------------------------------------------------------------------------
 
 export { KLINE_INTERVALS };
-export type { KlineInterval, CandleData, PriceLevel, OrderBookSide, TradeEntry, ConnectionState };
+export type {
+  KlineInterval,
+  CandleData,
+  PriceLevel,
+  OrderBookSide,
+  TradeEntry,
+  ConnectionState,
+  WatchlistTicker,
+};

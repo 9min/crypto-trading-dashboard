@@ -3,17 +3,23 @@
 // =============================================================================
 // WatchlistWidget Component
 // =============================================================================
-// DOM-based widget (not Canvas) displaying a list of popular trading symbols.
-// Clicking a symbol updates uiStore.symbol, which triggers all other widgets
-// to switch to the selected pair.
+// DOM-based widget displaying a list of watchlist symbols with real-time
+// prices and 24-hour price change percentages. Data is sourced from the
+// watchlistStore, populated via REST API and updated by WebSocket miniTicker.
 //
-// Shows the current price and price direction for the active symbol.
+// Each SymbolRow subscribes to its own ticker slice via a Zustand selector,
+// so only the row whose data changed re-renders — not the entire widget.
+//
+// Clicking a symbol updates uiStore.symbol, triggering all other widgets
+// to switch to the selected pair.
 // =============================================================================
 
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useUiStore } from '@/stores/uiStore';
-import { useTradeStore } from '@/stores/tradeStore';
+import { useWatchlistStore } from '@/stores/watchlistStore';
+import { useWatchlistStream } from '@/hooks/useWatchlistStream';
 import { formatPrice } from '@/utils/formatPrice';
+import { formatSymbol } from '@/utils/formatSymbol';
 import { WidgetWrapper } from './WidgetWrapper';
 
 // -----------------------------------------------------------------------------
@@ -23,47 +29,26 @@ import { WidgetWrapper } from './WidgetWrapper';
 interface SymbolRowProps {
   symbol: string;
   isActive: boolean;
-  lastPrice: number;
-  priceDirection: 'up' | 'down' | 'neutral';
   onSelect: (symbol: string) => void;
 }
-
-// -----------------------------------------------------------------------------
-// Constants
-// -----------------------------------------------------------------------------
-
-const WATCHLIST_SYMBOLS = [
-  'BTCUSDT',
-  'ETHUSDT',
-  'BNBUSDT',
-  'SOLUSDT',
-  'XRPUSDT',
-  'DOGEUSDT',
-  'ADAUSDT',
-  'AVAXUSDT',
-] as const;
 
 // -----------------------------------------------------------------------------
 // Sub-Component
 // -----------------------------------------------------------------------------
 
-const SymbolRow = memo(function SymbolRow({
-  symbol,
-  isActive,
-  lastPrice,
-  priceDirection,
-  onSelect,
-}: SymbolRowProps) {
+const SymbolRow = memo(function SymbolRow({ symbol, isActive, onSelect }: SymbolRowProps) {
+  const ticker = useWatchlistStore((state) => state.tickers.get(symbol));
+
   const handleClick = useCallback(() => {
     onSelect(symbol);
   }, [symbol, onSelect]);
 
-  const priceColorClass =
-    priceDirection === 'up'
-      ? 'text-buy'
-      : priceDirection === 'down'
-        ? 'text-sell'
-        : 'text-foreground';
+  const price = ticker?.price ?? 0;
+  const changePercent = ticker?.priceChangePercent ?? 0;
+
+  const changeColorClass =
+    changePercent > 0 ? 'text-buy' : changePercent < 0 ? 'text-sell' : 'text-foreground-secondary';
+  const changeSign = changePercent > 0 ? '+' : '';
 
   return (
     <button
@@ -74,11 +59,19 @@ const SymbolRow = memo(function SymbolRow({
       }`}
     >
       <span className={`text-xs font-medium ${isActive ? 'text-accent' : 'text-foreground'}`}>
-        {symbol.replace('USDT', '/USDT')}
+        {formatSymbol(symbol)}
       </span>
-      {isActive && lastPrice > 0 && (
-        <span className={`font-mono-num text-xs ${priceColorClass}`}>{formatPrice(lastPrice)}</span>
-      )}
+      <div className="flex items-center gap-2">
+        {price > 0 && (
+          <span className="font-mono-num text-foreground text-xs">{formatPrice(price)}</span>
+        )}
+        {price > 0 && (
+          <span className={`font-mono-num text-xs ${changeColorClass}`}>
+            {changeSign}
+            {changePercent.toFixed(2)}%
+          </span>
+        )}
+      </div>
     </button>
   );
 });
@@ -90,8 +83,9 @@ const SymbolRow = memo(function SymbolRow({
 export const WatchlistWidget = memo(function WatchlistWidget() {
   const activeSymbol = useUiStore((state) => state.symbol);
   const setSymbol = useUiStore((state) => state.setSymbol);
-  const lastPrice = useTradeStore((state) => state.lastPrice);
-  const lastPriceDirection = useTradeStore((state) => state.lastPriceDirection);
+  const symbols = useWatchlistStore((state) => state.symbols);
+
+  useWatchlistStream();
 
   const handleSelect = useCallback(
     (symbol: string) => {
@@ -99,8 +93,6 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
     },
     [setSymbol],
   );
-
-  const symbols = useMemo(() => [...WATCHLIST_SYMBOLS], []);
 
   return (
     <WidgetWrapper title="Watchlist">
@@ -110,8 +102,6 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
             key={symbol}
             symbol={symbol}
             isActive={symbol === activeSymbol}
-            lastPrice={symbol === activeSymbol ? lastPrice : 0}
-            priceDirection={symbol === activeSymbol ? lastPriceDirection : 'neutral'}
             onSelect={handleSelect}
           />
         ))}

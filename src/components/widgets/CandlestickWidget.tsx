@@ -222,7 +222,18 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
   // Update candle data — depends on isChartReady to avoid null series
   useEffect(() => {
     const series = seriesRef.current;
-    if (!isChartReady || !series || candles.length === 0) return;
+    if (!isChartReady || !series) return;
+
+    // When candles are cleared (symbol/interval change via resetKlineData),
+    // reset tracking refs so the next data arrival triggers a full setData.
+    if (candles.length === 0) {
+      prevCandleCountRef.current = 0;
+      prevFirstTimeRef.current = 0;
+      // Clear Lightweight Charts internal buffers so the previous symbol's
+      // data and price scale do not linger until new candles arrive.
+      series.setData([]);
+      return;
+    }
 
     const firstTime = candles[0].time;
 

@@ -297,6 +297,25 @@ interface BinanceRateLimit {
   limit: number;
 }
 
+/**
+ * Response from the Binance REST API `GET /api/v3/ticker/24hr` endpoint.
+ * Contains 24-hour price change statistics for a trading pair.
+ */
+interface Binance24hrTickerResponse {
+  /** Symbol name (e.g., "BTCUSDT") */
+  symbol: string;
+  /** Last traded price */
+  lastPrice: string;
+  /** Price change percentage over the last 24 hours */
+  priceChangePercent: string;
+  /** Total traded quote asset volume over the last 24 hours */
+  quoteVolume: string;
+  /** Highest price over the last 24 hours */
+  highPrice: string;
+  /** Lowest price over the last 24 hours */
+  lowPrice: string;
+}
+
 // -----------------------------------------------------------------------------
 // Exports
 // -----------------------------------------------------------------------------
@@ -316,4 +335,5 @@ export type {
   BinanceSymbolInfo,
   BinanceExchangeInfo,
   BinanceRateLimit,
+  Binance24hrTickerResponse,
 };
