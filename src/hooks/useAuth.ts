@@ -1,8 +1,8 @@
 // =============================================================================
 // useAuth Hook
 // =============================================================================
-// Manages Supabase authentication state: session detection, OAuth sign-in
-// (Google / GitHub), and sign-out. All operations are no-ops when the
+// Manages Supabase authentication state: session detection, Google OAuth
+// sign-in, and sign-out. All operations are no-ops when the
 // Supabase client is null (env vars not configured).
 // =============================================================================
 
@@ -39,8 +39,6 @@ interface UseAuthReturn {
   isLoading: boolean;
   /** Initiate Google OAuth sign-in */
   signInWithGoogle: () => Promise<void>;
-  /** Initiate GitHub OAuth sign-in */
-  signInWithGithub: () => Promise<void>;
   /** Sign out the current user */
   signOut: () => Promise<void>;
 }
@@ -100,22 +98,13 @@ export function useAuth(): UseAuthReturn {
     });
   }, []);
 
-  const signInWithGithub = useCallback(async () => {
-    if (!supabase) return;
-    const redirectTo = `${window.location.origin}/auth/callback`;
-    await supabase.auth.signInWithOAuth({
-      provider: 'github',
-      options: { redirectTo },
-    });
-  }, []);
-
   const signOut = useCallback(async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
     reset();
   }, [reset]);
 
-  return { user, isLoading, signInWithGoogle, signInWithGithub, signOut };
+  return { user, isLoading, signInWithGoogle, signOut };
 }
 
 // -----------------------------------------------------------------------------

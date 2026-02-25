@@ -147,19 +147,6 @@ describe('useAuth', () => {
     });
   });
 
-  it('signInWithGithub calls signInWithOAuth with correct provider', async () => {
-    const { result } = renderHook(() => useAuth());
-
-    await act(async () => {
-      await result.current.signInWithGithub();
-    });
-
-    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
-      provider: 'github',
-      options: { redirectTo: expect.stringContaining('/auth/callback') },
-    });
-  });
-
   it('signOut calls supabase signOut and resets authStore', async () => {
     useAuthStore.getState().setUser({
       id: 'user-1',
