@@ -28,6 +28,8 @@ interface UiStoreState {
   symbol: string;
   /** Currently selected exchange */
   exchange: ExchangeId;
+  /** Whether the persisted exchange has been hydrated from localStorage */
+  isExchangeHydrated: boolean;
   /** WebSocket connection state (discriminated union) */
   connectionState: ConnectionState;
   /** Current dashboard widget layout configuration */
@@ -80,7 +82,9 @@ export const useUiStore = create<UiStore>()((set) => {
   function hydrateExchange(): void {
     const persisted = loadExchange();
     if (persisted !== DEFAULT_EXCHANGE) {
-      set({ exchange: persisted });
+      set({ exchange: persisted, isExchangeHydrated: true });
+    } else {
+      set({ isExchangeHydrated: true });
     }
   }
 
@@ -97,6 +101,7 @@ export const useUiStore = create<UiStore>()((set) => {
     theme: 'dark',
     symbol: DEFAULT_SYMBOL,
     exchange: DEFAULT_EXCHANGE,
+    isExchangeHydrated: false,
     connectionState: { status: 'idle' },
     layout: [],
 

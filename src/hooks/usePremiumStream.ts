@@ -29,7 +29,6 @@ const RATE_POLL_INTERVAL_MS = 60_000;
 
 export function usePremiumStream(): void {
   const symbol = useUiStore((state) => state.symbol);
-  const exchange = useUiStore((state) => state.exchange);
   const setBinancePrice = usePremiumStore((state) => state.setBinancePrice);
   const setUpbitPrice = usePremiumStore((state) => state.setUpbitPrice);
   const setUsdKrwRate = usePremiumStore((state) => state.setUsdKrwRate);
@@ -150,5 +149,5 @@ export function usePremiumStream(): void {
         upbitWs.close();
       }
     };
-  }, [symbol, exchange, setBinancePrice, setUpbitPrice, setUsdKrwRate, resetPremium]);
+  }, [symbol, setBinancePrice, setUpbitPrice, setUsdKrwRate, resetPremium]);
 }

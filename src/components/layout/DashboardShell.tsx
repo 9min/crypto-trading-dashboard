@@ -17,13 +17,14 @@ import { useUiStore } from '@/stores/uiStore';
 
 export const DashboardShell = memo(function DashboardShell() {
   const hydrateExchange = useUiStore((state) => state.hydrateExchange);
+  const isExchangeHydrated = useUiStore((state) => state.isExchangeHydrated);
 
   // Hydrate persisted exchange preference after mount to avoid SSR mismatch
   useEffect(() => {
     hydrateExchange();
   }, [hydrateExchange]);
 
-  useExchangeWebSocket();
+  useExchangeWebSocket(isExchangeHydrated);
 
   return (
     <div className="bg-background flex h-screen flex-col">

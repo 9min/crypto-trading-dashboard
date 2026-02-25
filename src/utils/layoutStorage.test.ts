@@ -85,13 +85,14 @@ describe('layoutStorage', () => {
 
     it('returns null for non-object values', () => {
       mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
-
       mockStorage.set(STORAGE_KEY, '"just a string"');
       expect(loadLayout()).toBeNull();
 
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       mockStorage.set(STORAGE_KEY, '42');
       expect(loadLayout()).toBeNull();
 
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       mockStorage.set(STORAGE_KEY, 'null');
       expect(loadLayout()).toBeNull();
     });
