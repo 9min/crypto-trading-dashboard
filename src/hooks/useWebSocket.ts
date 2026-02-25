@@ -40,6 +40,8 @@ interface UseWebSocketParams {
   symbol?: string;
   /** Kline interval (e.g., "1m"). Falls back to klineStore value. */
   interval?: KlineInterval;
+  /** When false, disables the hook entirely (no connection). Defaults to true. */
+  enabled?: boolean;
 }
 
 interface UseWebSocketReturn {
@@ -95,9 +97,10 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   const addTrade = useTradeStore((state) => state.addTrade);
   const resetTradeStore = useTradeStore((state) => state.reset);
 
-  // Resolve effective symbol and interval (params override store defaults)
+  // Resolve effective symbol, interval, and enabled flag
   const symbol = params?.symbol ?? storeSymbol;
   const interval = params?.interval ?? storeInterval;
+  const enabled = params?.enabled ?? true;
 
   // -- Message Handlers (stable references via useCallback) -------------------
 
@@ -140,6 +143,9 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   // -- Main Effect: WebSocket lifecycle tied to symbol/interval ---------------
 
   useEffect(() => {
+    // When disabled, skip all WebSocket and REST operations
+    if (!enabled) return;
+
     // Local flag scoped to THIS effect execution. When cleanup runs,
     // `isActive` becomes false — preventing stale async REST responses
     // from overwriting the store after a symbol/interval change.
@@ -395,6 +401,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   }, [
     symbol,
     interval,
+    enabled,
     handleKline,
     handleTrade,
     setConnectionState,

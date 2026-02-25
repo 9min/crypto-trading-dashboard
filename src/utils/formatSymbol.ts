@@ -30,3 +30,19 @@ export function formatSymbol(symbol: string): string {
   }
   return symbol;
 }
+
+/**
+ * Formats an Upbit market code into a human-readable trading pair.
+ *
+ * @example
+ * formatUpbitSymbol('KRW-BTC')   // => 'BTC/KRW'
+ * formatUpbitSymbol('KRW-ETH')   // => 'ETH/KRW'
+ * formatUpbitSymbol('UNKNOWN')   // => 'UNKNOWN' (no match — returns original)
+ */
+export function formatUpbitSymbol(symbol: string): string {
+  const parts = symbol.split('-');
+  if (parts.length === 2) {
+    return `${parts[1]}/${parts[0]}`;
+  }
+  return symbol;
+}

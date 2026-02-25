@@ -17,9 +17,9 @@
 import { memo, useCallback, useMemo } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
-import { useWatchlistStream } from '@/hooks/useWatchlistStream';
+import { useExchangeWatchlistStream } from '@/hooks/useExchangeWatchlistStream';
 import { formatPrice } from '@/utils/formatPrice';
-import { formatSymbol } from '@/utils/formatSymbol';
+import { formatSymbol, formatUpbitSymbol } from '@/utils/formatSymbol';
 import { WidgetWrapper } from './WidgetWrapper';
 
 // -----------------------------------------------------------------------------
@@ -36,12 +36,23 @@ interface SymbolRowProps {
 // Sub-Component
 // -----------------------------------------------------------------------------
 
-const SymbolRow = memo(function SymbolRow({ symbol, isActive, onSelect }: SymbolRowProps) {
+interface SymbolRowInternalProps extends SymbolRowProps {
+  exchange: 'binance' | 'upbit';
+}
+
+const SymbolRow = memo(function SymbolRow({
+  symbol,
+  isActive,
+  onSelect,
+  exchange,
+}: SymbolRowInternalProps) {
   const ticker = useWatchlistStore((state) => state.tickers.get(symbol));
 
   const handleClick = useCallback(() => {
     onSelect(symbol);
   }, [symbol, onSelect]);
+
+  const displaySymbol = exchange === 'upbit' ? formatUpbitSymbol(symbol) : formatSymbol(symbol);
 
   const { price, changePercent, changeColorClass, changeSign } = useMemo(() => {
     const p = ticker?.price ?? 0;
@@ -49,8 +60,7 @@ const SymbolRow = memo(function SymbolRow({ symbol, isActive, onSelect }: Symbol
     return {
       price: p,
       changePercent: cp,
-      changeColorClass:
-        cp > 0 ? 'text-buy' : cp < 0 ? 'text-sell' : 'text-foreground-secondary',
+      changeColorClass: cp > 0 ? 'text-buy' : cp < 0 ? 'text-sell' : 'text-foreground-secondary',
       changeSign: cp > 0 ? '+' : '',
     };
   }, [ticker?.price, ticker?.priceChangePercent]);
@@ -64,7 +74,7 @@ const SymbolRow = memo(function SymbolRow({ symbol, isActive, onSelect }: Symbol
       }`}
     >
       <span className={`text-xs font-medium ${isActive ? 'text-accent' : 'text-foreground'}`}>
-        {formatSymbol(symbol)}
+        {displaySymbol}
       </span>
       <div className="flex items-center gap-2">
         {price > 0 && (
@@ -88,9 +98,10 @@ const SymbolRow = memo(function SymbolRow({ symbol, isActive, onSelect }: Symbol
 export const WatchlistWidget = memo(function WatchlistWidget() {
   const activeSymbol = useUiStore((state) => state.symbol);
   const setSymbol = useUiStore((state) => state.setSymbol);
+  const exchange = useUiStore((state) => state.exchange);
   const symbols = useWatchlistStore((state) => state.symbols);
 
-  useWatchlistStream();
+  useExchangeWatchlistStream();
 
   const handleSelect = useCallback(
     (symbol: string) => {
@@ -108,6 +119,7 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
             symbol={symbol}
             isActive={symbol === activeSymbol}
             onSelect={handleSelect}
+            exchange={exchange}
           />
         ))}
       </div>
