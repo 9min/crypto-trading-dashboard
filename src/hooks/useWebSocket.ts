@@ -27,6 +27,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useKlineStore } from '@/stores/klineStore';
 import { useDepthStore } from '@/stores/depthStore';
 import { useTradeStore } from '@/stores/tradeStore';
+import { useToastStore } from '@/stores/toastStore';
 import type { ConnectionState, PriceLevel, KlineInterval } from '@/types/chart';
 import type { BinanceKlineEvent, BinanceDepthEvent, BinanceTradeEvent } from '@/types/binance';
 
@@ -243,6 +244,9 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
               symbol,
               timestamp: Date.now(),
             });
+            useToastStore
+              .getState()
+              .addToast(`Order book sync failed for ${symbol}. Retrying in 30s...`, 'warning');
             snapshotRetryTimeout = setTimeout(() => {
               if (isActive) {
                 fetchAndApplySnapshot(0);
@@ -306,11 +310,37 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     // Subscribe to incoming WebSocket messages
     const unsubscribeMessages = manager.subscribe(router);
 
+    // Track previous connection status for transition detection
+    let prevStatus: ConnectionState['status'] = 'idle';
+
     // Subscribe to connection state changes and sync to uiStore
     const unsubscribeState = manager.onStateChange((state: ConnectionState): void => {
-      if (isActive) {
-        setConnectionState(state);
+      if (!isActive) return;
+
+      setConnectionState(state);
+
+      // Toast on connection failure
+      if (state.status === 'failed') {
+        useToastStore
+          .getState()
+          .addToast('WebSocket connection lost. Click Reconnect to retry.', 'error');
       }
+
+      // Re-fetch depth snapshot when reconnecting succeeds
+      if (
+        state.status === 'connected' &&
+        (prevStatus === 'reconnecting' || prevStatus === 'failed')
+      ) {
+        snapshotReady = false;
+        depthBuffer.length = 0;
+        if (snapshotRetryTimeout !== null) {
+          clearTimeout(snapshotRetryTimeout);
+          snapshotRetryTimeout = null;
+        }
+        fetchAndApplySnapshot(0);
+      }
+
+      prevStatus = state.status;
     });
 
     // Connect WebSocket
@@ -331,6 +361,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
           timestamp: Date.now(),
           error,
         });
+        useToastStore.getState().addToast(`Failed to load chart data for ${symbol}`, 'error');
       })
       .finally(() => {
         if (isActive) {
