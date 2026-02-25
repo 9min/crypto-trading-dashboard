@@ -104,7 +104,14 @@ export function useAuth(): UseAuthReturn {
 
   const signOut = useCallback(async () => {
     if (!supabase) return;
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('[useAuth] signOut failed', {
+        timestamp: Date.now(),
+        error: error.message,
+      });
+      return;
+    }
     reset();
   }, [reset]);
 

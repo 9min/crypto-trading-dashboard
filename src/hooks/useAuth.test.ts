@@ -164,4 +164,24 @@ describe('useAuth', () => {
     expect(mockSignOut).toHaveBeenCalledOnce();
     expect(useAuthStore.getState().user).toBeNull();
   });
+
+  it('signOut does not reset authStore when supabase signOut fails', async () => {
+    useAuthStore.getState().setUser({
+      id: 'user-1',
+      email: 'test@example.com',
+      name: 'Test',
+      avatarUrl: null,
+    });
+
+    mockSignOut.mockResolvedValueOnce({ error: { message: 'Network error' } });
+
+    const { result } = renderHook(() => useAuth());
+
+    await act(async () => {
+      await result.current.signOut();
+    });
+
+    expect(mockSignOut).toHaveBeenCalledOnce();
+    expect(useAuthStore.getState().user).not.toBeNull();
+  });
 });
