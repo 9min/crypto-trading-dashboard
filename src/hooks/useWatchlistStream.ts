@@ -28,7 +28,10 @@ export function useWatchlistStream(enabled = true): void {
   const setLoading = useWatchlistStore((state) => state.setLoading);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
 
     let isActive = true;
 
@@ -85,6 +88,7 @@ export function useWatchlistStream(enabled = true): void {
       isActive = false;
       unsubscribe();
       manager.disconnect();
+      setLoading(false);
     };
   }, [enabled, symbols, setTickers, updateTicker, setLoading]);
 }

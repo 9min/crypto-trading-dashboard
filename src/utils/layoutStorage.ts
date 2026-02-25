@@ -120,6 +120,13 @@ export function loadLayout(): ResponsiveLayouts | null {
 
     return parsed as ResponsiveLayouts;
   } catch (error) {
+    if (typeof window !== 'undefined') {
+      try {
+        clearStoredLayout();
+      } catch {
+        // cleanup best-effort
+      }
+    }
     console.error('[layoutStorage] Failed to load layout', {
       timestamp: Date.now(),
       error,
