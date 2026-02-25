@@ -70,7 +70,10 @@ export function usePreferencesSync(): void {
   // Merges consecutive partial updates so no field is lost.
   // ---------------------------------------------------------------------------
   const debouncedCloudSaveRef = useRef((partial: Partial<UserPreferences>): void => {
-    if (!useAuthStore.getState().user) return;
+    if (!useAuthStore.getState().user) {
+      pendingPatchRef.current = {};
+      return;
+    }
 
     // Merge into pending patch so consecutive changes accumulate
     pendingPatchRef.current = { ...pendingPatchRef.current, ...partial };
@@ -82,7 +85,10 @@ export function usePreferencesSync(): void {
     debounceTimerRef.current = setTimeout(() => {
       // Re-read user at execution time to avoid stale closure
       const currentUser = useAuthStore.getState().user;
-      if (!currentUser) return;
+      if (!currentUser) {
+        pendingPatchRef.current = {};
+        return;
+      }
 
       const patch = pendingPatchRef.current;
       pendingPatchRef.current = {};

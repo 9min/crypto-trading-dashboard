@@ -59,7 +59,7 @@ describe('preferencesService', () => {
       });
     });
 
-    it('returns null when no row exists (error from supabase)', async () => {
+    it('returns null when no row exists (PGRST116)', async () => {
       mockSingle.mockResolvedValue({
         data: null,
         error: { message: 'Row not found', code: 'PGRST116' },
@@ -67,6 +67,15 @@ describe('preferencesService', () => {
 
       const result = await fetchPreferences('user-1');
       expect(result).toBeNull();
+    });
+
+    it('throws on non-PGRST116 errors', async () => {
+      mockSingle.mockResolvedValue({
+        data: null,
+        error: { message: 'connection refused', code: '500' },
+      });
+
+      await expect(fetchPreferences('user-1')).rejects.toThrow('fetchPreferences failed');
     });
 
     it('returns null when data is null', async () => {

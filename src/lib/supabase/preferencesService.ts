@@ -64,13 +64,23 @@ function rowToPreferences(row: UserPreferencesRow): UserPreferences {
 /**
  * Fetches a user's preferences from Supabase.
  * Returns null if no row exists or the Supabase client is unavailable.
+ * Throws on actual DB/network errors to prevent callers from mistaking
+ * a transient failure for a "first login" scenario.
  */
 export async function fetchPreferences(userId: string): Promise<UserPreferences | null> {
   if (!supabase) return null;
 
   const { data, error } = await supabase.from(TABLE_NAME).select('*').eq('id', userId).single();
 
-  if (error || !data) return null;
+  if (error) {
+    // PGRST116 = "Row not found" from .single() — this is the expected
+    // "no preferences yet" case, not an actual error.
+    if (error.code === 'PGRST116') return null;
+
+    throw new Error(`[preferencesService] fetchPreferences failed: ${error.message}`);
+  }
+
+  if (!data) return null;
 
   return rowToPreferences(data as UserPreferencesRow);
 }
