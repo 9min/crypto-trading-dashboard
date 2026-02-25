@@ -35,7 +35,7 @@ export function saveLayout(layouts: ResponsiveLayouts): void {
 /**
  * Validates that a single layout item has the required fields with correct types.
  */
-function isValidLayoutItem(item: unknown): boolean {
+export function isValidLayoutItem(item: unknown): boolean {
   if (typeof item !== 'object' || item === null) return false;
   const obj = item as Record<string, unknown>;
   return (
