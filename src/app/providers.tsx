@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useUiStore } from '@/stores/uiStore';
+import { ToastContainer } from '@/components/ui/ToastContainer';
 
 interface ProvidersProps {
   children: React.ReactNode;
@@ -14,5 +15,10 @@ export function Providers({ children }: ProvidersProps) {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ToastContainer />
+    </>
+  );
 }
