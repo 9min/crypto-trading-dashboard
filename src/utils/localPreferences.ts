@@ -10,6 +10,8 @@
 import type { KlineInterval } from '@/types/chart';
 import { KLINE_INTERVALS } from '@/types/chart';
 import type { Theme } from '@/stores/uiStore';
+import type { ExchangeId } from '@/types/exchange';
+import { EXCHANGE_IDS } from '@/types/exchange';
 import { DEFAULT_WATCHLIST_SYMBOLS } from '@/utils/constants';
 
 // -----------------------------------------------------------------------------
@@ -19,9 +21,11 @@ import { DEFAULT_WATCHLIST_SYMBOLS } from '@/utils/constants';
 const THEME_KEY = 'dashboard-theme';
 const INTERVAL_KEY = 'dashboard-interval';
 const WATCHLIST_KEY = 'dashboard-watchlist';
+const EXCHANGE_KEY = 'dashboard-exchange';
 
 const VALID_THEMES = new Set<string>(['dark', 'light']);
 const VALID_INTERVALS = new Set<string>(KLINE_INTERVALS);
+const VALID_EXCHANGES = new Set<string>(EXCHANGE_IDS);
 
 // -----------------------------------------------------------------------------
 // Theme
@@ -119,7 +123,37 @@ export function loadWatchlistSymbols(): string[] {
 }
 
 // -----------------------------------------------------------------------------
+// Exchange
+// -----------------------------------------------------------------------------
+
+/** Saves the exchange preference to localStorage. */
+export function saveExchange(exchange: ExchangeId): void {
+  try {
+    localStorage.setItem(EXCHANGE_KEY, exchange);
+  } catch (error) {
+    console.error('[localPreferences] Failed to save exchange', {
+      timestamp: Date.now(),
+      error,
+    });
+  }
+}
+
+/** Loads the exchange preference from localStorage. Defaults to `'binance'`. */
+export function loadExchange(): ExchangeId {
+  try {
+    const raw = localStorage.getItem(EXCHANGE_KEY);
+    if (raw && VALID_EXCHANGES.has(raw)) return raw as ExchangeId;
+  } catch (error) {
+    console.error('[localPreferences] Failed to load exchange', {
+      timestamp: Date.now(),
+      error,
+    });
+  }
+  return 'binance';
+}
+
+// -----------------------------------------------------------------------------
 // Exports
 // -----------------------------------------------------------------------------
 
-export { THEME_KEY, INTERVAL_KEY, WATCHLIST_KEY };
+export { THEME_KEY, INTERVAL_KEY, WATCHLIST_KEY, EXCHANGE_KEY };

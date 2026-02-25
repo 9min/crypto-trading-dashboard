@@ -31,6 +31,18 @@ export const DEFAULT_WATCHLIST_SYMBOLS = [
   'ADAUSDT',
   'AVAXUSDT',
 ] as const;
+
+export const DEFAULT_UPBIT_WATCHLIST_SYMBOLS = [
+  'KRW-BTC',
+  'KRW-ETH',
+  'KRW-BNB',
+  'KRW-SOL',
+  'KRW-XRP',
+  'KRW-DOGE',
+  'KRW-ADA',
+  'KRW-AVAX',
+] as const;
+
 export const MAX_WATCHLIST_SYMBOLS = 20;
 
 export const COLORS = {

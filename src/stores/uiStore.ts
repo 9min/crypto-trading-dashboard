@@ -8,6 +8,7 @@
 import { create } from 'zustand';
 import type { ConnectionState } from '@/types/chart';
 import type { LayoutItem } from '@/types/widget';
+import type { ExchangeId } from '@/types/exchange';
 import { DEFAULT_SYMBOL } from '@/utils/constants';
 
 // -----------------------------------------------------------------------------
@@ -19,8 +20,10 @@ type Theme = 'dark' | 'light';
 interface UiStoreState {
   /** Current color theme */
   theme: Theme;
-  /** Active trading symbol across the dashboard (e.g., "BTCUSDT") */
+  /** Active trading symbol across the dashboard (e.g., "BTCUSDT" or "KRW-BTC") */
   symbol: string;
+  /** Currently selected exchange */
+  exchange: ExchangeId;
   /** WebSocket connection state (discriminated union) */
   connectionState: ConnectionState;
   /** Current dashboard widget layout configuration */
@@ -34,6 +37,8 @@ interface UiStoreActions {
   toggleTheme: () => void;
   /** Change the active trading symbol */
   setSymbol: (symbol: string) => void;
+  /** Change the active exchange */
+  setExchange: (exchange: ExchangeId) => void;
   /** Update WebSocket connection state */
   setConnectionState: (state: ConnectionState) => void;
   /** Replace the entire dashboard layout */
@@ -50,6 +55,7 @@ export const useUiStore = create<UiStore>()((set) => ({
   // -- State ------------------------------------------------------------------
   theme: 'dark',
   symbol: DEFAULT_SYMBOL,
+  exchange: 'binance',
   connectionState: { status: 'idle' },
   layout: [],
 
@@ -66,6 +72,10 @@ export const useUiStore = create<UiStore>()((set) => ({
 
   setSymbol: (symbol: string): void => {
     set({ symbol });
+  },
+
+  setExchange: (exchange: ExchangeId): void => {
+    set({ exchange });
   },
 
   setConnectionState: (connectionState: ConnectionState): void => {
