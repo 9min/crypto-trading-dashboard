@@ -5,6 +5,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { ConnectionStatus } from './ConnectionStatus';
 import { IntervalSelector } from './IntervalSelector';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { UserMenu } from '@/components/ui/UserMenu';
 import { formatSymbol } from '@/utils/formatSymbol';
 
 export const DashboardHeader = memo(function DashboardHeader() {
@@ -22,6 +23,7 @@ export const DashboardHeader = memo(function DashboardHeader() {
       <div className="flex items-center gap-3">
         <ConnectionStatus />
         <ThemeToggle />
+        <UserMenu />
       </div>
     </header>
   );
