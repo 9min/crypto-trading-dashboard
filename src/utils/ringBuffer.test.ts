@@ -193,6 +193,138 @@ describe('RingBuffer', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // getField (zero-allocation single field access)
+  // ---------------------------------------------------------------------------
+
+  describe('getField', () => {
+    it('returns the correct field value', () => {
+      const buffer = new RingBuffer(5, 3);
+      buffer.push([10, 20, 30]);
+      buffer.push([40, 50, 60]);
+
+      expect(buffer.getField(0, 0)).toBe(10);
+      expect(buffer.getField(0, 1)).toBe(20);
+      expect(buffer.getField(0, 2)).toBe(30);
+      expect(buffer.getField(1, 0)).toBe(40);
+      expect(buffer.getField(1, 2)).toBe(60);
+    });
+
+    it('returns null for negative entry index', () => {
+      const buffer = new RingBuffer(5, 2);
+      buffer.push([1, 2]);
+      expect(buffer.getField(-1, 0)).toBeNull();
+    });
+
+    it('returns null for entry index >= length', () => {
+      const buffer = new RingBuffer(5, 2);
+      buffer.push([1, 2]);
+      expect(buffer.getField(1, 0)).toBeNull();
+      expect(buffer.getField(5, 0)).toBeNull();
+    });
+
+    it('returns null for negative field index', () => {
+      const buffer = new RingBuffer(5, 2);
+      buffer.push([1, 2]);
+      expect(buffer.getField(0, -1)).toBeNull();
+    });
+
+    it('returns null for field index >= fieldsPerEntry', () => {
+      const buffer = new RingBuffer(5, 2);
+      buffer.push([1, 2]);
+      expect(buffer.getField(0, 2)).toBeNull();
+    });
+
+    it('returns null on empty buffer', () => {
+      const buffer = new RingBuffer(5, 2);
+      expect(buffer.getField(0, 0)).toBeNull();
+    });
+
+    it('returns correct values after overflow', () => {
+      const buffer = new RingBuffer(2, 2);
+      buffer.push([1, 2]);
+      buffer.push([3, 4]);
+      buffer.push([5, 6]); // evicts [1, 2]
+
+      // index 0 is now [3, 4], index 1 is [5, 6]
+      expect(buffer.getField(0, 0)).toBe(3);
+      expect(buffer.getField(0, 1)).toBe(4);
+      expect(buffer.getField(1, 0)).toBe(5);
+      expect(buffer.getField(1, 1)).toBe(6);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // readInto (zero-allocation full entry access)
+  // ---------------------------------------------------------------------------
+
+  describe('readInto', () => {
+    it('reads entry into pre-allocated array', () => {
+      const buffer = new RingBuffer(5, 3);
+      buffer.push([10, 20, 30]);
+      buffer.push([40, 50, 60]);
+
+      const out = [0, 0, 0];
+      expect(buffer.readInto(0, out)).toBe(true);
+      expect(out).toEqual([10, 20, 30]);
+
+      expect(buffer.readInto(1, out)).toBe(true);
+      expect(out).toEqual([40, 50, 60]);
+    });
+
+    it('returns false for negative index', () => {
+      const buffer = new RingBuffer(5, 2);
+      buffer.push([1, 2]);
+      const out = [0, 0];
+      expect(buffer.readInto(-1, out)).toBe(false);
+    });
+
+    it('returns false for index >= length', () => {
+      const buffer = new RingBuffer(5, 2);
+      buffer.push([1, 2]);
+      const out = [0, 0];
+      expect(buffer.readInto(1, out)).toBe(false);
+    });
+
+    it('returns false on empty buffer', () => {
+      const buffer = new RingBuffer(5, 2);
+      const out = [0, 0];
+      expect(buffer.readInto(0, out)).toBe(false);
+    });
+
+    it('reuses the same output array across multiple reads', () => {
+      const buffer = new RingBuffer(5, 2);
+      buffer.push([10, 20]);
+      buffer.push([30, 40]);
+      buffer.push([50, 60]);
+
+      const out = [0, 0];
+
+      buffer.readInto(0, out);
+      expect(out).toEqual([10, 20]);
+
+      buffer.readInto(1, out);
+      expect(out).toEqual([30, 40]);
+
+      buffer.readInto(2, out);
+      expect(out).toEqual([50, 60]);
+    });
+
+    it('reads correctly after overflow', () => {
+      const buffer = new RingBuffer(2, 2);
+      buffer.push([1, 2]);
+      buffer.push([3, 4]);
+      buffer.push([5, 6]); // evicts [1, 2]
+
+      const out = [0, 0];
+      buffer.readInto(0, out);
+      expect(out).toEqual([3, 4]);
+
+      buffer.readInto(1, out);
+      expect(out).toEqual([5, 6]);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Edge Case: Capacity 1
   // ---------------------------------------------------------------------------
 
