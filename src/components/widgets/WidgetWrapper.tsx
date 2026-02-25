@@ -27,8 +27,10 @@ interface WidgetWrapperProps {
 export const WidgetWrapper = memo(function WidgetWrapper({ title, children }: WidgetWrapperProps) {
   return (
     <div className="border-border bg-background-secondary flex h-full flex-col overflow-hidden rounded-lg border">
-      <div className="widget-drag-handle border-border bg-background-tertiary flex h-8 shrink-0 cursor-grab items-center border-b px-3 active:cursor-grabbing">
-        <span className="text-foreground-secondary text-xs font-medium">{title}</span>
+      <div className="widget-drag-handle border-border bg-background-tertiary flex h-8 shrink-0 cursor-grab items-center border-b px-3 transition-colors active:cursor-grabbing">
+        <span className="border-accent text-foreground-secondary border-l-2 pl-2 text-xs font-medium">
+          {title}
+        </span>
       </div>
       <div className="relative flex-1 overflow-hidden">{children}</div>
     </div>

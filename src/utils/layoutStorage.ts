@@ -12,19 +12,36 @@ import type { ResponsiveLayouts } from 'react-grid-layout';
 // -----------------------------------------------------------------------------
 
 const STORAGE_KEY = 'dashboard-layout';
+const VERSION_KEY = 'dashboard-layout-version';
+
+/**
+ * Bump this number whenever DEFAULT_LAYOUTS in DashboardGrid changes.
+ * Stale saved layouts with a different version are automatically discarded.
+ */
+export const LAYOUT_VERSION = 2;
+
+/** Widget keys that every breakpoint must contain for a saved layout to be valid. */
+export const REQUIRED_WIDGET_KEYS = [
+  'candlestick',
+  'orderbook',
+  'trades',
+  'watchlist',
+  'premium',
+] as const;
 
 // -----------------------------------------------------------------------------
 // Functions
 // -----------------------------------------------------------------------------
 
 /**
- * Saves responsive grid layouts to localStorage.
+ * Saves responsive grid layouts to localStorage with the current version tag.
  * Silently fails if localStorage is unavailable (e.g., incognito quota exceeded).
  */
 export function saveLayout(layouts: ResponsiveLayouts): void {
   try {
     if (typeof window === 'undefined') return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts));
+    localStorage.setItem(VERSION_KEY, String(LAYOUT_VERSION));
   } catch (error) {
     console.error('[layoutStorage] Failed to save layout', {
       timestamp: Date.now(),
@@ -50,12 +67,21 @@ export function isValidLayoutItem(item: unknown): boolean {
 
 /**
  * Loads responsive grid layouts from localStorage.
- * Returns null if no saved layout exists or if the data is invalid.
- * Validates each breakpoint is an array of items with required fields (i/x/y/w/h).
+ * Returns null if no saved layout exists, if the data is invalid,
+ * if the version doesn't match, or if required widget keys are missing.
  */
 export function loadLayout(): ResponsiveLayouts | null {
   try {
     if (typeof window === 'undefined') return null;
+
+    // Version mismatch → discard stale layout
+    const savedVersion = localStorage.getItem(VERSION_KEY);
+    if (savedVersion !== String(LAYOUT_VERSION)) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(VERSION_KEY);
+      return null;
+    }
+
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
 
@@ -72,6 +98,12 @@ export function loadLayout(): ResponsiveLayouts | null {
       const value = record[key];
       if (!Array.isArray(value)) return null;
       if (!value.every(isValidLayoutItem)) return null;
+
+      // Every breakpoint must contain all required widget keys
+      const itemKeys = new Set((value as Array<{ i: string }>).map((item) => item.i));
+      for (const required of REQUIRED_WIDGET_KEYS) {
+        if (!itemKeys.has(required)) return null;
+      }
     }
 
     return parsed as ResponsiveLayouts;
@@ -88,4 +120,4 @@ export function loadLayout(): ResponsiveLayouts | null {
 // Exports
 // -----------------------------------------------------------------------------
 
-export { STORAGE_KEY };
+export { STORAGE_KEY, VERSION_KEY };

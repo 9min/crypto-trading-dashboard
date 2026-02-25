@@ -63,9 +63,9 @@ const IntervalButton = memo(function IntervalButton({
     <button
       type="button"
       onClick={handleClick}
-      className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+      className={`rounded px-2.5 py-0.5 text-xs font-medium transition-colors ${
         isActive
-          ? 'bg-background-tertiary text-foreground'
+          ? 'border-accent bg-background-tertiary text-foreground border-b-2'
           : 'text-foreground-secondary hover:text-foreground'
       }`}
     >

@@ -35,26 +35,31 @@ export const KimchiPremiumWidget = memo(function KimchiPremiumWidget() {
 
   return (
     <WidgetWrapper title="Kimchi Premium">
-      <div className="flex flex-col items-center justify-center gap-3 p-4">
+      <div className="flex h-full flex-col items-start justify-center gap-3 p-4">
         {hasData ? (
           <>
-            <div className={`text-3xl font-bold ${premiumDisplay.colorClass}`}>
+            <div className={`text-2xl font-bold ${premiumDisplay.colorClass}`}>
               {premiumDisplay.sign}
               {premium.toFixed(2)}%
             </div>
-            <div className="flex w-full flex-col gap-1.5 text-xs">
-              <div className="text-foreground-secondary flex justify-between">
-                <span>Binance (USD)</span>
-                <span className="font-mono-num text-foreground">${formatPrice(binancePrice)}</span>
+            <div className="flex w-full min-w-0 flex-col gap-1.5 text-xs">
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                <span className="text-foreground-secondary shrink-0">Binance</span>
+                <span className="font-mono-num text-foreground truncate">
+                  ${formatPrice(binancePrice)}
+                </span>
               </div>
-              <div className="text-foreground-secondary flex justify-between">
-                <span>Upbit (KRW)</span>
-                <span className="font-mono-num text-foreground">{formatPrice(upbitPrice, 0)}</span>
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                <span className="text-foreground-secondary shrink-0">Upbit</span>
+                <span className="font-mono-num text-foreground truncate">
+                  {'\u20A9'}
+                  {formatPrice(upbitPrice, 0)}
+                </span>
               </div>
               <div className="border-border mt-1 border-t pt-1">
-                <div className="text-foreground-secondary flex justify-between">
-                  <span>USD/KRW</span>
-                  <span className="font-mono-num text-foreground">
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <span className="text-foreground-secondary shrink-0">USD/KRW</span>
+                  <span className="font-mono-num text-foreground truncate">
                     {formatPrice(usdKrwRate, 2)}
                   </span>
                 </div>
