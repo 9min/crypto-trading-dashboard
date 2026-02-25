@@ -15,7 +15,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { WebSocketManager } from '@/lib/websocket/WebSocketManager';
 import { createMessageRouter } from '@/lib/websocket/messageRouter';
 import { buildCombinedStreamUrl } from '@/lib/binance/streamUrls';
-import { fetchKlines } from '@/lib/binance/restApi';
+import { fetchKlines, fetchDepthSnapshot } from '@/lib/binance/restApi';
 import { useUiStore } from '@/stores/uiStore';
 import { useKlineStore } from '@/stores/klineStore';
 import { useDepthStore } from '@/stores/depthStore';
@@ -71,6 +71,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   const resetKlineStore = useKlineStore((state) => state.reset);
 
   const applyDepthUpdate = useDepthStore((state) => state.applyDepthUpdate);
+  const setDepthSnapshot = useDepthStore((state) => state.setSnapshot);
   const resetDepthStore = useDepthStore((state) => state.reset);
 
   const addTrade = useTradeStore((state) => state.addTrade);
@@ -185,6 +186,23 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
         }
       });
 
+    // Fetch initial depth snapshot via REST API
+    fetchDepthSnapshot(symbol)
+      .then((snapshot) => {
+        if (isActiveRef.current) {
+          const bids: PriceLevel[] = snapshot.bids.map(parseDepthLevel);
+          const asks: PriceLevel[] = snapshot.asks.map(parseDepthLevel);
+          setDepthSnapshot(bids, asks, snapshot.lastUpdateId);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('[useWebSocket] Failed to fetch depth snapshot', {
+          symbol,
+          timestamp: Date.now(),
+          error,
+        });
+      });
+
     // -- Cleanup on unmount or dependency change ------------------------------
     return () => {
       isActiveRef.current = false;
@@ -201,6 +219,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     setConnectionState,
     setCandles,
     setKlineLoading,
+    setDepthSnapshot,
     resetKlineStore,
     resetDepthStore,
     resetTradeStore,
