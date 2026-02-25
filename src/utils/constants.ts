@@ -14,6 +14,18 @@ export const RECONNECT_BASE_DELAY_MS = 1000;
 export const HEARTBEAT_TIMEOUT_MS = 30000;
 export const WS_MAX_RECONNECT_ATTEMPTS = 10;
 
+export const DEFAULT_WATCHLIST_SYMBOLS = [
+  'BTCUSDT',
+  'ETHUSDT',
+  'BNBUSDT',
+  'SOLUSDT',
+  'XRPUSDT',
+  'DOGEUSDT',
+  'ADAUSDT',
+  'AVAXUSDT',
+] as const;
+export const MAX_WATCHLIST_SYMBOLS = 20;
+
 export const COLORS = {
   BUY: '#00C087',
   SELL: '#F6465D',
