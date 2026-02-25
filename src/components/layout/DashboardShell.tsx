@@ -12,10 +12,10 @@
 import { memo } from 'react';
 import { DashboardHeader } from './DashboardHeader';
 import { DashboardGrid } from './DashboardGrid';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { useExchangeWebSocket } from '@/hooks/useExchangeWebSocket';
 
 export const DashboardShell = memo(function DashboardShell() {
-  useWebSocket();
+  useExchangeWebSocket();
 
   return (
     <div className="bg-background flex h-screen flex-col">

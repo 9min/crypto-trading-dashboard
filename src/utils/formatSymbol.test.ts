@@ -2,7 +2,7 @@
 // formatSymbol Utility Unit Tests
 // =============================================================================
 
-import { formatSymbol } from './formatSymbol';
+import { formatSymbol, formatUpbitSymbol } from './formatSymbol';
 
 describe('formatSymbol', () => {
   // ---------------------------------------------------------------------------
@@ -81,5 +81,35 @@ describe('formatSymbol', () => {
   it('prefers USDT over BTC when symbol ends with USDT', () => {
     // BTCUSDT should match USDT, not BTC
     expect(formatSymbol('BTCUSDT')).toBe('BTC/USDT');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatUpbitSymbol
+// ---------------------------------------------------------------------------
+
+describe('formatUpbitSymbol', () => {
+  it('formats KRW-BTC to BTC/KRW', () => {
+    expect(formatUpbitSymbol('KRW-BTC')).toBe('BTC/KRW');
+  });
+
+  it('formats KRW-ETH to ETH/KRW', () => {
+    expect(formatUpbitSymbol('KRW-ETH')).toBe('ETH/KRW');
+  });
+
+  it('formats KRW-DOGE to DOGE/KRW', () => {
+    expect(formatUpbitSymbol('KRW-DOGE')).toBe('DOGE/KRW');
+  });
+
+  it('formats BTC-ETH to ETH/BTC', () => {
+    expect(formatUpbitSymbol('BTC-ETH')).toBe('ETH/BTC');
+  });
+
+  it('returns original for invalid format', () => {
+    expect(formatUpbitSymbol('UNKNOWN')).toBe('UNKNOWN');
+  });
+
+  it('returns original for empty string', () => {
+    expect(formatUpbitSymbol('')).toBe('');
   });
 });
