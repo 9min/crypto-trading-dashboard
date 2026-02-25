@@ -70,6 +70,7 @@ export class OrderBookRenderer implements CanvasRenderer {
   private width = 0;
   private height = 0;
   private colors: OrderBookColors;
+  private forceDirty = false;
 
   // Pre-allocated Float64Array buffers — reused every frame to avoid GC pressure
   private bidCumulativeBuf = new Float64Array(MAX_DEPTH_LEVELS);
@@ -91,10 +92,15 @@ export class OrderBookRenderer implements CanvasRenderer {
 
   onFrame(): void {
     const state = useDepthStore.getState();
-    if (!state.isDirty) return;
+    if (!state.isDirty && !this.forceDirty) return;
 
     this.draw();
+    this.forceDirty = false;
     state.markClean();
+  }
+
+  markDirty(): void {
+    this.forceDirty = true;
   }
 
   destroy(): void {

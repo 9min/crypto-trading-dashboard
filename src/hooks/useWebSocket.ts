@@ -27,6 +27,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useKlineStore } from '@/stores/klineStore';
 import { useDepthStore } from '@/stores/depthStore';
 import { useTradeStore } from '@/stores/tradeStore';
+import { useToastStore } from '@/stores/toastStore';
 import type { ConnectionState, PriceLevel, KlineInterval } from '@/types/chart';
 import type { BinanceKlineEvent, BinanceDepthEvent, BinanceTradeEvent } from '@/types/binance';
 
@@ -85,7 +86,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   const addCandle = useKlineStore((state) => state.addCandle);
   const updateLastCandle = useKlineStore((state) => state.updateLastCandle);
   const setKlineLoading = useKlineStore((state) => state.setLoading);
-  const resetKlineStore = useKlineStore((state) => state.reset);
+  const resetKlineData = useKlineStore((state) => state.resetData);
 
   const applyDepthUpdate = useDepthStore((state) => state.applyDepthUpdate);
   const setDepthSnapshot = useDepthStore((state) => state.setSnapshot);
@@ -153,8 +154,8 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     const manager = WebSocketManager.getInstance();
     const url = buildCombinedStreamUrl(symbol, interval);
 
-    // Reset all data stores when symbol/interval changes
-    resetKlineStore();
+    // Reset data stores when symbol/interval changes (preserve interval selection)
+    resetKlineData();
     resetDepthStore();
     resetTradeStore();
 
@@ -196,12 +197,12 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
 
             // Validate sequence continuity for buffered events
             if (buffered.U > expectedNextUpdateId) {
-              // Gap in buffer — stop replaying, live events will re-sync
-              console.error('[useWebSocket] Depth sequence gap in buffer replay', {
+              // Gap in buffer — expected during React Strict Mode double-mount
+              // or when snapshot fetch is slow. Live events will re-sync.
+              console.warn('[useWebSocket] Depth sequence gap in buffer replay, will re-sync', {
                 symbol,
                 expected: expectedNextUpdateId,
                 eventU: buffered.U,
-                timestamp: Date.now(),
               });
               break;
             }
@@ -243,6 +244,9 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
               symbol,
               timestamp: Date.now(),
             });
+            useToastStore
+              .getState()
+              .addToast(`Order book sync failed for ${symbol}. Retrying in 30s...`, 'warning');
             snapshotRetryTimeout = setTimeout(() => {
               if (isActive) {
                 fetchAndApplySnapshot(0);
@@ -271,12 +275,12 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
       }
 
       if (event.U > expectedNextUpdateId) {
-        // Gap detected — re-sync by fetching a new snapshot
-        console.error('[useWebSocket] Depth sequence gap detected, re-syncing', {
+        // Gap detected — re-sync by fetching a new snapshot.
+        // Expected during React Strict Mode double-mount or after tab switch.
+        console.warn('[useWebSocket] Depth sequence gap detected, re-syncing', {
           symbol,
           expected: expectedNextUpdateId,
           eventU: event.U,
-          timestamp: Date.now(),
         });
         snapshotReady = false;
         depthBuffer.length = 0;
@@ -306,11 +310,45 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     // Subscribe to incoming WebSocket messages
     const unsubscribeMessages = manager.subscribe(router);
 
+    // Track whether the initial connection has been established, so we can
+    // distinguish the very first `connected` event (handled by the explicit
+    // fetchAndApplySnapshot call below) from subsequent reconnections.
+    let hasEverConnected = false;
+    let prevStatus: ConnectionState['status'] = 'idle';
+
     // Subscribe to connection state changes and sync to uiStore
     const unsubscribeState = manager.onStateChange((state: ConnectionState): void => {
-      if (isActive) {
-        setConnectionState(state);
+      if (!isActive) return;
+
+      setConnectionState(state);
+
+      // Toast on connection failure
+      if (state.status === 'failed') {
+        useToastStore
+          .getState()
+          .addToast('WebSocket connection lost. Click Reconnect to retry.', 'error');
       }
+
+      // Re-fetch depth snapshot whenever the connection is (re-)established
+      // after the initial connect. Covers all reconnection paths including:
+      //   reconnecting → connected
+      //   failed → connecting → connected
+      //   reconnecting → connecting → connected (tab visibility restore)
+      if (state.status === 'connected' && hasEverConnected && prevStatus !== 'connected') {
+        snapshotReady = false;
+        depthBuffer.length = 0;
+        if (snapshotRetryTimeout !== null) {
+          clearTimeout(snapshotRetryTimeout);
+          snapshotRetryTimeout = null;
+        }
+        fetchAndApplySnapshot(0);
+      }
+
+      if (state.status === 'connected') {
+        hasEverConnected = true;
+      }
+
+      prevStatus = state.status;
     });
 
     // Connect WebSocket
@@ -325,12 +363,14 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
         }
       })
       .catch((error: unknown) => {
+        if (!isActive) return;
         console.error('[useWebSocket] Failed to fetch initial kline data', {
           symbol,
           interval,
           timestamp: Date.now(),
           error,
         });
+        useToastStore.getState().addToast(`Failed to load chart data for ${symbol}`, 'error');
       })
       .finally(() => {
         if (isActive) {
@@ -362,7 +402,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     setKlineLoading,
     setDepthSnapshot,
     applyDepthUpdate,
-    resetKlineStore,
+    resetKlineData,
     resetDepthStore,
     resetTradeStore,
   ]);

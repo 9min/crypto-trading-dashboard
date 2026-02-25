@@ -1,7 +1,9 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useUiStore } from '@/stores/uiStore';
+import { WebSocketManager } from '@/lib/websocket/WebSocketManager';
+import { Button } from '@/components/ui/Button';
 
 interface StatusConfig {
   color: string;
@@ -11,6 +13,10 @@ interface StatusConfig {
 
 export const ConnectionStatus = memo(function ConnectionStatus() {
   const connectionState = useUiStore((state) => state.connectionState);
+
+  const handleReconnect = useCallback(() => {
+    WebSocketManager.getInstance().reconnect();
+  }, []);
 
   const getStatusConfig = (): StatusConfig => {
     switch (connectionState.status) {
@@ -33,6 +39,7 @@ export const ConnectionStatus = memo(function ConnectionStatus() {
   };
 
   const config = getStatusConfig();
+  const isFailed = connectionState.status === 'failed';
 
   return (
     <div className="flex items-center gap-2">
@@ -45,6 +52,11 @@ export const ConnectionStatus = memo(function ConnectionStatus() {
         <span className={`relative inline-flex h-2 w-2 rounded-full ${config.color}`} />
       </div>
       <span className="text-foreground-secondary text-xs">{config.label}</span>
+      {isFailed && (
+        <Button variant="ghost" size="sm" onClick={handleReconnect}>
+          Reconnect
+        </Button>
+      )}
     </div>
   );
 });

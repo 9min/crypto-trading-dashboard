@@ -100,6 +100,10 @@ export class TradesFeedRenderer implements CanvasRenderer {
     this.lastRenderedTradeId = latestId;
   }
 
+  markDirty(): void {
+    this.lastRenderedTradeId = -1;
+  }
+
   destroy(): void {
     // No internal resources to release
   }

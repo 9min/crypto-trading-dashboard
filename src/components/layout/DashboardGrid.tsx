@@ -11,13 +11,14 @@
 // and ResponsiveGridLayout for responsive breakpoint handling.
 // =============================================================================
 
-import { memo, useMemo, useCallback, type ReactNode } from 'react';
+import { memo, useMemo, useState, useCallback, type ReactNode } from 'react';
 import {
   ResponsiveGridLayout,
   useContainerWidth,
   type Layout,
   type ResponsiveLayouts,
 } from 'react-grid-layout';
+import { saveLayout, loadLayout } from '@/utils/layoutStorage';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { CandlestickWidget } from '@/components/widgets/CandlestickWidget';
 import { OrderBookWidget } from '@/components/widgets/OrderBookWidget';
@@ -72,6 +73,10 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
 export const DashboardGrid = memo(function DashboardGrid() {
   const { width, containerRef, mounted } = useContainerWidth();
 
+  const [layouts] = useState<ResponsiveLayouts<'lg' | 'md' | 'sm'>>(
+    () => loadLayout() ?? DEFAULT_LAYOUTS,
+  );
+
   const widgets: GridWidget[] = useMemo(
     () => [
       { key: 'candlestick', title: 'Chart', component: <CandlestickWidget /> },
@@ -83,8 +88,8 @@ export const DashboardGrid = memo(function DashboardGrid() {
   );
 
   const handleLayoutChange = useCallback(
-    (_layout: Layout, _layouts: ResponsiveLayouts<'lg' | 'md' | 'sm'>) => {
-      // Future: persist layout to uiStore / Supabase
+    (_layout: Layout, allLayouts: ResponsiveLayouts<'lg' | 'md' | 'sm'>) => {
+      saveLayout(allLayouts);
     },
     [],
   );
@@ -95,7 +100,7 @@ export const DashboardGrid = memo(function DashboardGrid() {
         <ResponsiveGridLayout
           className="layout"
           width={width}
-          layouts={DEFAULT_LAYOUTS}
+          layouts={layouts}
           breakpoints={GRID_BREAKPOINTS}
           cols={GRID_COLS}
           rowHeight={GRID_ROW_HEIGHT}

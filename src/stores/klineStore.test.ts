@@ -209,6 +209,27 @@ describe('klineStore', () => {
   // reset
   // ---------------------------------------------------------------------------
 
+  describe('resetData', () => {
+    it('clears candles and isLoading but preserves interval', () => {
+      useKlineStore.getState().setCandles([createCandle({ time: 1 }), createCandle({ time: 2 })]);
+      useKlineStore.getState().setInterval('4h');
+      useKlineStore.getState().setLoading(true);
+
+      useKlineStore.getState().resetData();
+      const state = useKlineStore.getState();
+
+      expect(state.candles).toEqual([]);
+      expect(state.isLoading).toBe(false);
+      // Interval MUST be preserved — resetting it would cause infinite
+      // effect loops when useWebSocket re-runs on interval change
+      expect(state.interval).toBe('4h');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // reset
+  // ---------------------------------------------------------------------------
+
   describe('reset', () => {
     it('clears all state to initial values', () => {
       useKlineStore.getState().setCandles([createCandle({ time: 1 }), createCandle({ time: 2 })]);

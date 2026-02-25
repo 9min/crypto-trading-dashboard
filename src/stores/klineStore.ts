@@ -34,7 +34,9 @@ interface KlineStoreActions {
   setInterval: (interval: KlineInterval) => void;
   /** Set the loading state */
   setLoading: (isLoading: boolean) => void;
-  /** Reset store to initial state */
+  /** Reset only data state (candles + loading), preserving the current interval */
+  resetData: () => void;
+  /** Reset store to initial state (including interval) */
   reset: () => void;
 }
 
@@ -91,6 +93,10 @@ export const useKlineStore = create<KlineStore>()((set) => ({
 
   setLoading: (isLoading: boolean): void => {
     set({ isLoading });
+  },
+
+  resetData: (): void => {
+    set({ candles: [], isLoading: false });
   },
 
   reset: (): void => {

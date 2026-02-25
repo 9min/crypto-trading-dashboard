@@ -25,6 +25,8 @@ interface CanvasRenderer {
   setSize: (width: number, height: number) => void;
   /** Called once per rAF frame. Renderer decides whether to draw (dirty flag). */
   onFrame: () => void;
+  /** Force the renderer to draw on the next frame (e.g., after tab visibility change). */
+  markDirty: () => void;
   /** Tear down all internal resources. */
   destroy: () => void;
 }
@@ -69,14 +71,45 @@ export function useCanvasRenderer<T extends CanvasRenderer>({
     const renderer = createRenderer(ctx);
     rendererRef.current = renderer;
 
-    // rAF loop
+    let isRunning = true;
+
+    // rAF loop — paused when tab is hidden (CLAUDE.md requirement)
     const loop = (): void => {
+      if (!isRunning) return;
       renderer.onFrame();
       rafIdRef.current = requestAnimationFrame(loop);
     };
     rafIdRef.current = requestAnimationFrame(loop);
 
+    const startLoop = (): void => {
+      if (isRunning) return;
+      isRunning = true;
+      // Force draw on next frame after visibility restore
+      renderer.markDirty();
+      rafIdRef.current = requestAnimationFrame(loop);
+    };
+
+    const stopLoop = (): void => {
+      isRunning = false;
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopLoop();
+      } else {
+        startLoop();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      isRunning = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
