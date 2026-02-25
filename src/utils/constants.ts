@@ -7,7 +7,14 @@ export const DEFAULT_INTERVAL = '1m';
 export const MAX_CANDLES = 2000;
 export const MAX_TRADES = 200;
 export const MAX_DEPTH_LEVELS = 50;
-export const TRADE_FIELDS_PER_ENTRY = 4; // timestamp, price, quantity, isBuyerMaker
+export const TRADE_FIELDS_PER_ENTRY = 5; // id, price, quantity, time, isBuyerMaker
+
+/** Field index constants for RingBuffer trade entries */
+export const TRADE_FIELD_ID = 0;
+export const TRADE_FIELD_PRICE = 1;
+export const TRADE_FIELD_QUANTITY = 2;
+export const TRADE_FIELD_TIME = 3;
+export const TRADE_FIELD_IS_BUYER_MAKER = 4;
 
 export const RECONNECT_MAX_DELAY_MS = 30000;
 export const RECONNECT_BASE_DELAY_MS = 1000;
