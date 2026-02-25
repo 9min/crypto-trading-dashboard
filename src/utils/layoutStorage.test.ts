@@ -79,5 +79,31 @@ describe('layoutStorage', () => {
       mockStorage.set(STORAGE_KEY, '[1, 2, 3]');
       expect(loadLayout()).toBeNull();
     });
+
+    it('returns null when breakpoint value is not an array', () => {
+      mockStorage.set(STORAGE_KEY, JSON.stringify({ lg: 'not-an-array' }));
+      expect(loadLayout()).toBeNull();
+    });
+
+    it('returns null when layout item has missing fields', () => {
+      // Missing 'w' and 'h'
+      mockStorage.set(STORAGE_KEY, JSON.stringify({ lg: [{ i: 'chart', x: 0, y: 0 }] }));
+      expect(loadLayout()).toBeNull();
+    });
+
+    it('returns null when layout item has wrong field types', () => {
+      // 'x' should be number, not string
+      mockStorage.set(
+        STORAGE_KEY,
+        JSON.stringify({ lg: [{ i: 'chart', x: '0', y: 0, w: 8, h: 14 }] }),
+      );
+      expect(loadLayout()).toBeNull();
+    });
+
+    it('accepts valid layouts with empty breakpoint arrays', () => {
+      const layouts = { lg: [], md: [] };
+      mockStorage.set(STORAGE_KEY, JSON.stringify(layouts));
+      expect(loadLayout()).toEqual(layouts);
+    });
   });
 });

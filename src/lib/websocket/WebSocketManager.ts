@@ -183,10 +183,12 @@ export class WebSocketManager {
   reconnect(): void {
     if (!this.currentUrl) return;
 
+    // Copy URL before cleanup() clears WebSocket state
+    const url = this.currentUrl;
     this.reconnectAttempt = 0;
     this.cleanup();
     this.setState({ status: 'connecting' });
-    this.createWebSocket(this.currentUrl);
+    this.createWebSocket(url);
   }
 
   // ---------------------------------------------------------------------------

@@ -310,7 +310,10 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     // Subscribe to incoming WebSocket messages
     const unsubscribeMessages = manager.subscribe(router);
 
-    // Track previous connection status for transition detection
+    // Track whether the initial connection has been established, so we can
+    // distinguish the very first `connected` event (handled by the explicit
+    // fetchAndApplySnapshot call below) from subsequent reconnections.
+    let hasEverConnected = false;
     let prevStatus: ConnectionState['status'] = 'idle';
 
     // Subscribe to connection state changes and sync to uiStore
@@ -326,11 +329,12 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
           .addToast('WebSocket connection lost. Click Reconnect to retry.', 'error');
       }
 
-      // Re-fetch depth snapshot when reconnecting succeeds
-      if (
-        state.status === 'connected' &&
-        (prevStatus === 'reconnecting' || prevStatus === 'failed')
-      ) {
+      // Re-fetch depth snapshot whenever the connection is (re-)established
+      // after the initial connect. Covers all reconnection paths including:
+      //   reconnecting → connected
+      //   failed → connecting → connected
+      //   reconnecting → connecting → connected (tab visibility restore)
+      if (state.status === 'connected' && hasEverConnected && prevStatus !== 'connected') {
         snapshotReady = false;
         depthBuffer.length = 0;
         if (snapshotRetryTimeout !== null) {
@@ -338,6 +342,10 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
           snapshotRetryTimeout = null;
         }
         fetchAndApplySnapshot(0);
+      }
+
+      if (state.status === 'connected') {
+        hasEverConnected = true;
       }
 
       prevStatus = state.status;
@@ -355,6 +363,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
         }
       })
       .catch((error: unknown) => {
+        if (!isActive) return;
         console.error('[useWebSocket] Failed to fetch initial kline data', {
           symbol,
           interval,
