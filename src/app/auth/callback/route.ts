@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.redirect(origin);
+    return NextResponse.redirect(`${origin}/?auth_error=true`);
   }
 
   const response = NextResponse.redirect(origin);

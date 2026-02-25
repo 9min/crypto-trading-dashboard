@@ -80,7 +80,10 @@ export class WatchlistStreamManager {
    */
   connect(symbols: string[]): void {
     if (typeof window === 'undefined') return;
-    if (symbols.length === 0) return;
+    if (symbols.length === 0) {
+      this.disconnect();
+      return;
+    }
 
     // Check if already connected with identical symbols
     if (this.isSameSymbols(symbols) && this.ws?.readyState === WebSocket.OPEN) {

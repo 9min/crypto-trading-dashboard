@@ -38,20 +38,19 @@ const DEBOUNCE_MS = 500;
 // -----------------------------------------------------------------------------
 
 /**
- * Replaces the watchlist store's symbols with the given list.
- * Uses add/remove to work with the existing store API.
+ * Replaces the watchlist store's symbols with the given list,
+ * preserving the exact order of nextSymbols.
+ * Removes all current symbols first, then adds in order.
  */
 function replaceWatchlistSymbols(nextSymbols: string[]): void {
   const store = useWatchlistStore.getState();
   const current = store.symbols;
 
-  // Remove symbols not in the new list
+  // Remove all current symbols
   for (const s of current) {
-    if (!nextSymbols.includes(s)) {
-      store.removeSymbol(s);
-    }
+    store.removeSymbol(s);
   }
-  // Add symbols not yet present
+  // Add in the exact order of nextSymbols
   for (const s of nextSymbols) {
     store.addSymbol(s);
   }
@@ -63,23 +62,31 @@ function replaceWatchlistSymbols(nextSymbols: string[]): void {
 
 export function usePreferencesSync(): void {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPatchRef = useRef<Partial<UserPreferences>>({});
   const isInitialLoadRef = useRef(true);
 
   // ---------------------------------------------------------------------------
   // Debounced cloud save helper (defined before effects that use it)
+  // Merges consecutive partial updates so no field is lost.
   // ---------------------------------------------------------------------------
   const debouncedCloudSaveRef = useRef((partial: Partial<UserPreferences>): void => {
     const user = useAuthStore.getState().user;
     if (!user) return;
+
+    // Merge into pending patch so consecutive changes accumulate
+    pendingPatchRef.current = { ...pendingPatchRef.current, ...partial };
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
     debounceTimerRef.current = setTimeout(() => {
+      const patch = pendingPatchRef.current;
+      pendingPatchRef.current = {};
+
       void (async () => {
         try {
-          await upsertPreferences(user.id, partial);
+          await upsertPreferences(user.id, patch);
         } catch {
           useToastStore.getState().addToast('Failed to save preferences to cloud', 'warning');
         }
@@ -114,36 +121,40 @@ export function usePreferencesSync(): void {
       if (!user || prevUser) return;
 
       void (async () => {
-        const prefs = await fetchPreferences(user.id);
+        try {
+          const prefs = await fetchPreferences(user.id);
 
-        if (prefs) {
-          // Apply cloud preferences to app state
-          useUiStore.getState().setTheme(prefs.theme);
-          useKlineStore.getState().setInterval(prefs.interval);
-          replaceWatchlistSymbols(prefs.watchlistSymbols);
+          if (prefs) {
+            // Apply cloud preferences to app state
+            useUiStore.getState().setTheme(prefs.theme);
+            useKlineStore.getState().setInterval(prefs.interval);
+            replaceWatchlistSymbols(prefs.watchlistSymbols);
 
-          // Apply layout if available
-          if (prefs.layout) {
-            saveLayout(prefs.layout);
+            // Apply layout if available
+            if (prefs.layout) {
+              saveLayout(prefs.layout);
+            }
+
+            // Also update localStorage as offline backup
+            saveTheme(prefs.theme);
+            saveInterval(prefs.interval);
+            saveWatchlistSymbols(prefs.watchlistSymbols);
+          } else {
+            // First login: migrate current localStorage values to Supabase
+            const currentTheme = useUiStore.getState().theme;
+            const currentInterval = useKlineStore.getState().interval;
+            const currentSymbols = useWatchlistStore.getState().symbols;
+            const currentLayout = loadLayout();
+
+            await upsertPreferences(user.id, {
+              theme: currentTheme,
+              interval: currentInterval,
+              watchlistSymbols: currentSymbols,
+              layout: currentLayout,
+            });
           }
-
-          // Also update localStorage as offline backup
-          saveTheme(prefs.theme);
-          saveInterval(prefs.interval);
-          saveWatchlistSymbols(prefs.watchlistSymbols);
-        } else {
-          // First login: migrate current localStorage values to Supabase
-          const currentTheme = useUiStore.getState().theme;
-          const currentInterval = useKlineStore.getState().interval;
-          const currentSymbols = useWatchlistStore.getState().symbols;
-          const currentLayout = loadLayout();
-
-          await upsertPreferences(user.id, {
-            theme: currentTheme,
-            interval: currentInterval,
-            watchlistSymbols: currentSymbols,
-            layout: currentLayout,
-          });
+        } catch {
+          useToastStore.getState().addToast('Failed to load cloud preferences', 'warning');
         }
       })();
     });

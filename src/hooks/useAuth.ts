@@ -60,9 +60,12 @@ export function useAuth(): UseAuthReturn {
   useEffect(() => {
     if (!supabase) return;
 
+    let isMounted = true;
+
     // Check existing session on mount
     setLoading(true);
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
       if (session?.user) {
         setUser(toUserProfile(session.user));
       }
@@ -81,6 +84,7 @@ export function useAuth(): UseAuthReturn {
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [setUser, setLoading]);
@@ -90,7 +94,7 @@ export function useAuth(): UseAuthReturn {
   // ---------------------------------------------------------------------------
 
   const signInWithGoogle = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || typeof window === 'undefined') return;
     const redirectTo = `${window.location.origin}/auth/callback`;
     await supabase.auth.signInWithOAuth({
       provider: 'google',
