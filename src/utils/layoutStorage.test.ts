@@ -146,7 +146,7 @@ describe('layoutStorage', () => {
       expect(loadLayout()).toBeNull();
     });
 
-    it('returns null when a required widget key is missing from a breakpoint', () => {
+    it('returns null when a required widget key is missing and cleans up storage', () => {
       const layouts = {
         lg: [
           { i: 'candlestick', x: 0, y: 0, w: 8, h: 14 },
@@ -158,6 +158,16 @@ describe('layoutStorage', () => {
       mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
 
       expect(loadLayout()).toBeNull();
+      expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
+      expect(localStorage.removeItem).toHaveBeenCalledWith(VERSION_KEY);
+    });
+
+    it('cleans up storage when layout structure is invalid', () => {
+      mockStorage.set(STORAGE_KEY, JSON.stringify({ lg: 'not-an-array' }));
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
+
+      expect(loadLayout()).toBeNull();
+      expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
     });
   });
 });

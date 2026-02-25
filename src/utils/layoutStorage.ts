@@ -65,10 +65,17 @@ export function isValidLayoutItem(item: unknown): boolean {
   );
 }
 
+/** Removes stale layout data from localStorage. */
+function clearStoredLayout(): void {
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(VERSION_KEY);
+}
+
 /**
  * Loads responsive grid layouts from localStorage.
  * Returns null if no saved layout exists, if the data is invalid,
  * if the version doesn't match, or if required widget keys are missing.
+ * Invalid data is always cleaned up from localStorage.
  */
 export function loadLayout(): ResponsiveLayouts | null {
   try {
@@ -77,8 +84,7 @@ export function loadLayout(): ResponsiveLayouts | null {
     // Version mismatch → discard stale layout
     const savedVersion = localStorage.getItem(VERSION_KEY);
     if (savedVersion !== String(LAYOUT_VERSION)) {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(VERSION_KEY);
+      clearStoredLayout();
       return null;
     }
 
@@ -89,6 +95,7 @@ export function loadLayout(): ResponsiveLayouts | null {
 
     // Must be a non-null, non-array object
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      clearStoredLayout();
       return null;
     }
 
@@ -96,13 +103,18 @@ export function loadLayout(): ResponsiveLayouts | null {
     const record = parsed as Record<string, unknown>;
     for (const key of Object.keys(record)) {
       const value = record[key];
-      if (!Array.isArray(value)) return null;
-      if (!value.every(isValidLayoutItem)) return null;
+      if (!Array.isArray(value) || !value.every(isValidLayoutItem)) {
+        clearStoredLayout();
+        return null;
+      }
 
       // Every breakpoint must contain all required widget keys
       const itemKeys = new Set((value as Array<{ i: string }>).map((item) => item.i));
       for (const required of REQUIRED_WIDGET_KEYS) {
-        if (!itemKeys.has(required)) return null;
+        if (!itemKeys.has(required)) {
+          clearStoredLayout();
+          return null;
+        }
       }
     }
 

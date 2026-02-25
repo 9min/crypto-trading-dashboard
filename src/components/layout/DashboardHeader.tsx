@@ -21,7 +21,7 @@ export const DashboardHeader = memo(function DashboardHeader() {
   return (
     <header className="border-border bg-background-secondary flex h-12 shrink-0 items-center justify-between border-b px-4">
       <div className="flex items-center gap-4">
-        <h1 className="text-accent text-sm font-bold tracking-wide">CryptoDash</h1>
+        <h1 className="text-accent text-sm font-bold tracking-wide">CryptoDash - 9min</h1>
         <div className="bg-border h-5 w-px" />
         <ExchangeSelector />
         <span className="font-mono-num text-foreground text-sm font-semibold">{displaySymbol}</span>

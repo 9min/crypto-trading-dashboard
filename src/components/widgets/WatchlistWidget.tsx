@@ -56,8 +56,10 @@ const SymbolRow = memo(function SymbolRow({
     onSelect(symbol);
   }, [symbol, onSelect]);
 
-  const displaySymbol =
-    exchange === 'upbit' ? formatUpbitSymbol(toUpbitSymbol(symbol)) : formatSymbol(symbol);
+  const displaySymbol = useMemo(
+    () => (exchange === 'upbit' ? formatUpbitSymbol(toUpbitSymbol(symbol)) : formatSymbol(symbol)),
+    [exchange, symbol],
+  );
 
   const { price, changePercent, changeColorClass, changeSign } = useMemo(() => {
     const p = ticker?.price ?? 0;
