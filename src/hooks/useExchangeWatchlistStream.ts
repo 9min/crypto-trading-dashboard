@@ -34,7 +34,7 @@ export function useExchangeWatchlistStream(): void {
   // Binance watchlist: only active when exchange === 'binance'
   // useWatchlistStream reads symbols from the store internally,
   // so we only need to conditionally manage the upbit side
-  useWatchlistStream();
+  useWatchlistStream(exchange === 'binance');
 
   // Upbit watchlist: active when exchange === 'upbit'
   useUpbitWatchlistStream({ symbols: upbitSymbols });

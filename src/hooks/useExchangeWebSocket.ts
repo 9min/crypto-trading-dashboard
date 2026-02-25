@@ -12,6 +12,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useKlineStore } from '@/stores/klineStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useUpbitStream } from '@/hooks/useUpbitStream';
+import { toUpbitSymbol } from '@/utils/symbolMap';
 import type { KlineInterval } from '@/types/chart';
 
 // -----------------------------------------------------------------------------
@@ -34,8 +35,9 @@ export function useExchangeWebSocket(): void {
   });
 
   // Upbit hook: active when exchange === 'upbit'
+  // Convert Binance-format symbol to Upbit format for the Upbit API
   useUpbitStream({
-    symbol: exchange === 'upbit' ? symbol : null,
+    symbol: exchange === 'upbit' ? toUpbitSymbol(symbol) : null,
     interval: interval as KlineInterval,
   });
 }

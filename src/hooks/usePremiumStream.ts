@@ -38,15 +38,9 @@ export function usePremiumStream(): void {
   useEffect(() => {
     let isActive = true;
 
-    // Determine the Binance symbol and Upbit market code
-    const binanceSymbol = exchange === 'binance' ? symbol : symbol;
-    const upbitSymbol = exchange === 'upbit' ? symbol : toUpbitSymbol(symbol);
-
-    // Skip if Upbit symbol mapping doesn't exist
-    if (upbitSymbol === binanceSymbol && exchange === 'binance') {
-      // toUpbitSymbol returned the original — no mapping exists
-      // Still try to connect, the premium will just be 0
-    }
+    // symbol is always Binance format — convert for Upbit API
+    const binanceSymbol = symbol;
+    const upbitSymbol = toUpbitSymbol(symbol);
 
     resetPremium();
 

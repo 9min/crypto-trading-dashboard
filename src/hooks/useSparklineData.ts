@@ -9,6 +9,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ExchangeId } from '@/types/exchange';
 import { EXCHANGES } from '@/types/exchange';
+import { toUpbitSymbol } from '@/utils/symbolMap';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -132,7 +133,7 @@ export function useSparklineData(symbol: string, exchange: ExchangeId): number[]
         const result =
           exchange === 'binance'
             ? await fetchBinanceSparkline(symbol)
-            : await fetchUpbitSparkline(symbol);
+            : await fetchUpbitSparkline(toUpbitSymbol(symbol));
 
         if (controller.signal.aborted) return;
 

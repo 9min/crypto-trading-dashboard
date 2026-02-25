@@ -12,6 +12,7 @@ import { UpbitWebSocketManager } from '@/lib/upbit/UpbitWebSocketManager';
 import { createUpbitMessageRouter } from '@/lib/upbit/messageRouter';
 import { fetchUpbitTickers } from '@/lib/upbit/restClient';
 import { useWatchlistStore } from '@/stores/watchlistStore';
+import { toBinanceSymbol } from '@/utils/symbolMap';
 import type { UpbitTickerEvent } from '@/types/upbit';
 
 // -----------------------------------------------------------------------------
@@ -53,7 +54,7 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
         if (!isActive) return;
 
         const tickers = responses.map((r) => ({
-          symbol: r.market,
+          symbol: toBinanceSymbol(r.market),
           price: r.trade_price,
           priceChangePercent: r.signed_change_rate * 100,
           volume: r.acc_trade_price_24h,
@@ -79,7 +80,7 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
     const handleTicker = (event: UpbitTickerEvent): void => {
       if (!isActive) return;
 
-      updateTicker(event.code, {
+      updateTicker(toBinanceSymbol(event.code), {
         price: event.trade_price,
         priceChangePercent: event.signed_change_rate * 100,
         volume: event.acc_trade_price_24h,
