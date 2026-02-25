@@ -6,6 +6,7 @@ import { ConnectionStatus } from './ConnectionStatus';
 import { IntervalSelector } from './IntervalSelector';
 import { ExchangeSelector } from '@/components/ui/ExchangeSelector';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { PriceAlertPopover } from '@/components/ui/PriceAlertPopover';
 import { UserMenu } from '@/components/ui/UserMenu';
 import { formatSymbol, formatUpbitSymbol } from '@/utils/formatSymbol';
 
@@ -25,6 +26,7 @@ export const DashboardHeader = memo(function DashboardHeader() {
       </div>
       <div className="flex items-center gap-3">
         <ConnectionStatus />
+        <PriceAlertPopover />
         <ThemeToggle />
         <UserMenu />
       </div>
