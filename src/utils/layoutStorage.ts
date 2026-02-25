@@ -101,7 +101,13 @@ export function loadLayout(): ResponsiveLayouts | null {
 
     // Validate each breakpoint: must be an array of valid layout items
     const record = parsed as Record<string, unknown>;
-    for (const key of Object.keys(record)) {
+    const breakpointKeys = Object.keys(record);
+    if (breakpointKeys.length === 0) {
+      clearStoredLayout();
+      return null;
+    }
+
+    for (const key of breakpointKeys) {
       const value = record[key];
       if (!Array.isArray(value) || !value.every(isValidLayoutItem)) {
         clearStoredLayout();

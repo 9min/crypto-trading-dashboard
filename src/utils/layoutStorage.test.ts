@@ -170,6 +170,15 @@ describe('layoutStorage', () => {
       expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
     });
 
+    it('returns null and cleans up when layout is an empty object', () => {
+      mockStorage.set(STORAGE_KEY, JSON.stringify({}));
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
+
+      expect(loadLayout()).toBeNull();
+      expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
+      expect(localStorage.removeItem).toHaveBeenCalledWith(VERSION_KEY);
+    });
+
     it('cleans up corrupted data on parse failure', () => {
       mockStorage.set(STORAGE_KEY, '{invalid json!!!}');
       mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
