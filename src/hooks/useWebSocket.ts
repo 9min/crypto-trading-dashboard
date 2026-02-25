@@ -9,13 +9,20 @@
 // On mount: connects WebSocket, fetches initial klines, subscribes to messages.
 // On unmount: unsubscribes from messages, unsubscribes from state changes.
 // When symbol/interval changes: disconnects old stream, resets stores, reconnects.
+//
+// Depth synchronization follows Binance's official protocol:
+//   1. Buffer WebSocket depth events while fetching the REST snapshot.
+//   2. Once the snapshot arrives, drop buffered events where u <= snapshot.lastUpdateId.
+//   3. The first applied event must satisfy U <= lastUpdateId+1 && u >= lastUpdateId+1.
+//   4. Subsequent events validate U/u continuity (gap → re-sync).
+//   5. Buffer is capped at MAX_DEPTH_BUFFER to prevent OOM on snapshot failure.
 // =============================================================================
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { WebSocketManager } from '@/lib/websocket/WebSocketManager';
 import { createMessageRouter } from '@/lib/websocket/messageRouter';
 import { buildCombinedStreamUrl } from '@/lib/binance/streamUrls';
-import { fetchKlines } from '@/lib/binance/restApi';
+import { fetchKlines, fetchDepthSnapshot } from '@/lib/binance/restApi';
 import { useUiStore } from '@/stores/uiStore';
 import { useKlineStore } from '@/stores/klineStore';
 import { useDepthStore } from '@/stores/depthStore';
@@ -38,6 +45,16 @@ interface UseWebSocketReturn {
   /** Current WebSocket connection state */
   connectionState: ConnectionState;
 }
+
+// -----------------------------------------------------------------------------
+// Constants
+// -----------------------------------------------------------------------------
+
+/** Max buffered depth events before snapshot arrives. Prevents OOM. */
+const MAX_DEPTH_BUFFER = 5000;
+
+/** Max snapshot retry attempts with exponential backoff. */
+const MAX_SNAPSHOT_RETRIES = 3;
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -71,6 +88,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   const resetKlineStore = useKlineStore((state) => state.reset);
 
   const applyDepthUpdate = useDepthStore((state) => state.applyDepthUpdate);
+  const setDepthSnapshot = useDepthStore((state) => state.setSnapshot);
   const resetDepthStore = useDepthStore((state) => state.reset);
 
   const addTrade = useTradeStore((state) => state.addTrade);
@@ -79,9 +97,6 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   // Resolve effective symbol and interval (params override store defaults)
   const symbol = params?.symbol ?? storeSymbol;
   const interval = params?.interval ?? storeInterval;
-
-  // Ref to track whether the effect is still active (prevents stale closures)
-  const isActiveRef = useRef(true);
 
   // -- Message Handlers (stable references via useCallback) -------------------
 
@@ -108,15 +123,6 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     [addCandle, updateLastCandle],
   );
 
-  const handleDepth = useCallback(
-    (event: BinanceDepthEvent): void => {
-      const bidUpdates: PriceLevel[] = event.b.map(parseDepthLevel);
-      const askUpdates: PriceLevel[] = event.a.map(parseDepthLevel);
-      applyDepthUpdate(bidUpdates, askUpdates, event.u);
-    },
-    [applyDepthUpdate],
-  );
-
   const handleTrade = useCallback(
     (event: BinanceTradeEvent): void => {
       addTrade({
@@ -133,7 +139,16 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   // -- Main Effect: WebSocket lifecycle tied to symbol/interval ---------------
 
   useEffect(() => {
-    isActiveRef.current = true;
+    // Local flag scoped to THIS effect execution. When cleanup runs,
+    // `isActive` becomes false — preventing stale async REST responses
+    // from overwriting the store after a symbol/interval change.
+    let isActive = true;
+
+    // -- Depth buffering & sequencing state ----------------------------------
+    let snapshotReady = false;
+    let expectedNextUpdateId = 0;
+    const depthBuffer: BinanceDepthEvent[] = [];
+    let snapshotRetryTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const manager = WebSocketManager.getInstance();
     const url = buildCombinedStreamUrl(symbol, interval);
@@ -142,6 +157,144 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     resetKlineStore();
     resetDepthStore();
     resetTradeStore();
+
+    // -- Depth snapshot fetch with retry + replay ----------------------------
+    const fetchAndApplySnapshot = (retryCount: number): void => {
+      fetchDepthSnapshot(symbol)
+        .then((snapshot) => {
+          if (!isActive) return;
+
+          const bids: PriceLevel[] = snapshot.bids.map(parseDepthLevel);
+          const asks: PriceLevel[] = snapshot.asks.map(parseDepthLevel);
+          setDepthSnapshot(bids, asks, snapshot.lastUpdateId);
+
+          const snapshotLastUpdateId = snapshot.lastUpdateId;
+          expectedNextUpdateId = snapshotLastUpdateId + 1;
+          snapshotReady = true;
+
+          // Replay buffered depth events per Binance protocol:
+          // - Drop events where u <= snapshot.lastUpdateId (stale)
+          // - First valid event must satisfy U <= lastUpdateId+1 && u >= lastUpdateId+1
+          // - Subsequent events validate U/u continuity
+          let firstValid = false;
+          for (const buffered of depthBuffer) {
+            // Drop events that are entirely before the snapshot
+            if (buffered.u <= snapshotLastUpdateId) continue;
+
+            if (!firstValid) {
+              // First event must bridge the snapshot boundary
+              if (
+                buffered.U <= snapshotLastUpdateId + 1 &&
+                buffered.u >= snapshotLastUpdateId + 1
+              ) {
+                firstValid = true;
+              } else {
+                // Gap detected — skip
+                continue;
+              }
+            }
+
+            // Validate sequence continuity for buffered events
+            if (buffered.U > expectedNextUpdateId) {
+              // Gap in buffer — stop replaying, live events will re-sync
+              console.error('[useWebSocket] Depth sequence gap in buffer replay', {
+                symbol,
+                expected: expectedNextUpdateId,
+                eventU: buffered.U,
+                timestamp: Date.now(),
+              });
+              break;
+            }
+
+            const bidUpdates: PriceLevel[] = buffered.b.map(parseDepthLevel);
+            const askUpdates: PriceLevel[] = buffered.a.map(parseDepthLevel);
+            applyDepthUpdate(bidUpdates, askUpdates, buffered.u);
+            expectedNextUpdateId = buffered.u + 1;
+          }
+
+          // Clear the buffer — no longer needed
+          depthBuffer.length = 0;
+        })
+        .catch((error: unknown) => {
+          if (!isActive) return;
+
+          console.error('[useWebSocket] Failed to fetch depth snapshot', {
+            symbol,
+            timestamp: Date.now(),
+            attempt: retryCount + 1,
+            error,
+          });
+
+          // Clear the buffer to prevent unbounded growth
+          depthBuffer.length = 0;
+
+          // Retry with exponential backoff
+          if (retryCount < MAX_SNAPSHOT_RETRIES) {
+            const delay = 1000 * Math.pow(2, retryCount);
+            snapshotRetryTimeout = setTimeout(() => {
+              if (isActive) {
+                fetchAndApplySnapshot(retryCount + 1);
+              }
+            }, delay);
+          } else {
+            // All fast retries exhausted — schedule a slow recovery retry (30s)
+            // so the order book can self-heal without requiring user intervention
+            console.error('[useWebSocket] Depth snapshot retries exhausted, scheduling recovery', {
+              symbol,
+              timestamp: Date.now(),
+            });
+            snapshotRetryTimeout = setTimeout(() => {
+              if (isActive) {
+                fetchAndApplySnapshot(0);
+              }
+            }, 30_000);
+          }
+        });
+    };
+
+    // -- Depth handler with buffering + sequencing ----------------------------
+    const handleDepth = (event: BinanceDepthEvent): void => {
+      if (!isActive) return;
+
+      if (!snapshotReady) {
+        // Snapshot hasn't arrived yet — buffer with cap to prevent OOM
+        if (depthBuffer.length < MAX_DEPTH_BUFFER) {
+          depthBuffer.push(event);
+        }
+        return;
+      }
+
+      // Validate U/u sequence continuity
+      if (event.u < expectedNextUpdateId) {
+        // Stale/duplicate event — ignore
+        return;
+      }
+
+      if (event.U > expectedNextUpdateId) {
+        // Gap detected — re-sync by fetching a new snapshot
+        console.error('[useWebSocket] Depth sequence gap detected, re-syncing', {
+          symbol,
+          expected: expectedNextUpdateId,
+          eventU: event.U,
+          timestamp: Date.now(),
+        });
+        snapshotReady = false;
+        depthBuffer.length = 0;
+        // Cancel any pending retry timer to prevent concurrent fetch races
+        if (snapshotRetryTimeout !== null) {
+          clearTimeout(snapshotRetryTimeout);
+          snapshotRetryTimeout = null;
+        }
+        fetchAndApplySnapshot(0);
+        return;
+      }
+
+      // Normal path: apply the update
+      const bidUpdates: PriceLevel[] = event.b.map(parseDepthLevel);
+      const askUpdates: PriceLevel[] = event.a.map(parseDepthLevel);
+      applyDepthUpdate(bidUpdates, askUpdates, event.u);
+      expectedNextUpdateId = event.u + 1;
+    };
 
     // Create the message router with typed handlers
     const router = createMessageRouter({
@@ -155,7 +308,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
 
     // Subscribe to connection state changes and sync to uiStore
     const unsubscribeState = manager.onStateChange((state: ConnectionState): void => {
-      if (isActiveRef.current) {
+      if (isActive) {
         setConnectionState(state);
       }
     });
@@ -167,7 +320,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     setKlineLoading(true);
     fetchKlines(symbol, interval)
       .then((candles) => {
-        if (isActiveRef.current) {
+        if (isActive) {
           setCandles(candles);
         }
       })
@@ -180,14 +333,21 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
         });
       })
       .finally(() => {
-        if (isActiveRef.current) {
+        if (isActive) {
           setKlineLoading(false);
         }
       });
 
+    // Fetch initial depth snapshot via REST API
+    fetchAndApplySnapshot(0);
+
     // -- Cleanup on unmount or dependency change ------------------------------
     return () => {
-      isActiveRef.current = false;
+      isActive = false;
+      depthBuffer.length = 0;
+      if (snapshotRetryTimeout !== null) {
+        clearTimeout(snapshotRetryTimeout);
+      }
       unsubscribeMessages();
       unsubscribeState();
       manager.disconnect();
@@ -196,11 +356,12 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     symbol,
     interval,
     handleKline,
-    handleDepth,
     handleTrade,
     setConnectionState,
     setCandles,
     setKlineLoading,
+    setDepthSnapshot,
+    applyDepthUpdate,
     resetKlineStore,
     resetDepthStore,
     resetTradeStore,
