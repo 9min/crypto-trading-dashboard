@@ -236,6 +236,18 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
                 fetchAndApplySnapshot(retryCount + 1);
               }
             }, delay);
+          } else {
+            // All fast retries exhausted — schedule a slow recovery retry (30s)
+            // so the order book can self-heal without requiring user intervention
+            console.error('[useWebSocket] Depth snapshot retries exhausted, scheduling recovery', {
+              symbol,
+              timestamp: Date.now(),
+            });
+            snapshotRetryTimeout = setTimeout(() => {
+              if (isActive) {
+                fetchAndApplySnapshot(0);
+              }
+            }, 30_000);
           }
         });
     };
@@ -268,6 +280,11 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
         });
         snapshotReady = false;
         depthBuffer.length = 0;
+        // Cancel any pending retry timer to prevent concurrent fetch races
+        if (snapshotRetryTimeout !== null) {
+          clearTimeout(snapshotRetryTimeout);
+          snapshotRetryTimeout = null;
+        }
         fetchAndApplySnapshot(0);
         return;
       }
