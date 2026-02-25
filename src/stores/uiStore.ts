@@ -80,12 +80,7 @@ export const useUiStore = create<UiStore>()((set) => {
   }
 
   function hydrateExchange(): void {
-    const persisted = loadExchange();
-    if (persisted !== DEFAULT_EXCHANGE) {
-      set({ exchange: persisted, isExchangeHydrated: true });
-    } else {
-      set({ isExchangeHydrated: true });
-    }
+    set({ exchange: loadExchange(), isExchangeHydrated: true });
   }
 
   function setConnectionState(connectionState: ConnectionState): void {
