@@ -229,6 +229,9 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
     if (candles.length === 0) {
       prevCandleCountRef.current = 0;
       prevFirstTimeRef.current = 0;
+      // Clear Lightweight Charts internal buffers so the previous symbol's
+      // data and price scale do not linger until new candles arrive.
+      series.setData([]);
       return;
     }
 

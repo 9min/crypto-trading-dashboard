@@ -7,6 +7,9 @@
 // prices and 24-hour price change percentages. Data is sourced from the
 // watchlistStore, populated via REST API and updated by WebSocket miniTicker.
 //
+// Each SymbolRow subscribes to its own ticker slice via a Zustand selector,
+// so only the row whose data changed re-renders — not the entire widget.
+//
 // Clicking a symbol updates uiStore.symbol, triggering all other widgets
 // to switch to the selected pair.
 // =============================================================================
@@ -18,7 +21,6 @@ import { useWatchlistStream } from '@/hooks/useWatchlistStream';
 import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol } from '@/utils/formatSymbol';
 import { WidgetWrapper } from './WidgetWrapper';
-import type { WatchlistTicker } from '@/types/chart';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -27,7 +29,6 @@ import type { WatchlistTicker } from '@/types/chart';
 interface SymbolRowProps {
   symbol: string;
   isActive: boolean;
-  ticker: WatchlistTicker | undefined;
   onSelect: (symbol: string) => void;
 }
 
@@ -35,7 +36,9 @@ interface SymbolRowProps {
 // Sub-Component
 // -----------------------------------------------------------------------------
 
-const SymbolRow = memo(function SymbolRow({ symbol, isActive, ticker, onSelect }: SymbolRowProps) {
+const SymbolRow = memo(function SymbolRow({ symbol, isActive, onSelect }: SymbolRowProps) {
+  const ticker = useWatchlistStore((state) => state.tickers.get(symbol));
+
   const handleClick = useCallback(() => {
     onSelect(symbol);
   }, [symbol, onSelect]);
@@ -81,7 +84,6 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
   const activeSymbol = useUiStore((state) => state.symbol);
   const setSymbol = useUiStore((state) => state.setSymbol);
   const symbols = useWatchlistStore((state) => state.symbols);
-  const tickers = useWatchlistStore((state) => state.tickers);
 
   useWatchlistStream();
 
@@ -100,7 +102,6 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
             key={symbol}
             symbol={symbol}
             isActive={symbol === activeSymbol}
-            ticker={tickers.get(symbol)}
             onSelect={handleSelect}
           />
         ))}
