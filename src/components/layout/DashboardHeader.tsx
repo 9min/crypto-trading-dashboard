@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { ConnectionStatus } from './ConnectionStatus';
+import { IntervalSelector } from './IntervalSelector';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export const DashboardHeader = memo(function DashboardHeader() {
@@ -13,6 +14,7 @@ export const DashboardHeader = memo(function DashboardHeader() {
       <div className="flex items-center gap-3">
         <h1 className="text-foreground text-sm font-semibold">CryptoDash</h1>
         <span className="font-mono-num text-accent text-sm font-medium">{symbol}</span>
+        <IntervalSelector />
       </div>
       <div className="flex items-center gap-3">
         <ConnectionStatus />
