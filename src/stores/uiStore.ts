@@ -52,42 +52,51 @@ type UiStore = UiStoreState & UiStoreActions;
 // Store
 // -----------------------------------------------------------------------------
 
-export const useUiStore = create<UiStore>()((set) => ({
-  // -- State ------------------------------------------------------------------
-  theme: 'dark',
-  symbol: DEFAULT_SYMBOL,
-  exchange: loadExchange(),
-  connectionState: { status: 'idle' },
-  layout: [],
-
-  // -- Actions ----------------------------------------------------------------
-  setTheme: (theme: Theme): void => {
+export const useUiStore = create<UiStore>()((set) => {
+  function setTheme(theme: Theme): void {
     set({ theme });
-  },
+  }
 
-  toggleTheme: (): void => {
+  function toggleTheme(): void {
     set((state) => ({
       theme: state.theme === 'dark' ? 'light' : 'dark',
     }));
-  },
+  }
 
-  setSymbol: (symbol: string): void => {
+  function setSymbol(symbol: string): void {
     set({ symbol });
-  },
+  }
 
-  setExchange: (exchange: ExchangeId): void => {
+  function setExchange(exchange: ExchangeId): void {
     saveExchange(exchange);
     set({ exchange });
-  },
+  }
 
-  setConnectionState: (connectionState: ConnectionState): void => {
+  function setConnectionState(connectionState: ConnectionState): void {
     set({ connectionState });
-  },
+  }
 
-  setLayout: (layout: LayoutItem[]): void => {
+  function setLayout(layout: LayoutItem[]): void {
     set({ layout });
-  },
-}));
+  }
+
+  return {
+    // -- State ----------------------------------------------------------------
+    theme: 'dark',
+    symbol: DEFAULT_SYMBOL,
+    exchange: loadExchange(),
+    connectionState: { status: 'idle' },
+    layout: [],
+
+    // -- Actions --------------------------------------------------------------
+    setTheme,
+    toggleTheme,
+    setSymbol,
+    setExchange,
+    setConnectionState,
+    setLayout,
+  };
+});
 
 // -----------------------------------------------------------------------------
 // Exports
