@@ -14,7 +14,7 @@
 // to switch to the selected pair.
 // =============================================================================
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useWatchlistStream } from '@/hooks/useWatchlistStream';
@@ -43,12 +43,17 @@ const SymbolRow = memo(function SymbolRow({ symbol, isActive, onSelect }: Symbol
     onSelect(symbol);
   }, [symbol, onSelect]);
 
-  const price = ticker?.price ?? 0;
-  const changePercent = ticker?.priceChangePercent ?? 0;
-
-  const changeColorClass =
-    changePercent > 0 ? 'text-buy' : changePercent < 0 ? 'text-sell' : 'text-foreground-secondary';
-  const changeSign = changePercent > 0 ? '+' : '';
+  const { price, changePercent, changeColorClass, changeSign } = useMemo(() => {
+    const p = ticker?.price ?? 0;
+    const cp = ticker?.priceChangePercent ?? 0;
+    return {
+      price: p,
+      changePercent: cp,
+      changeColorClass:
+        cp > 0 ? 'text-buy' : cp < 0 ? 'text-sell' : 'text-foreground-secondary',
+      changeSign: cp > 0 ? '+' : '',
+    };
+  }, [ticker?.price, ticker?.priceChangePercent]);
 
   return (
     <button
