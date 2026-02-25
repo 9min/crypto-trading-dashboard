@@ -11,12 +11,16 @@
 //   Center     → Spread display
 //
 // Each level shows: cumulative quantity bar + price + quantity text overlay.
+//
+// Performance: uses pre-allocated Float64Array buffers for cumulative quantities
+// to eliminate per-frame heap allocations and GC pressure.
 // =============================================================================
 
 import { useDepthStore } from '@/stores/depthStore';
 import type { PriceLevel } from '@/types/chart';
 import type { CanvasRenderer } from '@/hooks/useCanvasRenderer';
 import { formatPrice } from '@/utils/formatPrice';
+import { MAX_DEPTH_LEVELS } from '@/utils/constants';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -67,6 +71,10 @@ export class OrderBookRenderer implements CanvasRenderer {
   private height = 0;
   private colors: OrderBookColors;
 
+  // Pre-allocated Float64Array buffers — reused every frame to avoid GC pressure
+  private bidCumulativeBuf = new Float64Array(MAX_DEPTH_LEVELS);
+  private askCumulativeBuf = new Float64Array(MAX_DEPTH_LEVELS);
+
   constructor(ctx: CanvasRenderingContext2D, colors?: Partial<OrderBookColors>) {
     this.ctx = ctx;
     this.colors = { ...DEFAULT_COLORS, ...colors };
@@ -114,28 +122,39 @@ export class OrderBookRenderer implements CanvasRenderer {
     const halfWidth = width / 2;
     const visibleRows = Math.floor((height - SPREAD_HEIGHT) / ROW_HEIGHT);
 
-    const displayBids = bids.slice(0, visibleRows);
-    const displayAsks = asks.slice(0, visibleRows);
+    const bidCount = Math.min(bids.length, visibleRows);
+    const askCount = Math.min(asks.length, visibleRows);
 
-    // Compute cumulative quantities for bar widths
-    const bidCumulative = this.computeCumulative(displayBids);
-    const askCumulative = this.computeCumulative(displayAsks);
+    // Compute cumulative quantities into pre-allocated buffers
+    this.computeCumulative(bids, bidCount, this.bidCumulativeBuf);
+    this.computeCumulative(asks, askCount, this.askCumulativeBuf);
+
     const maxCumQty = Math.max(
-      bidCumulative.length > 0 ? bidCumulative[bidCumulative.length - 1] : 0,
-      askCumulative.length > 0 ? askCumulative[askCumulative.length - 1] : 0,
+      bidCount > 0 ? this.bidCumulativeBuf[bidCount - 1] : 0,
+      askCount > 0 ? this.askCumulativeBuf[askCount - 1] : 0,
       1, // Prevent division by zero
     );
 
     // Draw spread bar
-    this.drawSpread(displayBids, displayAsks);
+    this.drawSpread(bids, asks);
 
     // Draw bids (left side, top-to-bottom, best bid at top)
-    this.drawLevels(displayBids, bidCumulative, maxCumQty, 0, halfWidth, SPREAD_HEIGHT, 'bid');
+    this.drawLevels(
+      bids,
+      bidCount,
+      this.bidCumulativeBuf,
+      maxCumQty,
+      0,
+      halfWidth,
+      SPREAD_HEIGHT,
+      'bid',
+    );
 
     // Draw asks (right side, top-to-bottom, best ask at top)
     this.drawLevels(
-      displayAsks,
-      askCumulative,
+      asks,
+      askCount,
+      this.askCumulativeBuf,
       maxCumQty,
       halfWidth,
       halfWidth,
@@ -178,7 +197,8 @@ export class OrderBookRenderer implements CanvasRenderer {
 
   private drawLevels(
     levels: PriceLevel[],
-    cumulative: number[],
+    count: number,
+    cumulative: Float64Array,
     maxCumQty: number,
     startX: number,
     sectionWidth: number,
@@ -192,7 +212,7 @@ export class OrderBookRenderer implements CanvasRenderer {
 
     ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
 
-    for (let i = 0; i < levels.length; i++) {
+    for (let i = 0; i < count; i++) {
       const level = levels[i];
       const y = startY + i * ROW_HEIGHT;
 
@@ -239,14 +259,16 @@ export class OrderBookRenderer implements CanvasRenderer {
 
   // -- Helpers ----------------------------------------------------------------
 
-  private computeCumulative(levels: PriceLevel[]): number[] {
-    const result: number[] = [];
+  /**
+   * Computes cumulative quantities into a pre-allocated Float64Array buffer.
+   * Returns the count of levels written (same as input count).
+   */
+  private computeCumulative(levels: PriceLevel[], count: number, buf: Float64Array): void {
     let sum = 0;
-    for (const level of levels) {
-      sum += level.quantity;
-      result.push(sum);
+    for (let i = 0; i < count; i++) {
+      sum += levels[i].quantity;
+      buf[i] = sum;
     }
-    return result;
   }
 
   private formatQuantity(qty: number): string {

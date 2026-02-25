@@ -108,6 +108,7 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
   const chartRef = useRef<ChartApi | null>(null);
   const seriesRef = useRef<CandlestickSeriesApi | null>(null);
   const prevCandleCountRef = useRef(0);
+  const prevFirstTimeRef = useRef(0);
   const colorsRef = useRef<ChartColors>(DARK_COLORS);
 
   // State flag to signal that the async chart init has completed and
@@ -170,6 +171,7 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
       chartRef.current = chart;
       seriesRef.current = series;
       prevCandleCountRef.current = 0;
+      prevFirstTimeRef.current = 0;
       setIsChartReady(true);
     });
 
@@ -222,8 +224,19 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
     const series = seriesRef.current;
     if (!isChartReady || !series || candles.length === 0) return;
 
-    if (prevCandleCountRef.current === 0 || candles.length < prevCandleCountRef.current) {
-      // Full data set (initial load or symbol change)
+    const firstTime = candles[0].time;
+
+    // Detect when a full setData is needed:
+    // - Initial load (prevCandleCountRef === 0)
+    // - Symbol change (length decreased)
+    // - Rolling window shift (first candle's time changed while length stayed the same,
+    //   meaning addCandle triggered slice(-MAX_CANDLES) eviction)
+    const needsFullReset =
+      prevCandleCountRef.current === 0 ||
+      candles.length < prevCandleCountRef.current ||
+      (candles.length === prevCandleCountRef.current && prevFirstTimeRef.current !== firstTime);
+
+    if (needsFullReset) {
       // @ts-expect-error — lightweight-charts Time is a branded number type,
       // but our CandleData.time is a plain number (UTC seconds). The values are
       // compatible at runtime; the branded type just prevents direct assignment.
@@ -237,6 +250,7 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
     }
 
     prevCandleCountRef.current = candles.length;
+    prevFirstTimeRef.current = firstTime;
   }, [candles, isChartReady]);
 
   return (
