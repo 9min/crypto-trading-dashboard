@@ -18,8 +18,10 @@ import { memo, useCallback, useMemo } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useExchangeWatchlistStream } from '@/hooks/useExchangeWatchlistStream';
+import { useSparklineData } from '@/hooks/useSparklineData';
 import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol, formatUpbitSymbol } from '@/utils/formatSymbol';
+import { Sparkline } from '@/components/ui/Sparkline';
 import { WidgetWrapper } from './WidgetWrapper';
 
 // -----------------------------------------------------------------------------
@@ -47,6 +49,7 @@ const SymbolRow = memo(function SymbolRow({
   exchange,
 }: SymbolRowInternalProps) {
   const ticker = useWatchlistStore((state) => state.tickers.get(symbol));
+  const sparklineData = useSparklineData(symbol, exchange);
 
   const handleClick = useCallback(() => {
     onSelect(symbol);
@@ -77,6 +80,7 @@ const SymbolRow = memo(function SymbolRow({
         {displaySymbol}
       </span>
       <div className="flex items-center gap-2">
+        {sparklineData.length >= 2 && <Sparkline data={sparklineData} width={48} height={16} />}
         {price > 0 && (
           <span className="font-mono-num text-foreground text-xs">{formatPrice(price)}</span>
         )}
