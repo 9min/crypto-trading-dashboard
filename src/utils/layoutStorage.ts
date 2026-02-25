@@ -23,6 +23,7 @@ const STORAGE_KEY = 'dashboard-layout';
  */
 export function saveLayout(layouts: ResponsiveLayouts): void {
   try {
+    if (typeof window === 'undefined') return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts));
   } catch (error) {
     console.error('[layoutStorage] Failed to save layout', {
@@ -54,6 +55,7 @@ export function isValidLayoutItem(item: unknown): boolean {
  */
 export function loadLayout(): ResponsiveLayouts | null {
   try {
+    if (typeof window === 'undefined') return null;
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
 

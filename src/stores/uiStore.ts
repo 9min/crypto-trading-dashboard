@@ -8,7 +8,9 @@
 import { create } from 'zustand';
 import type { ConnectionState } from '@/types/chart';
 import type { LayoutItem } from '@/types/widget';
+import type { ExchangeId } from '@/types/exchange';
 import { DEFAULT_SYMBOL } from '@/utils/constants';
+import { loadExchange, saveExchange } from '@/utils/localPreferences';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -19,8 +21,10 @@ type Theme = 'dark' | 'light';
 interface UiStoreState {
   /** Current color theme */
   theme: Theme;
-  /** Active trading symbol across the dashboard (e.g., "BTCUSDT") */
+  /** Active trading symbol across the dashboard (e.g., "BTCUSDT" or "KRW-BTC") */
   symbol: string;
+  /** Currently selected exchange */
+  exchange: ExchangeId;
   /** WebSocket connection state (discriminated union) */
   connectionState: ConnectionState;
   /** Current dashboard widget layout configuration */
@@ -34,6 +38,8 @@ interface UiStoreActions {
   toggleTheme: () => void;
   /** Change the active trading symbol */
   setSymbol: (symbol: string) => void;
+  /** Change the active exchange */
+  setExchange: (exchange: ExchangeId) => void;
   /** Update WebSocket connection state */
   setConnectionState: (state: ConnectionState) => void;
   /** Replace the entire dashboard layout */
@@ -46,36 +52,51 @@ type UiStore = UiStoreState & UiStoreActions;
 // Store
 // -----------------------------------------------------------------------------
 
-export const useUiStore = create<UiStore>()((set) => ({
-  // -- State ------------------------------------------------------------------
-  theme: 'dark',
-  symbol: DEFAULT_SYMBOL,
-  connectionState: { status: 'idle' },
-  layout: [],
-
-  // -- Actions ----------------------------------------------------------------
-  setTheme: (theme: Theme): void => {
+export const useUiStore = create<UiStore>()((set) => {
+  function setTheme(theme: Theme): void {
     set({ theme });
-  },
+  }
 
-  toggleTheme: (): void => {
+  function toggleTheme(): void {
     set((state) => ({
       theme: state.theme === 'dark' ? 'light' : 'dark',
     }));
-  },
+  }
 
-  setSymbol: (symbol: string): void => {
+  function setSymbol(symbol: string): void {
     set({ symbol });
-  },
+  }
 
-  setConnectionState: (connectionState: ConnectionState): void => {
+  function setExchange(exchange: ExchangeId): void {
+    saveExchange(exchange);
+    set({ exchange });
+  }
+
+  function setConnectionState(connectionState: ConnectionState): void {
     set({ connectionState });
-  },
+  }
 
-  setLayout: (layout: LayoutItem[]): void => {
+  function setLayout(layout: LayoutItem[]): void {
     set({ layout });
-  },
-}));
+  }
+
+  return {
+    // -- State ----------------------------------------------------------------
+    theme: 'dark',
+    symbol: DEFAULT_SYMBOL,
+    exchange: loadExchange(),
+    connectionState: { status: 'idle' },
+    layout: [],
+
+    // -- Actions --------------------------------------------------------------
+    setTheme,
+    toggleTheme,
+    setSymbol,
+    setExchange,
+    setConnectionState,
+    setLayout,
+  };
+});
 
 // -----------------------------------------------------------------------------
 // Exports
