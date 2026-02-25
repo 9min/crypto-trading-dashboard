@@ -64,13 +64,24 @@ export function useAuth(): UseAuthReturn {
 
     // Check existing session on mount
     setLoading(true);
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!isMounted) return;
-      if (session?.user) {
-        setUser(toUserProfile(session.user));
-      }
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!isMounted) return;
+        if (session?.user) {
+          setUser(toUserProfile(session.user));
+        }
+      })
+      .catch((error: unknown) => {
+        if (!isMounted) return;
+        console.error('[useAuth] getSession failed', {
+          timestamp: Date.now(),
+          error,
+        });
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
 
     // Listen for auth state changes (sign-in, sign-out, token refresh)
     const {
@@ -96,10 +107,16 @@ export function useAuth(): UseAuthReturn {
   const signInWithGoogle = useCallback(async () => {
     if (!supabase || typeof window === 'undefined') return;
     const redirectTo = `${window.location.origin}/auth/callback`;
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
     });
+    if (error) {
+      console.error('[useAuth] signInWithGoogle failed', {
+        timestamp: Date.now(),
+        error: error.message,
+      });
+    }
   }, []);
 
   const signOut = useCallback(async () => {

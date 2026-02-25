@@ -70,8 +70,7 @@ export function usePreferencesSync(): void {
   // Merges consecutive partial updates so no field is lost.
   // ---------------------------------------------------------------------------
   const debouncedCloudSaveRef = useRef((partial: Partial<UserPreferences>): void => {
-    const user = useAuthStore.getState().user;
-    if (!user) return;
+    if (!useAuthStore.getState().user) return;
 
     // Merge into pending patch so consecutive changes accumulate
     pendingPatchRef.current = { ...pendingPatchRef.current, ...partial };
@@ -81,12 +80,16 @@ export function usePreferencesSync(): void {
     }
 
     debounceTimerRef.current = setTimeout(() => {
+      // Re-read user at execution time to avoid stale closure
+      const currentUser = useAuthStore.getState().user;
+      if (!currentUser) return;
+
       const patch = pendingPatchRef.current;
       pendingPatchRef.current = {};
 
       void (async () => {
         try {
-          await upsertPreferences(user.id, patch);
+          await upsertPreferences(currentUser.id, patch);
         } catch {
           useToastStore.getState().addToast('Failed to save preferences to cloud', 'warning');
         }
@@ -123,6 +126,9 @@ export function usePreferencesSync(): void {
       void (async () => {
         try {
           const prefs = await fetchPreferences(user.id);
+
+          // Staleness guard: if user logged out while fetching, discard result
+          if (useAuthStore.getState().user?.id !== user.id) return;
 
           if (prefs) {
             // Apply cloud preferences to app state
