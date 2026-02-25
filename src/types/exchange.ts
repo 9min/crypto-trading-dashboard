@@ -5,6 +5,8 @@
 // Currently supports Binance and Upbit.
 // =============================================================================
 
+import { BINANCE_WS_BASE_URL, BINANCE_REST_BASE_URL } from '@/utils/constants';
+
 // -----------------------------------------------------------------------------
 // Exchange ID
 // -----------------------------------------------------------------------------
@@ -53,8 +55,8 @@ const EXCHANGES: Record<ExchangeId, ExchangeConfig> = {
   binance: {
     id: 'binance',
     name: 'Binance',
-    wsUrl: 'wss://stream.binance.com:9443/stream',
-    restBaseUrl: 'https://api.binance.com/api/v3',
+    wsUrl: BINANCE_WS_BASE_URL,
+    restBaseUrl: BINANCE_REST_BASE_URL,
     symbolFormat: 'BTCUSDT',
   },
   upbit: {

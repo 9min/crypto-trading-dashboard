@@ -141,6 +141,7 @@ export function saveExchange(exchange: ExchangeId): void {
 /** Loads the exchange preference from localStorage. Defaults to `'binance'`. */
 export function loadExchange(): ExchangeId {
   try {
+    if (typeof window === 'undefined') return 'binance';
     const raw = localStorage.getItem(EXCHANGE_KEY);
     if (raw && VALID_EXCHANGES.has(raw)) return raw as ExchangeId;
   } catch (error) {

@@ -10,6 +10,7 @@ import type { ConnectionState } from '@/types/chart';
 import type { LayoutItem } from '@/types/widget';
 import type { ExchangeId } from '@/types/exchange';
 import { DEFAULT_SYMBOL } from '@/utils/constants';
+import { loadExchange, saveExchange } from '@/utils/localPreferences';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -55,7 +56,7 @@ export const useUiStore = create<UiStore>()((set) => ({
   // -- State ------------------------------------------------------------------
   theme: 'dark',
   symbol: DEFAULT_SYMBOL,
-  exchange: 'binance',
+  exchange: loadExchange(),
   connectionState: { status: 'idle' },
   layout: [],
 
@@ -75,6 +76,7 @@ export const useUiStore = create<UiStore>()((set) => ({
   },
 
   setExchange: (exchange: ExchangeId): void => {
+    saveExchange(exchange);
     set({ exchange });
   },
 
