@@ -175,6 +175,20 @@ export class WebSocketManager {
     return this.state;
   }
 
+  /**
+   * Manually triggers a reconnection attempt.
+   * Resets the reconnect counter so the full backoff sequence starts fresh.
+   * No-op if there is no URL to reconnect to.
+   */
+  reconnect(): void {
+    if (!this.currentUrl) return;
+
+    this.reconnectAttempt = 0;
+    this.cleanup();
+    this.setState({ status: 'connecting' });
+    this.createWebSocket(this.currentUrl);
+  }
+
   // ---------------------------------------------------------------------------
   // WebSocket Lifecycle (Private)
   // ---------------------------------------------------------------------------
