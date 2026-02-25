@@ -86,7 +86,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   const addCandle = useKlineStore((state) => state.addCandle);
   const updateLastCandle = useKlineStore((state) => state.updateLastCandle);
   const setKlineLoading = useKlineStore((state) => state.setLoading);
-  const resetKlineStore = useKlineStore((state) => state.reset);
+  const resetKlineData = useKlineStore((state) => state.resetData);
 
   const applyDepthUpdate = useDepthStore((state) => state.applyDepthUpdate);
   const setDepthSnapshot = useDepthStore((state) => state.setSnapshot);
@@ -154,8 +154,8 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     const manager = WebSocketManager.getInstance();
     const url = buildCombinedStreamUrl(symbol, interval);
 
-    // Reset all data stores when symbol/interval changes
-    resetKlineStore();
+    // Reset data stores when symbol/interval changes (preserve interval selection)
+    resetKlineData();
     resetDepthStore();
     resetTradeStore();
 
@@ -393,7 +393,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     setKlineLoading,
     setDepthSnapshot,
     applyDepthUpdate,
-    resetKlineStore,
+    resetKlineData,
     resetDepthStore,
     resetTradeStore,
   ]);
