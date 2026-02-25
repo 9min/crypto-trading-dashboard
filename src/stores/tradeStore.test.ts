@@ -33,7 +33,7 @@ describe('tradeStore', () => {
   // ---------------------------------------------------------------------------
 
   describe('addTrade', () => {
-    it('prepends a trade to the list', () => {
+    it('adds a trade to the buffer', () => {
       const trade1 = createTrade({ id: 1, price: 50000 });
       const trade2 = createTrade({ id: 2, price: 51000 });
 
@@ -41,10 +41,19 @@ describe('tradeStore', () => {
       useTradeStore.getState().addTrade(trade2);
 
       const state = useTradeStore.getState();
-      expect(state.trades).toHaveLength(2);
+      expect(state.buffer.length).toBe(2);
+      expect(state.lastTradeId).toBe(2);
+    });
+
+    it('toTradeEntries returns newest-first order', () => {
+      useTradeStore.getState().addTrade(createTrade({ id: 1, price: 50000 }));
+      useTradeStore.getState().addTrade(createTrade({ id: 2, price: 51000 }));
+
+      const entries = useTradeStore.getState().toTradeEntries();
+      expect(entries).toHaveLength(2);
       // Newest first
-      expect(state.trades[0].id).toBe(2);
-      expect(state.trades[1].id).toBe(1);
+      expect(entries[0].id).toBe(2);
+      expect(entries[1].id).toBe(1);
     });
 
     it('caps trades at MAX_TRADES', () => {
@@ -54,9 +63,11 @@ describe('tradeStore', () => {
       }
 
       const state = useTradeStore.getState();
-      expect(state.trades).toHaveLength(MAX_TRADES);
-      // Most recent trade should be at index 0
-      expect(state.trades[0].id).toBe(MAX_TRADES + 4);
+      expect(state.buffer.length).toBe(MAX_TRADES);
+
+      // Most recent trade should be first in toTradeEntries
+      const entries = state.toTradeEntries();
+      expect(entries[0].id).toBe(MAX_TRADES + 4);
     });
 
     it('does not exceed MAX_TRADES when adding one past capacity', () => {
@@ -64,11 +75,21 @@ describe('tradeStore', () => {
       for (let i = 0; i < MAX_TRADES; i++) {
         useTradeStore.getState().addTrade(createTrade({ id: i }));
       }
-      expect(useTradeStore.getState().trades).toHaveLength(MAX_TRADES);
+      expect(useTradeStore.getState().buffer.length).toBe(MAX_TRADES);
 
       // Add one more
       useTradeStore.getState().addTrade(createTrade({ id: MAX_TRADES }));
-      expect(useTradeStore.getState().trades).toHaveLength(MAX_TRADES);
+      expect(useTradeStore.getState().buffer.length).toBe(MAX_TRADES);
+    });
+
+    it('preserves isBuyerMaker flag correctly', () => {
+      useTradeStore.getState().addTrade(createTrade({ id: 1, isBuyerMaker: true }));
+      useTradeStore.getState().addTrade(createTrade({ id: 2, isBuyerMaker: false }));
+
+      const entries = useTradeStore.getState().toTradeEntries();
+      // newest first
+      expect(entries[0].isBuyerMaker).toBe(false);
+      expect(entries[1].isBuyerMaker).toBe(true);
     });
   });
 
@@ -147,9 +168,9 @@ describe('tradeStore', () => {
       ];
       useTradeStore.getState().setTrades(newTrades);
 
-      const state = useTradeStore.getState();
-      expect(state.trades).toHaveLength(2);
-      expect(state.trades[0].id).toBe(10);
+      const entries = useTradeStore.getState().toTradeEntries();
+      expect(entries).toHaveLength(2);
+      expect(entries[0].id).toBe(10);
     });
 
     it('sets lastPrice from the first (newest) trade', () => {
@@ -158,6 +179,14 @@ describe('tradeStore', () => {
         .setTrades([createTrade({ id: 10, price: 60000 }), createTrade({ id: 11, price: 59000 })]);
 
       expect(useTradeStore.getState().lastPrice).toBe(60000);
+    });
+
+    it('sets lastTradeId from the first (newest) trade', () => {
+      useTradeStore
+        .getState()
+        .setTrades([createTrade({ id: 10, price: 60000 }), createTrade({ id: 11, price: 59000 })]);
+
+      expect(useTradeStore.getState().lastTradeId).toBe(10);
     });
 
     it('sets direction to neutral on setTrades', () => {
@@ -175,7 +204,51 @@ describe('tradeStore', () => {
       const manyTrades = Array.from({ length: MAX_TRADES + 10 }, (_, i) => createTrade({ id: i }));
 
       useTradeStore.getState().setTrades(manyTrades);
-      expect(useTradeStore.getState().trades).toHaveLength(MAX_TRADES);
+      expect(useTradeStore.getState().buffer.length).toBe(MAX_TRADES);
+    });
+
+    it('preserves chronological order in buffer after setTrades', () => {
+      // Input is newest-first: [id=3, id=2, id=1]
+      const trades = [
+        createTrade({ id: 3, price: 53000, time: 3000 }),
+        createTrade({ id: 2, price: 52000, time: 2000 }),
+        createTrade({ id: 1, price: 51000, time: 1000 }),
+      ];
+      useTradeStore.getState().setTrades(trades);
+
+      // toTradeEntries should return newest-first
+      const entries = useTradeStore.getState().toTradeEntries();
+      expect(entries[0].id).toBe(3);
+      expect(entries[1].id).toBe(2);
+      expect(entries[2].id).toBe(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // toTradeEntries
+  // ---------------------------------------------------------------------------
+
+  describe('toTradeEntries', () => {
+    it('returns empty array when buffer is empty', () => {
+      expect(useTradeStore.getState().toTradeEntries()).toEqual([]);
+    });
+
+    it('returns TradeEntry objects with correct types', () => {
+      useTradeStore
+        .getState()
+        .addTrade(
+          createTrade({ id: 42, price: 50000, quantity: 1.5, time: 1000, isBuyerMaker: true }),
+        );
+
+      const entries = useTradeStore.getState().toTradeEntries();
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toEqual({
+        id: 42,
+        price: 50000,
+        quantity: 1.5,
+        time: 1000,
+        isBuyerMaker: true,
+      });
     });
   });
 
@@ -191,8 +264,10 @@ describe('tradeStore', () => {
       useTradeStore.getState().reset();
       const state = useTradeStore.getState();
 
-      expect(state.trades).toEqual([]);
+      expect(state.buffer.length).toBe(0);
+      expect(state.toTradeEntries()).toEqual([]);
       expect(state.lastPrice).toBe(0);
+      expect(state.lastTradeId).toBe(-1);
       expect(state.lastPriceDirection).toBe('neutral');
     });
   });

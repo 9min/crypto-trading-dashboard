@@ -14,9 +14,14 @@
 // =============================================================================
 
 import { useTradeStore } from '@/stores/tradeStore';
-import type { TradeEntry } from '@/types/chart';
 import type { CanvasRenderer } from '@/hooks/useCanvasRenderer';
 import { formatPrice } from '@/utils/formatPrice';
+import {
+  TRADE_FIELD_PRICE,
+  TRADE_FIELD_QUANTITY,
+  TRADE_FIELD_TIME,
+  TRADE_FIELD_IS_BUYER_MAKER,
+} from '@/utils/constants';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -82,9 +87,9 @@ export class TradesFeedRenderer implements CanvasRenderer {
   }
 
   onFrame(): void {
-    const { trades } = useTradeStore.getState();
+    const { lastTradeId, buffer } = useTradeStore.getState();
 
-    if (trades.length === 0) {
+    if (buffer.length === 0) {
       // No trades yet — clear stale data if previously drawn
       if (this.lastRenderedTradeId !== -1) {
         this.draw();
@@ -93,11 +98,10 @@ export class TradesFeedRenderer implements CanvasRenderer {
       return;
     }
 
-    const latestId = trades[0].id;
-    if (latestId === this.lastRenderedTradeId) return;
+    if (lastTradeId === this.lastRenderedTradeId) return;
 
     this.draw();
-    this.lastRenderedTradeId = latestId;
+    this.lastRenderedTradeId = lastTradeId;
   }
 
   markDirty(): void {
@@ -118,7 +122,7 @@ export class TradesFeedRenderer implements CanvasRenderer {
   // -- Drawing ----------------------------------------------------------------
 
   private draw(): void {
-    const { trades } = useTradeStore.getState();
+    const { buffer } = useTradeStore.getState();
     const { ctx, width, height, colors } = this;
 
     if (width === 0 || height === 0) return;
@@ -134,14 +138,21 @@ export class TradesFeedRenderer implements CanvasRenderer {
     // Draw header
     this.drawHeader(col1X, col2X);
 
-    // Draw trade rows
+    // Draw trade rows — newest first (reverse buffer order)
     const visibleRows = Math.floor((height - HEADER_HEIGHT) / ROW_HEIGHT);
-    const displayTrades = trades.slice(0, visibleRows);
+    const count = Math.min(buffer.length, visibleRows);
 
     ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
 
-    for (let i = 0; i < displayTrades.length; i++) {
-      const trade = displayTrades[i];
+    for (let i = 0; i < count; i++) {
+      const readIndex = buffer.length - 1 - i;
+      const price = buffer.getField(readIndex, TRADE_FIELD_PRICE);
+      const quantity = buffer.getField(readIndex, TRADE_FIELD_QUANTITY);
+      const time = buffer.getField(readIndex, TRADE_FIELD_TIME);
+      const isBuyerMaker = buffer.getField(readIndex, TRADE_FIELD_IS_BUYER_MAKER);
+
+      if (price === null || quantity === null || time === null || isBuyerMaker === null) continue;
+
       const y = HEADER_HEIGHT + i * ROW_HEIGHT;
 
       // Alternating row background for readability
@@ -150,7 +161,7 @@ export class TradesFeedRenderer implements CanvasRenderer {
         ctx.fillRect(0, y, width, ROW_HEIGHT);
       }
 
-      this.drawTradeRow(trade, y, col1X, col2X);
+      this.drawTradeRowFromFields(price, quantity, time, isBuyerMaker === 1, y, col1X, col2X);
     }
   }
 
@@ -183,12 +194,20 @@ export class TradesFeedRenderer implements CanvasRenderer {
     ctx.stroke();
   }
 
-  private drawTradeRow(trade: TradeEntry, y: number, col1X: number, col2X: number): void {
+  private drawTradeRowFromFields(
+    price: number,
+    quantity: number,
+    time: number,
+    isBuyerMaker: boolean,
+    y: number,
+    col1X: number,
+    col2X: number,
+  ): void {
     const { ctx, width, colors } = this;
 
     // isBuyerMaker: true = sell aggressor (seller matched passive buy),
     //               false = buy aggressor (buyer matched passive sell)
-    const priceColor = trade.isBuyerMaker ? colors.sellText : colors.buyText;
+    const priceColor = isBuyerMaker ? colors.sellText : colors.buyText;
     const textY = y + ROW_HEIGHT / 2;
 
     ctx.textBaseline = 'middle';
@@ -196,17 +215,17 @@ export class TradesFeedRenderer implements CanvasRenderer {
     // Time column
     ctx.textAlign = 'left';
     ctx.fillStyle = colors.foregroundSecondary;
-    ctx.fillText(this.formatTime(trade.time), col1X, textY);
+    ctx.fillText(this.formatTime(time), col1X, textY);
 
     // Price column
     ctx.textAlign = 'left';
     ctx.fillStyle = priceColor;
-    ctx.fillText(formatPrice(trade.price), col2X, textY);
+    ctx.fillText(formatPrice(price), col2X, textY);
 
     // Quantity column (right-aligned)
     ctx.textAlign = 'right';
     ctx.fillStyle = colors.foreground;
-    ctx.fillText(this.formatQuantity(trade.quantity), width - PADDING_X, textY);
+    ctx.fillText(this.formatQuantity(quantity), width - PADDING_X, textY);
   }
 
   // -- Helpers ----------------------------------------------------------------
