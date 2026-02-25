@@ -9,9 +9,15 @@
 // On mount: connects WebSocket, fetches initial klines, subscribes to messages.
 // On unmount: unsubscribes from messages, unsubscribes from state changes.
 // When symbol/interval changes: disconnects old stream, resets stores, reconnects.
+//
+// Depth synchronization follows Binance's official protocol:
+//   1. Buffer WebSocket depth events while fetching the REST snapshot.
+//   2. Once the snapshot arrives, drop buffered events where u <= snapshot.lastUpdateId.
+//   3. The first applied event must satisfy U <= lastUpdateId+1 && u >= lastUpdateId+1.
+//   4. Subsequent events are applied normally via depthStore.applyDepthUpdate.
 // =============================================================================
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { WebSocketManager } from '@/lib/websocket/WebSocketManager';
 import { createMessageRouter } from '@/lib/websocket/messageRouter';
 import { buildCombinedStreamUrl } from '@/lib/binance/streamUrls';
@@ -81,9 +87,6 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   const symbol = params?.symbol ?? storeSymbol;
   const interval = params?.interval ?? storeInterval;
 
-  // Ref to track whether the effect is still active (prevents stale closures)
-  const isActiveRef = useRef(true);
-
   // -- Message Handlers (stable references via useCallback) -------------------
 
   const handleKline = useCallback(
@@ -109,15 +112,6 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     [addCandle, updateLastCandle],
   );
 
-  const handleDepth = useCallback(
-    (event: BinanceDepthEvent): void => {
-      const bidUpdates: PriceLevel[] = event.b.map(parseDepthLevel);
-      const askUpdates: PriceLevel[] = event.a.map(parseDepthLevel);
-      applyDepthUpdate(bidUpdates, askUpdates, event.u);
-    },
-    [applyDepthUpdate],
-  );
-
   const handleTrade = useCallback(
     (event: BinanceTradeEvent): void => {
       addTrade({
@@ -134,7 +128,16 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
   // -- Main Effect: WebSocket lifecycle tied to symbol/interval ---------------
 
   useEffect(() => {
-    isActiveRef.current = true;
+    // Local flag scoped to THIS effect execution. When cleanup runs,
+    // `isActive` becomes false — preventing stale async REST responses
+    // from overwriting the store after a symbol/interval change.
+    let isActive = true;
+
+    // -- Depth buffering state ------------------------------------------------
+    // Buffer depth WS events until the REST snapshot arrives, then replay.
+    let snapshotReady = false;
+    let snapshotLastUpdateId = 0;
+    const depthBuffer: BinanceDepthEvent[] = [];
 
     const manager = WebSocketManager.getInstance();
     const url = buildCombinedStreamUrl(symbol, interval);
@@ -143,6 +146,22 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     resetKlineStore();
     resetDepthStore();
     resetTradeStore();
+
+    // -- Depth handler with buffering -----------------------------------------
+    const handleDepth = (event: BinanceDepthEvent): void => {
+      if (!isActive) return;
+
+      if (!snapshotReady) {
+        // Snapshot hasn't arrived yet — buffer the event
+        depthBuffer.push(event);
+        return;
+      }
+
+      // Normal path: apply the update
+      const bidUpdates: PriceLevel[] = event.b.map(parseDepthLevel);
+      const askUpdates: PriceLevel[] = event.a.map(parseDepthLevel);
+      applyDepthUpdate(bidUpdates, askUpdates, event.u);
+    };
 
     // Create the message router with typed handlers
     const router = createMessageRouter({
@@ -156,7 +175,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
 
     // Subscribe to connection state changes and sync to uiStore
     const unsubscribeState = manager.onStateChange((state: ConnectionState): void => {
-      if (isActiveRef.current) {
+      if (isActive) {
         setConnectionState(state);
       }
     });
@@ -168,7 +187,7 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     setKlineLoading(true);
     fetchKlines(symbol, interval)
       .then((candles) => {
-        if (isActiveRef.current) {
+        if (isActive) {
           setCandles(candles);
         }
       })
@@ -181,19 +200,48 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
         });
       })
       .finally(() => {
-        if (isActiveRef.current) {
+        if (isActive) {
           setKlineLoading(false);
         }
       });
 
-    // Fetch initial depth snapshot via REST API
+    // Fetch initial depth snapshot via REST API, then replay buffered events
     fetchDepthSnapshot(symbol)
       .then((snapshot) => {
-        if (isActiveRef.current) {
-          const bids: PriceLevel[] = snapshot.bids.map(parseDepthLevel);
-          const asks: PriceLevel[] = snapshot.asks.map(parseDepthLevel);
-          setDepthSnapshot(bids, asks, snapshot.lastUpdateId);
+        if (!isActive) return;
+
+        const bids: PriceLevel[] = snapshot.bids.map(parseDepthLevel);
+        const asks: PriceLevel[] = snapshot.asks.map(parseDepthLevel);
+        setDepthSnapshot(bids, asks, snapshot.lastUpdateId);
+
+        snapshotLastUpdateId = snapshot.lastUpdateId;
+        snapshotReady = true;
+
+        // Replay buffered depth events per Binance protocol:
+        // - Drop events where u <= snapshot.lastUpdateId (stale)
+        // - First valid event must satisfy U <= lastUpdateId+1 && u >= lastUpdateId+1
+        let firstValid = false;
+        for (const buffered of depthBuffer) {
+          // Drop events that are entirely before the snapshot
+          if (buffered.u <= snapshotLastUpdateId) continue;
+
+          if (!firstValid) {
+            // First event must bridge the snapshot boundary
+            if (buffered.U <= snapshotLastUpdateId + 1 && buffered.u >= snapshotLastUpdateId + 1) {
+              firstValid = true;
+            } else {
+              // Gap detected — skip (store guard will also reject via lastUpdateId)
+              continue;
+            }
+          }
+
+          const bidUpdates: PriceLevel[] = buffered.b.map(parseDepthLevel);
+          const askUpdates: PriceLevel[] = buffered.a.map(parseDepthLevel);
+          applyDepthUpdate(bidUpdates, askUpdates, buffered.u);
         }
+
+        // Clear the buffer — no longer needed
+        depthBuffer.length = 0;
       })
       .catch((error: unknown) => {
         console.error('[useWebSocket] Failed to fetch depth snapshot', {
@@ -205,7 +253,8 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
 
     // -- Cleanup on unmount or dependency change ------------------------------
     return () => {
-      isActiveRef.current = false;
+      isActive = false;
+      depthBuffer.length = 0;
       unsubscribeMessages();
       unsubscribeState();
       manager.disconnect();
@@ -214,12 +263,12 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
     symbol,
     interval,
     handleKline,
-    handleDepth,
     handleTrade,
     setConnectionState,
     setCandles,
     setKlineLoading,
     setDepthSnapshot,
+    applyDepthUpdate,
     resetKlineStore,
     resetDepthStore,
     resetTradeStore,

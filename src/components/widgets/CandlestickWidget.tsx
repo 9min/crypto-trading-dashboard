@@ -12,7 +12,7 @@
 // - On unmount: calls chart.remove() for complete cleanup
 // =============================================================================
 
-import { memo, useEffect, useRef, useCallback, useMemo } from 'react';
+import { memo, useEffect, useRef, useMemo, useState } from 'react';
 import { useKlineStore } from '@/stores/klineStore';
 import { useUiStore } from '@/stores/uiStore';
 import type { CandleData } from '@/types/chart';
@@ -108,6 +108,11 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
   const chartRef = useRef<ChartApi | null>(null);
   const seriesRef = useRef<CandlestickSeriesApi | null>(null);
   const prevCandleCountRef = useRef(0);
+  const colorsRef = useRef<ChartColors>(DARK_COLORS);
+
+  // State flag to signal that the async chart init has completed and
+  // seriesRef is ready. This triggers the candle data effect to run.
+  const [isChartReady, setIsChartReady] = useState(false);
 
   const candles = useKlineStore((state) => state.candles);
   const isLoading = useKlineStore((state) => state.isLoading);
@@ -115,72 +120,71 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
 
   const colors = useMemo(() => getColorsForTheme(theme), [theme]);
 
-  // Initialize chart
-  const initChart = useCallback(async () => {
+  // Keep colorsRef in sync so the mount effect can read current colors
+  colorsRef.current = colors;
+
+  // Mount / unmount chart — runs once, does NOT depend on colors
+  useEffect(() => {
+    let disposed = false;
     const container = containerRef.current;
     if (!container) return;
 
     // Dynamically import to avoid SSR issues
-    const { createChart, CandlestickSeries } = await import('lightweight-charts');
+    import('lightweight-charts').then(({ createChart, CandlestickSeries }) => {
+      if (disposed) return;
 
-    // Clean up existing chart
-    if (chartRef.current) {
-      chartRef.current.remove();
-      chartRef.current = null;
-      seriesRef.current = null;
-    }
+      const c = colorsRef.current;
 
-    const chart = createChart(container, {
-      autoSize: true,
-      layout: {
-        background: { color: colors.background },
-        textColor: colors.text,
-      },
-      grid: {
-        vertLines: { color: colors.grid },
-        horzLines: { color: colors.grid },
-      },
-      crosshair: {
-        vertLine: { color: colors.crosshair, labelBackgroundColor: colors.crosshair },
-        horzLine: { color: colors.crosshair, labelBackgroundColor: colors.crosshair },
-      },
-      rightPriceScale: {
-        borderColor: colors.border,
-      },
-      timeScale: {
-        borderColor: colors.border,
-        timeVisible: true,
-        secondsVisible: false,
-      },
+      const chart = createChart(container, {
+        autoSize: true,
+        layout: {
+          background: { color: c.background },
+          textColor: c.text,
+        },
+        grid: {
+          vertLines: { color: c.grid },
+          horzLines: { color: c.grid },
+        },
+        crosshair: {
+          vertLine: { color: c.crosshair, labelBackgroundColor: c.crosshair },
+          horzLine: { color: c.crosshair, labelBackgroundColor: c.crosshair },
+        },
+        rightPriceScale: {
+          borderColor: c.border,
+        },
+        timeScale: {
+          borderColor: c.border,
+          timeVisible: true,
+          secondsVisible: false,
+        },
+      });
+
+      const series = chart.addSeries(CandlestickSeries, {
+        upColor: c.upColor,
+        downColor: c.downColor,
+        borderVisible: false,
+        wickUpColor: c.wickUpColor,
+        wickDownColor: c.wickDownColor,
+      });
+
+      chartRef.current = chart;
+      seriesRef.current = series;
+      prevCandleCountRef.current = 0;
+      setIsChartReady(true);
     });
-
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: colors.upColor,
-      downColor: colors.downColor,
-      borderVisible: false,
-      wickUpColor: colors.wickUpColor,
-      wickDownColor: colors.wickDownColor,
-    });
-
-    chartRef.current = chart;
-    seriesRef.current = series;
-    prevCandleCountRef.current = 0;
-  }, [colors]);
-
-  // Mount / unmount chart
-  useEffect(() => {
-    initChart();
 
     return () => {
+      disposed = true;
       if (chartRef.current) {
         chartRef.current.remove();
         chartRef.current = null;
         seriesRef.current = null;
       }
+      setIsChartReady(false);
     };
-  }, [initChart]);
+  }, []);
 
-  // Apply theme changes
+  // Apply theme changes via applyOptions (no chart recreation)
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -213,10 +217,10 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
     }
   }, [colors]);
 
-  // Update candle data
+  // Update candle data — depends on isChartReady to avoid null series
   useEffect(() => {
     const series = seriesRef.current;
-    if (!series || candles.length === 0) return;
+    if (!isChartReady || !series || candles.length === 0) return;
 
     if (prevCandleCountRef.current === 0 || candles.length < prevCandleCountRef.current) {
       // Full data set (initial load or symbol change)
@@ -233,7 +237,7 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
     }
 
     prevCandleCountRef.current = candles.length;
-  }, [candles]);
+  }, [candles, isChartReady]);
 
   return (
     <WidgetWrapper title="Chart">

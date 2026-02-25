@@ -112,7 +112,7 @@ export class OrderBookRenderer implements CanvasRenderer {
     ctx.fillRect(0, 0, width, height);
 
     const halfWidth = width / 2;
-    const visibleRows = Math.floor((height - SPREAD_HEIGHT) / 2 / ROW_HEIGHT);
+    const visibleRows = Math.floor((height - SPREAD_HEIGHT) / ROW_HEIGHT);
 
     const displayBids = bids.slice(0, visibleRows);
     const displayAsks = asks.slice(0, visibleRows);
@@ -130,12 +130,18 @@ export class OrderBookRenderer implements CanvasRenderer {
     this.drawSpread(displayBids, displayAsks);
 
     // Draw bids (left side, top-to-bottom, best bid at top)
-    const bidsStartY = SPREAD_HEIGHT / 2;
-    this.drawLevels(displayBids, bidCumulative, maxCumQty, 0, halfWidth, bidsStartY, 'bid');
+    this.drawLevels(displayBids, bidCumulative, maxCumQty, 0, halfWidth, SPREAD_HEIGHT, 'bid');
 
     // Draw asks (right side, top-to-bottom, best ask at top)
-    const asksStartY = SPREAD_HEIGHT / 2;
-    this.drawLevels(displayAsks, askCumulative, maxCumQty, halfWidth, halfWidth, asksStartY, 'ask');
+    this.drawLevels(
+      displayAsks,
+      askCumulative,
+      maxCumQty,
+      halfWidth,
+      halfWidth,
+      SPREAD_HEIGHT,
+      'ask',
+    );
 
     // Draw center divider
     ctx.strokeStyle = colors.border;

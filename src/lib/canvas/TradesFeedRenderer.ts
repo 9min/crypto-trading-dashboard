@@ -83,7 +83,15 @@ export class TradesFeedRenderer implements CanvasRenderer {
 
   onFrame(): void {
     const { trades } = useTradeStore.getState();
-    if (trades.length === 0) return;
+
+    if (trades.length === 0) {
+      // No trades yet — clear stale data if previously drawn
+      if (this.lastRenderedTradeId !== -1) {
+        this.draw();
+        this.lastRenderedTradeId = -1;
+      }
+      return;
+    }
 
     const latestId = trades[0].id;
     if (latestId === this.lastRenderedTradeId) return;
