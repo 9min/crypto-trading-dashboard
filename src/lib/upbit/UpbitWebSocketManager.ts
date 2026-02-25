@@ -73,7 +73,6 @@ export class UpbitWebSocketManager {
 
   private messageSubscribers = new Set<UpbitMessageCallback>();
   private stateSubscribers = new Set<UpbitStateChangeCallback>();
-  private subscriberCount = 0;
 
   private constructor() {}
 
@@ -105,12 +104,11 @@ export class UpbitWebSocketManager {
   }
 
   /**
-   * Decrements subscriber count and closes connection when no subscribers remain.
-   * Always call this in cleanup functions instead of directly closing.
+   * Closes connection when no message subscribers remain.
+   * Always call this in cleanup functions after unsubscribe().
    */
   disconnect(): void {
-    this.subscriberCount = Math.max(0, this.subscriberCount - 1);
-    if (this.subscriberCount > 0) return;
+    if (this.messageSubscribers.size > 0) return;
 
     this.cleanup();
     this.currentSubscriptions = [];
@@ -119,12 +117,11 @@ export class UpbitWebSocketManager {
   }
 
   /**
-   * Subscribes to incoming WebSocket messages and increments subscriber count.
-   * @returns An unsubscribe function that decrements the count.
+   * Subscribes to incoming WebSocket messages.
+   * @returns An unsubscribe function that removes the callback.
    */
   subscribe(callback: UpbitMessageCallback): () => void {
     this.messageSubscribers.add(callback);
-    this.subscriberCount++;
     return () => {
       this.messageSubscribers.delete(callback);
     };
