@@ -197,12 +197,12 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
 
             // Validate sequence continuity for buffered events
             if (buffered.U > expectedNextUpdateId) {
-              // Gap in buffer — stop replaying, live events will re-sync
-              console.error('[useWebSocket] Depth sequence gap in buffer replay', {
+              // Gap in buffer — expected during React Strict Mode double-mount
+              // or when snapshot fetch is slow. Live events will re-sync.
+              console.warn('[useWebSocket] Depth sequence gap in buffer replay, will re-sync', {
                 symbol,
                 expected: expectedNextUpdateId,
                 eventU: buffered.U,
-                timestamp: Date.now(),
               });
               break;
             }
@@ -275,12 +275,12 @@ export function useWebSocket(params?: UseWebSocketParams): UseWebSocketReturn {
       }
 
       if (event.U > expectedNextUpdateId) {
-        // Gap detected — re-sync by fetching a new snapshot
-        console.error('[useWebSocket] Depth sequence gap detected, re-syncing', {
+        // Gap detected — re-sync by fetching a new snapshot.
+        // Expected during React Strict Mode double-mount or after tab switch.
+        console.warn('[useWebSocket] Depth sequence gap detected, re-syncing', {
           symbol,
           expected: expectedNextUpdateId,
           eventU: event.U,
-          timestamp: Date.now(),
         });
         snapshotReady = false;
         depthBuffer.length = 0;
