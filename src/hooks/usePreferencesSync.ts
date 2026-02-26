@@ -24,7 +24,7 @@ import {
   saveWatchlistSymbols,
   loadWatchlistSymbols,
 } from '@/utils/localPreferences';
-import { loadLayout, saveLayout } from '@/utils/layoutStorage';
+import { loadLayout, applyCloudLayout } from '@/utils/layoutStorage';
 import type { UserPreferences } from '@/types/supabase';
 
 // -----------------------------------------------------------------------------
@@ -142,9 +142,10 @@ export function usePreferencesSync(): void {
             useKlineStore.getState().setInterval(prefs.interval);
             replaceWatchlistSymbols(prefs.watchlistSymbols);
 
-            // Apply layout if available
+            // Apply layout if available — use applyCloudLayout to notify
+            // already-mounted DashboardGrid so it updates its React state.
             if (prefs.layout) {
-              saveLayout(prefs.layout);
+              applyCloudLayout(prefs.layout);
             }
 
             // Also update localStorage as offline backup

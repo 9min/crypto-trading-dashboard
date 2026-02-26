@@ -143,6 +143,37 @@ export function loadLayout(): ResponsiveLayouts | null {
 }
 
 // -----------------------------------------------------------------------------
+// Layout Change Event
+// -----------------------------------------------------------------------------
+
+/** Custom event name dispatched when cloud layout is applied. */
+const LAYOUT_CHANGE_EVENT = 'dashboard-layout-change';
+
+/**
+ * Saves layout to localStorage AND dispatches a custom event so that
+ * already-mounted components (e.g., DashboardGrid) can react to the change.
+ * Use this when applying cloud-loaded layout after initial mount.
+ */
+export function applyCloudLayout(layouts: ResponsiveLayouts): void {
+  saveLayout(layouts);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(LAYOUT_CHANGE_EVENT, { detail: layouts }));
+  }
+}
+
+/**
+ * Subscribes to cloud-applied layout changes.
+ * Returns an unsubscribe function.
+ */
+export function onCloudLayoutApplied(callback: (layouts: ResponsiveLayouts) => void): () => void {
+  const handler = (event: Event): void => {
+    callback((event as CustomEvent<ResponsiveLayouts>).detail);
+  };
+  window.addEventListener(LAYOUT_CHANGE_EVENT, handler);
+  return () => window.removeEventListener(LAYOUT_CHANGE_EVENT, handler);
+}
+
+// -----------------------------------------------------------------------------
 // Exports
 // -----------------------------------------------------------------------------
 
