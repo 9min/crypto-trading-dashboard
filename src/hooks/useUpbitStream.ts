@@ -310,7 +310,7 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
         if (!isActive) return;
         setKlineLoading(false);
         // Connect WS after initial candle data is loaded to maintain data consistency
-        manager.connect([
+        manager.connect('stream', [
           { type: 'trade', codes: [symbol], isOnlyRealtime: true },
           { type: 'orderbook', codes: [symbol], isOnlyRealtime: true },
         ]);
@@ -376,6 +376,7 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
       stopPolling();
       unsubscribeMessages();
       unsubscribeState();
+      manager.disconnectGroup('stream');
       manager.disconnect();
     };
   }, [

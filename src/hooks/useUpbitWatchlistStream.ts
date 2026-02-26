@@ -155,7 +155,7 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
     });
 
     // Connect with ticker subscription for all watchlist symbols
-    manager.connect([{ type: 'ticker', codes: symbols, isOnlyRealtime: true }]);
+    manager.connect('watchlist', [{ type: 'ticker', codes: symbols, isOnlyRealtime: true }]);
 
     const unsubscribe = manager.subscribe(router);
 
@@ -164,6 +164,7 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
       stopPolling();
       unsubscribe();
       unsubscribeState();
+      manager.disconnectGroup('watchlist');
       manager.disconnect();
     };
   }, [symbols, setTickers, updateTicker, setLoading]);

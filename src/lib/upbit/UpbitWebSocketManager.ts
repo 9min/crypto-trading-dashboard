@@ -55,7 +55,7 @@ export class UpbitWebSocketManager {
   /** Resets the singleton instance. Intended for testing only. */
   static resetInstance(): void {
     if (UpbitWebSocketManager.instance) {
-      UpbitWebSocketManager.instance.disconnect();
+      UpbitWebSocketManager.instance.forceDisconnect();
       UpbitWebSocketManager.instance = null;
     }
   }
@@ -69,6 +69,16 @@ export class UpbitWebSocketManager {
   private reconnectAttempt = 0;
   private reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private pingIntervalId: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Grouped subscription registry. Multiple callers (hooks) register their
+   * subscriptions under a unique group ID. The manager merges all groups
+   * into a single combined subscription sent to the Upbit WebSocket.
+   * This prevents race conditions when multiple hooks call connect().
+   */
+  private subscriptionGroups = new Map<string, UpbitSubscriptionType[]>();
+
+  /** Merged result of all subscription groups, sent to the WS. */
   private currentSubscriptions: UpbitSubscriptionType[] = [];
 
   private messageSubscribers = new Set<UpbitMessageCallback>();
@@ -81,26 +91,81 @@ export class UpbitWebSocketManager {
   // ---------------------------------------------------------------------------
 
   /**
-   * Opens a WebSocket connection to Upbit and subscribes to the given types.
-   * If already connected with the same subscriptions, this is a no-op.
+   * Registers subscriptions under a group ID and connects (or updates) the WS.
+   *
+   * Multiple callers can register different subscription groups concurrently.
+   * The manager merges all groups into a single WS subscription, preventing
+   * the race condition where a later connect() overwrites an earlier one.
+   *
+   * Behavior based on current WS state:
+   *   - idle/failed: start a fresh connection with merged subscriptions
+   *   - connecting/reconnecting: update pending subscriptions (no restart)
+   *   - open: re-send subscription message with the merged set
+   *
+   * @param groupId - Unique identifier for this caller (e.g., "stream", "watchlist")
+   * @param subscriptions - Subscription types for this group
    */
-  connect(subscriptions: UpbitSubscriptionType[]): void {
+  connect(groupId: string, subscriptions: UpbitSubscriptionType[]): void {
     if (typeof window === 'undefined') return;
+
     if (subscriptions.length === 0) {
+      this.disconnectGroup(groupId);
+      return;
+    }
+
+    this.subscriptionGroups.set(groupId, subscriptions);
+    const merged = this.getMergedSubscriptions();
+
+    // If already connected with the same merged set, no-op
+    if (this.isSameSubscriptions(merged) && this.ws?.readyState === WebSocket.OPEN) {
+      return;
+    }
+
+    this.currentSubscriptions = merged;
+
+    // If WS is already connecting or reconnecting, just update the pending
+    // subscriptions — they will be sent when the connection opens.
+    if (this.state.status === 'connecting' || this.state.status === 'reconnecting') {
+      return;
+    }
+
+    // If WS is open, re-send subscription message with merged set
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.sendSubscription();
+      return;
+    }
+
+    // No active connection — start fresh
+    this.cleanup();
+    this.reconnectAttempt = 0;
+    this.setState({ status: 'connecting' });
+    this.createWebSocket();
+  }
+
+  /**
+   * Removes a subscription group and updates the WS accordingly.
+   *
+   * If other groups remain, the WS continues with the remaining subscriptions.
+   * If no groups remain and no message subscribers are active, disconnects fully.
+   *
+   * @param groupId - The group to remove (e.g., "stream", "watchlist")
+   */
+  disconnectGroup(groupId: string): void {
+    this.subscriptionGroups.delete(groupId);
+    const merged = this.getMergedSubscriptions();
+
+    if (merged.length === 0) {
+      // No subscriptions remain — full disconnect if no subscribers
       this.disconnect();
       return;
     }
 
-    // Check if already connected with identical subscriptions
-    if (this.isSameSubscriptions(subscriptions) && this.ws?.readyState === WebSocket.OPEN) {
-      return;
-    }
+    this.currentSubscriptions = merged;
 
-    this.cleanup();
-    this.currentSubscriptions = subscriptions;
-    this.reconnectAttempt = 0;
-    this.setState({ status: 'connecting' });
-    this.createWebSocket();
+    // Re-send subscription with remaining types if WS is open
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.sendSubscription();
+    }
   }
 
   /**
@@ -111,6 +176,18 @@ export class UpbitWebSocketManager {
     if (this.messageSubscribers.size > 0) return;
 
     this.cleanup();
+    this.subscriptionGroups.clear();
+    this.currentSubscriptions = [];
+    this.reconnectAttempt = 0;
+    this.setState({ status: 'idle' });
+  }
+
+  /**
+   * Unconditionally closes the connection. Used by resetInstance() for testing.
+   */
+  forceDisconnect(): void {
+    this.cleanup();
+    this.subscriptionGroups.clear();
     this.currentSubscriptions = [];
     this.reconnectAttempt = 0;
     this.setState({ status: 'idle' });
@@ -145,10 +222,12 @@ export class UpbitWebSocketManager {
   }
 
   /**
-   * Manually triggers a reconnection attempt.
+   * Manually triggers a reconnection attempt with all registered subscriptions.
    */
   reconnect(): void {
-    if (this.currentSubscriptions.length === 0) return;
+    const merged = this.getMergedSubscriptions();
+    if (merged.length === 0) return;
+    this.currentSubscriptions = merged;
     this.reconnectAttempt = 0;
     this.cleanup();
     this.setState({ status: 'connecting' });
@@ -321,13 +400,48 @@ export class UpbitWebSocketManager {
   // Helpers (Private)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Merges all subscription groups into a single array by type.
+   * Codes from different groups with the same type are combined and deduplicated.
+   */
+  private getMergedSubscriptions(): UpbitSubscriptionType[] {
+    const typeMap = new Map<string, Set<string>>();
+
+    for (const group of this.subscriptionGroups.values()) {
+      for (const sub of group) {
+        const existing = typeMap.get(sub.type) ?? new Set<string>();
+        for (const code of sub.codes) {
+          existing.add(code);
+        }
+        typeMap.set(sub.type, existing);
+      }
+    }
+
+    return Array.from(typeMap.entries()).map(([type, codes]) => ({
+      type: type as 'ticker' | 'trade' | 'orderbook',
+      codes: Array.from(codes).sort(),
+      isOnlyRealtime: true,
+    }));
+  }
+
+  /**
+   * Compares a set of subscriptions against the current active subscriptions.
+   * Uses sorted codes for order-independent comparison.
+   */
   private isSameSubscriptions(subscriptions: UpbitSubscriptionType[]): boolean {
     if (subscriptions.length !== this.currentSubscriptions.length) return false;
-    return subscriptions.every((sub, i) => {
-      const current = this.currentSubscriptions[i];
+
+    // Sort both arrays by type for consistent comparison
+    const sortedA = [...subscriptions].sort((a, b) => a.type.localeCompare(b.type));
+    const sortedB = [...this.currentSubscriptions].sort((a, b) => a.type.localeCompare(b.type));
+
+    return sortedA.every((sub, i) => {
+      const current = sortedB[i];
       if (sub.type !== current.type) return false;
       if (sub.codes.length !== current.codes.length) return false;
-      return sub.codes.every((code, j) => code === current.codes[j]);
+      const codesA = [...sub.codes].sort();
+      const codesB = [...current.codes].sort();
+      return codesA.every((code, j) => code === codesB[j]);
     });
   }
 
