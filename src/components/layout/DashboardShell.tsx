@@ -15,16 +15,23 @@ import { DashboardHeader } from './DashboardHeader';
 import { DashboardGrid } from './DashboardGrid';
 import { useExchangeWebSocket } from '@/hooks/useExchangeWebSocket';
 import { usePriceAlertMonitor } from '@/hooks/usePriceAlertMonitor';
+import { useSymbolFromUrl } from '@/hooks/useSymbolFromUrl';
 import { useUiStore } from '@/stores/uiStore';
+import { useWidgetStore } from '@/stores/widgetStore';
 
 export const DashboardShell = memo(function DashboardShell() {
   const hydrateExchange = useUiStore((state) => state.hydrateExchange);
   const isExchangeHydrated = useUiStore((state) => state.isExchangeHydrated);
+  const hydrateWidgets = useWidgetStore((state) => state.hydrateWidgets);
 
   // Hydrate persisted exchange preference after mount to avoid SSR mismatch
   useEffect(() => {
     hydrateExchange();
-  }, [hydrateExchange]);
+    hydrateWidgets();
+  }, [hydrateExchange, hydrateWidgets]);
+
+  // Sync ?symbol= URL param ↔ uiStore.symbol after exchange hydration
+  useSymbolFromUrl();
 
   useExchangeWebSocket(isExchangeHydrated);
 

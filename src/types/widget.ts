@@ -81,8 +81,39 @@ interface DashboardLayout {
 }
 
 // -----------------------------------------------------------------------------
+// Widget Metadata
+// -----------------------------------------------------------------------------
+
+/**
+ * Display metadata for each widget type.
+ * Used by the WidgetSelector popover and default layout placement.
+ */
+interface WidgetMeta {
+  /** Human-readable label for UI display */
+  label: string;
+  /** Minimum grid width */
+  minW: number;
+  /** Minimum grid height */
+  minH: number;
+  /** Default grid width when adding a widget back */
+  defaultW: number;
+  /** Default grid height when adding a widget back */
+  defaultH: number;
+}
+
+const WIDGET_METADATA: Record<WidgetType, WidgetMeta> = {
+  candlestick: { label: 'Chart', minW: 4, minH: 8, defaultW: 9, defaultH: 14 },
+  orderbook: { label: 'Order Book', minW: 2, minH: 6, defaultW: 3, defaultH: 14 },
+  trades: { label: 'Trades', minW: 2, minH: 6, defaultW: 2, defaultH: 10 },
+  watchlist: { label: 'Watchlist', minW: 2, minH: 6, defaultW: 3, defaultH: 10 },
+  premium: { label: 'Kimchi Premium', minW: 2, minH: 6, defaultW: 2, defaultH: 10 },
+  depth: { label: 'Depth Chart', minW: 2, minH: 6, defaultW: 2, defaultH: 10 },
+  perf: { label: 'Performance', minW: 2, minH: 6, defaultW: 3, defaultH: 10 },
+} as const;
+
+// -----------------------------------------------------------------------------
 // Exports
 // -----------------------------------------------------------------------------
 
-export { WIDGET_TYPES };
-export type { WidgetType, WidgetConfig, LayoutItem, DashboardLayout };
+export { WIDGET_TYPES, WIDGET_METADATA };
+export type { WidgetType, WidgetConfig, LayoutItem, DashboardLayout, WidgetMeta };

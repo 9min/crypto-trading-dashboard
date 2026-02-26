@@ -23,6 +23,7 @@ import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol, formatUpbitSymbol } from '@/utils/formatSymbol';
 import { toUpbitSymbol, BINANCE_TO_UPBIT_MAP } from '@/utils/symbolMap';
 import { Sparkline } from '@/components/ui/Sparkline';
+import { WatchlistManagePopover } from '@/components/ui/WatchlistManagePopover';
 import { WidgetWrapper } from './WidgetWrapper';
 
 // -----------------------------------------------------------------------------
@@ -33,6 +34,8 @@ interface SymbolRowProps {
   symbol: string;
   isActive: boolean;
   onSelect: (symbol: string) => void;
+  canRemove: boolean;
+  onRemove: (symbol: string) => void;
 }
 
 // -----------------------------------------------------------------------------
@@ -43,10 +46,50 @@ interface SymbolRowInternalProps extends SymbolRowProps {
   exchange: 'binance' | 'upbit';
 }
 
+// -----------------------------------------------------------------------------
+// Remove Button Sub-Component
+// -----------------------------------------------------------------------------
+
+interface RemoveButtonProps {
+  symbol: string;
+  onRemove: (symbol: string) => void;
+}
+
+const RemoveButton = memo(function RemoveButton({ symbol, onRemove }: RemoveButtonProps) {
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onRemove(symbol);
+    },
+    [symbol, onRemove],
+  );
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="text-foreground-tertiary hover:text-sell ml-1 shrink-0 cursor-pointer rounded p-0.5 opacity-0 transition-all group-hover:opacity-100 focus:opacity-100"
+      aria-label={`Remove ${symbol}`}
+    >
+      <svg
+        className="h-3 w-3"
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={2}
+        stroke="currentColor"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  );
+});
+
 const SymbolRow = memo(function SymbolRow({
   symbol,
   isActive,
   onSelect,
+  canRemove,
+  onRemove,
   exchange,
 }: SymbolRowInternalProps) {
   const ticker = useWatchlistStore((state) => state.tickers.get(symbol));
@@ -73,11 +116,15 @@ const SymbolRow = memo(function SymbolRow({
   }, [ticker?.price, ticker?.priceChangePercent]);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') handleClick();
+      }}
       aria-current={isActive ? 'true' : undefined}
-      className={`border-border/30 flex w-full cursor-pointer items-center border-b px-3 py-2.5 text-left transition-colors ${
+      className={`group border-border/30 flex w-full cursor-pointer items-center border-b px-3 py-2.5 text-left transition-colors ${
         isActive
           ? 'border-accent bg-background-tertiary border-l-2'
           : 'hover:border-l-foreground-tertiary hover:bg-background-tertiary/50 border-l-2 border-l-transparent'
@@ -97,7 +144,8 @@ const SymbolRow = memo(function SymbolRow({
       <span className={`font-mono-num w-16 shrink-0 text-right text-xs ${changeColorClass}`}>
         {price > 0 ? `${changeSign}${changePercent.toFixed(2)}%` : ''}
       </span>
-    </button>
+      {canRemove && <RemoveButton symbol={symbol} onRemove={onRemove} />}
+    </div>
   );
 });
 
@@ -110,6 +158,7 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
   const setSymbol = useUiStore((state) => state.setSymbol);
   const exchange = useUiStore((state) => state.exchange);
   const allSymbols = useWatchlistStore((state) => state.symbols);
+  const removeSymbol = useWatchlistStore((state) => state.removeSymbol);
 
   // Filter out symbols not available on the current exchange (e.g., BNB on Upbit)
   const symbols = useMemo(
@@ -127,8 +176,27 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
     [setSymbol],
   );
 
+  const handleRemove = useCallback(
+    (symbol: string) => {
+      // If removing the active symbol, switch to the first remaining symbol
+      if (symbol === activeSymbol) {
+        const remaining = symbols.filter((s) => s !== symbol);
+        if (remaining.length > 0) {
+          setSymbol(remaining[0]);
+        }
+      }
+      removeSymbol(symbol);
+    },
+    [activeSymbol, symbols, setSymbol, removeSymbol],
+  );
+
+  // Can only remove if more than 1 symbol remains
+  const canRemove = symbols.length > 1;
+
+  const headerActions = useMemo(() => <WatchlistManagePopover />, []);
+
   return (
-    <WidgetWrapper title="Watchlist">
+    <WidgetWrapper title="Watchlist" headerActions={headerActions}>
       <div className="flex flex-col overflow-y-auto">
         {symbols.map((symbol) => (
           <SymbolRow
@@ -136,6 +204,8 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
             symbol={symbol}
             isActive={symbol === activeSymbol}
             onSelect={handleSelect}
+            canRemove={canRemove}
+            onRemove={handleRemove}
             exchange={exchange}
           />
         ))}
