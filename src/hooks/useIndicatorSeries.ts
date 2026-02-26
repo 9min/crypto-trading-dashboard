@@ -46,6 +46,8 @@ interface SeriesEntry {
   series: SeriesApi[];
   /** Indicator type for cleanup logic */
   type: IndicatorConfig['type'];
+  /** Pane index where this series was created (for detecting pane changes) */
+  paneIndex?: number;
 }
 
 // -----------------------------------------------------------------------------
@@ -279,18 +281,31 @@ export function useIndicatorSeries({ chartRef, isChartReady }: UseIndicatorSerie
 
         case 'volume': {
           const { volumes, ma } = computeVolumeWithMa(candles, config.maPeriod);
-          if (existing) {
-            // @ts-expect-error — Time branded type
-            existing.series[0].setData(volumes);
-            // @ts-expect-error — Time branded type
-            existing.series[1].setData(ma);
-          } else {
-            // Determine pane index: 1 if no RSI, 2 if RSI exists
-            const rsiVisible = Object.values(indicators).some(
-              (ind) => ind.type === 'rsi' && ind.visible,
-            );
-            const volumePaneIndex = rsiVisible ? 2 : 1;
+          const rsiVisible = Object.values(indicators).some(
+            (ind) => ind.type === 'rsi' && ind.visible,
+          );
+          const volumePaneIndex = rsiVisible ? 2 : 1;
 
+          // If RSI visibility changed, the volume pane index shifts.
+          // Detect stale pane index and force recreation.
+          if (existing && existing.paneIndex !== volumePaneIndex) {
+            for (const s of existing.series) {
+              try {
+                chart.removeSeries(s);
+              } catch {
+                // Series may already be removed
+              }
+            }
+            seriesMap.delete(config.id);
+          }
+
+          const current = seriesMap.get(config.id);
+          if (current) {
+            // @ts-expect-error — Time branded type
+            current.series[0].setData(volumes);
+            // @ts-expect-error — Time branded type
+            current.series[1].setData(ma);
+          } else {
             const histogram = chart.addSeries(
               HistogramSeries,
               {
@@ -329,6 +344,7 @@ export function useIndicatorSeries({ chartRef, isChartReady }: UseIndicatorSerie
             seriesMap.set(config.id, {
               series: [histogram, maLine],
               type: 'volume',
+              paneIndex: volumePaneIndex,
             });
           }
           break;
