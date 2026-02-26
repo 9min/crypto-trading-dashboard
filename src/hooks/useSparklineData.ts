@@ -9,6 +9,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ExchangeId } from '@/types/exchange';
 import { EXCHANGES } from '@/types/exchange';
+import { fetchUpbitCandles } from '@/lib/upbit/restClient';
 import { toUpbitSymbol } from '@/utils/symbolMap';
 
 // -----------------------------------------------------------------------------
@@ -35,6 +36,34 @@ const SPARKLINE_CANDLE_COUNT = 24;
 // -----------------------------------------------------------------------------
 
 const sparklineCache = new Map<string, SparklineCache>();
+
+// -----------------------------------------------------------------------------
+// Upbit Request Stagger
+// -----------------------------------------------------------------------------
+// Upbit public API rate-limits at ~10 req/s. When 7+ sparkline requests fire
+// simultaneously on exchange switch, many get HTTP 429. This slot-based
+// stagger ensures each request waits for its turn (200ms apart).
+
+/** Timestamp (ms) of the next available request slot */
+let nextUpbitSlot = 0;
+
+/** Minimum gap between consecutive Upbit sparkline requests */
+const UPBIT_STAGGER_MS = 200;
+
+/**
+ * Returns a delay (ms) the caller should wait before making an Upbit request.
+ * Each call advances the next slot, so concurrent callers get sequential slots.
+ */
+function acquireUpbitSlot(): number {
+  const now = Date.now();
+  if (nextUpbitSlot <= now) {
+    nextUpbitSlot = now + UPBIT_STAGGER_MS;
+    return 0;
+  }
+  const delay = nextUpbitSlot - now;
+  nextUpbitSlot += UPBIT_STAGGER_MS;
+  return delay;
+}
 
 /**
  * Returns cached data if still valid, otherwise null.
@@ -79,21 +108,12 @@ async function fetchBinanceSparkline(symbol: string): Promise<number[]> {
 
 /**
  * Fetches 24 hourly close prices from Upbit candles API.
+ * Uses fetchUpbitCandles (with retry + exponential backoff) to handle
+ * rate limiting when multiple sparkline requests fire simultaneously.
  */
 async function fetchUpbitSparkline(symbol: string): Promise<number[]> {
-  const baseUrl = EXCHANGES.upbit.restBaseUrl;
-  const params = new URLSearchParams({
-    market: symbol,
-    count: String(SPARKLINE_CANDLE_COUNT),
-  });
-  const url = `${baseUrl}/candles/minutes/60?${params}`;
-
-  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-  const raw = (await response.json()) as Array<{ trade_price: number }>;
-  // Upbit returns newest-first; reverse for time-ascending order
-  return raw.map((candle) => candle.trade_price).reverse();
+  const candles = await fetchUpbitCandles(symbol, '1h', SPARKLINE_CANDLE_COUNT);
+  return candles.map((c) => c.close);
 }
 
 // -----------------------------------------------------------------------------
@@ -130,22 +150,36 @@ export function useSparklineData(symbol: string, exchange: ExchangeId): number[]
           return;
         }
 
-        const result =
-          exchange === 'binance'
-            ? await fetchBinanceSparkline(symbol)
-            : await fetchUpbitSparkline(toUpbitSymbol(symbol));
+        let result: number[];
+        if (exchange === 'binance') {
+          result = await fetchBinanceSparkline(symbol);
+        } else {
+          // Skip fetch if symbol has no Upbit mapping (e.g., BNB)
+          const upbitMarket = toUpbitSymbol(symbol);
+          if (!upbitMarket.startsWith('KRW-')) return;
+
+          // Stagger Upbit requests to stay under rate limit (~10 req/s)
+          const staggerDelay = acquireUpbitSlot();
+          if (staggerDelay > 0) {
+            await new Promise<void>((resolve) => setTimeout(resolve, staggerDelay));
+            if (controller.signal.aborted) return;
+          }
+
+          result = await fetchUpbitSparkline(upbitMarket);
+        }
 
         if (controller.signal.aborted) return;
 
         setCachedData(cacheKey, result);
         setData(result);
-      } catch (error) {
+      } catch (error: unknown) {
         if (controller.signal.aborted) return;
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error('[useSparklineData] Failed to fetch sparkline', {
           symbol,
           exchange,
           timestamp: Date.now(),
-          error,
+          errorMessage,
         });
       }
     };

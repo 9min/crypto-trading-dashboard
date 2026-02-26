@@ -65,10 +65,11 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
       })
       .catch((error: unknown) => {
         if (!isActive) return;
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error('[useUpbitWatchlistStream] Failed to fetch tickers', {
           symbols,
           timestamp: Date.now(),
-          error,
+          errorMessage,
         });
         setLoading(false);
       });

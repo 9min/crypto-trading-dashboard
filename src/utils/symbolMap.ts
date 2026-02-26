@@ -17,7 +17,7 @@
 const BINANCE_TO_UPBIT_MAP: ReadonlyMap<string, string> = new Map([
   ['BTCUSDT', 'KRW-BTC'],
   ['ETHUSDT', 'KRW-ETH'],
-  ['BNBUSDT', 'KRW-BNB'],
+  // BNB is not listed on Upbit (Binance-native token)
   ['SOLUSDT', 'KRW-SOL'],
   ['XRPUSDT', 'KRW-XRP'],
   ['DOGEUSDT', 'KRW-DOGE'],

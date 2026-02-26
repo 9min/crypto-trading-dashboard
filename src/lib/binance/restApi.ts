@@ -66,14 +66,20 @@ async function fetchWithRetry<T>(url: string, maxRetries = 3): Promise<T> {
  * @param symbol - Trading pair symbol (e.g., "BTCUSDT")
  * @param interval - Kline interval (e.g., "1m", "5m", "1h")
  * @param limit - Maximum number of klines to fetch (default: 500, max: 1000)
+ * @param endTime - Optional end time in milliseconds (inclusive). Fetches candles
+ *                  with openTime <= endTime. Useful for loading older historical data.
  * @returns Array of CandleData sorted by time ascending
  */
 export async function fetchKlines(
   symbol: string,
   interval: string,
   limit = 500,
+  endTime?: number,
 ): Promise<CandleData[]> {
   const params = new URLSearchParams({ symbol, interval, limit: String(limit) });
+  if (endTime !== undefined) {
+    params.set('endTime', String(endTime));
+  }
   const url = `${BINANCE_REST_BASE_URL}/klines?${params}`;
   const raw = await fetchWithRetry<BinanceKlineRaw[]>(url);
 

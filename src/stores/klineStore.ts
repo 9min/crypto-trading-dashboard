@@ -26,6 +26,8 @@ interface KlineStoreState {
 interface KlineStoreActions {
   /** Replace all candles (e.g., after fetching historical data) */
   setCandles: (candles: CandleData[]) => void;
+  /** Prepend older historical candles to the beginning (for infinite scroll) */
+  prependCandles: (candles: CandleData[]) => void;
   /** Append a new closed candle, enforcing MAX_CANDLES capacity via FIFO slice */
   addCandle: (candle: CandleData) => void;
   /** Replace the last candle in-place (live update for an unclosed kline) */
@@ -63,6 +65,20 @@ export const useKlineStore = create<KlineStore>()((set) => ({
   // -- Actions ----------------------------------------------------------------
   setCandles: (candles: CandleData[]): void => {
     set({ candles: candles.slice(-MAX_CANDLES) });
+  },
+
+  prependCandles: (candles: CandleData[]): void => {
+    set((state) => {
+      if (candles.length === 0) return state;
+      // Filter out any overlap with existing data
+      const oldestExistingTime = state.candles.length > 0 ? state.candles[0].time : Infinity;
+      const olderCandles = candles.filter((c) => c.time < oldestExistingTime);
+      if (olderCandles.length === 0) return state;
+      const merged = [...olderCandles, ...state.candles];
+      return {
+        candles: merged.length > MAX_CANDLES ? merged.slice(-MAX_CANDLES) : merged,
+      };
+    });
   },
 
   addCandle: (candle: CandleData): void => {

@@ -5,6 +5,9 @@
 // Connects to Upbit WS, fetches initial candle data via REST, and routes
 // incoming messages to the existing Zustand stores (klineStore, depthStore,
 // tradeStore). Translates Upbit-specific event formats into domain types.
+//
+// NOTE: Upbit does not provide a kline WebSocket stream. Live candles are
+// constructed from individual trade events using interval-aligned timestamps.
 // =============================================================================
 
 import { useEffect, useCallback } from 'react';
@@ -16,8 +19,9 @@ import { useKlineStore } from '@/stores/klineStore';
 import { useDepthStore } from '@/stores/depthStore';
 import { useTradeStore } from '@/stores/tradeStore';
 import { useToastStore } from '@/stores/toastStore';
+import { alignToIntervalSec } from '@/utils/intervalAlign';
 import type { ConnectionState, PriceLevel, KlineInterval } from '@/types/chart';
-import type { UpbitTickerEvent, UpbitTradeEvent, UpbitOrderBookEvent } from '@/types/upbit';
+import type { UpbitTradeEvent, UpbitOrderBookEvent } from '@/types/upbit';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -40,6 +44,7 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
   const setConnectionState = useUiStore((state) => state.setConnectionState);
   const storeInterval = useKlineStore((state) => state.interval);
   const setCandles = useKlineStore((state) => state.setCandles);
+  const addCandle = useKlineStore((state) => state.addCandle);
   const updateLastCandle = useKlineStore((state) => state.updateLastCandle);
   const setKlineLoading = useKlineStore((state) => state.setLoading);
   const resetKlineData = useKlineStore((state) => state.resetData);
@@ -52,25 +57,10 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
 
   const interval = paramInterval ?? storeInterval;
 
-  // -- Ticker handler: updates the live candle --
-  const handleTicker = useCallback(
-    (event: UpbitTickerEvent): void => {
-      // Upbit ticker gives us current OHLCV; update the live candle
-      updateLastCandle({
-        time: Math.floor(event.trade_timestamp / 1000),
-        open: event.opening_price,
-        high: event.high_price,
-        low: event.low_price,
-        close: event.trade_price,
-        volume: event.acc_trade_volume_24h,
-      });
-    },
-    [updateLastCandle],
-  );
-
-  // -- Trade handler --
+  // -- Trade handler: updates trade feed + builds live candles --
   const handleTrade = useCallback(
     (event: UpbitTradeEvent): void => {
+      // 1. Update trades feed (existing behavior)
       addTrade({
         id: event.sequential_id,
         price: event.trade_price,
@@ -78,8 +68,36 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
         time: event.trade_timestamp,
         isBuyerMaker: event.ask_bid === 'ASK',
       });
+
+      // 2. Build live candle from trade event
+      const candleOpenTimeSec = alignToIntervalSec(event.trade_timestamp, interval);
+      const { candles } = useKlineStore.getState();
+      const lastCandle = candles.length > 0 ? candles[candles.length - 1] : undefined;
+
+      if (!lastCandle || candleOpenTimeSec > lastCandle.time) {
+        // New candle period started — create a fresh candle
+        addCandle({
+          time: candleOpenTimeSec,
+          open: event.trade_price,
+          high: event.trade_price,
+          low: event.trade_price,
+          close: event.trade_price,
+          volume: event.trade_volume,
+        });
+      } else if (candleOpenTimeSec === lastCandle.time) {
+        // Same candle period — merge OHLCV
+        updateLastCandle({
+          time: lastCandle.time,
+          open: lastCandle.open,
+          high: Math.max(lastCandle.high, event.trade_price),
+          low: Math.min(lastCandle.low, event.trade_price),
+          close: event.trade_price,
+          volume: lastCandle.volume + event.trade_volume,
+        });
+      }
+      // candleOpenTimeSec < lastCandle.time → stale/out-of-order trade, ignore
     },
-    [addTrade],
+    [addTrade, addCandle, updateLastCandle, interval],
   );
 
   // -- OrderBook handler: full snapshot each time (Upbit sends complete book) --
@@ -111,9 +129,8 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
     resetDepthStore();
     resetTradeStore();
 
-    // Create message router
+    // Create message router (no ticker handler — candles built from trades)
     const router = createUpbitMessageRouter({
-      onTicker: handleTicker,
       onTrade: handleTrade,
       onOrderBook: handleOrderBook,
     });
@@ -132,14 +149,8 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
       }
     });
 
-    // Connect with subscriptions
-    manager.connect([
-      { type: 'ticker', codes: [symbol], isOnlyRealtime: true },
-      { type: 'trade', codes: [symbol], isOnlyRealtime: true },
-      { type: 'orderbook', codes: [symbol], isOnlyRealtime: true },
-    ]);
-
-    // Fetch initial candle data via REST
+    // Fetch initial candle data via REST, then connect WS after data is loaded
+    // to prevent live trades from being overwritten by the REST response.
     setKlineLoading(true);
     fetchUpbitCandles(symbol, interval)
       .then((candles) => {
@@ -158,9 +169,13 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
         useToastStore.getState().addToast(`Failed to load chart data for ${symbol}`, 'error');
       })
       .finally(() => {
-        if (isActive) {
-          setKlineLoading(false);
-        }
+        if (!isActive) return;
+        setKlineLoading(false);
+        // Connect WS after initial candle data is loaded to maintain data consistency
+        manager.connect([
+          { type: 'trade', codes: [symbol], isOnlyRealtime: true },
+          { type: 'orderbook', codes: [symbol], isOnlyRealtime: true },
+        ]);
       });
 
     // Fetch initial orderbook via REST
@@ -178,10 +193,11 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
       })
       .catch((error: unknown) => {
         if (!isActive) return;
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error('[useUpbitStream] Failed to fetch orderbook', {
           symbol,
           timestamp: Date.now(),
-          error,
+          errorMessage,
         });
       });
 
@@ -195,11 +211,11 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
   }, [
     symbol,
     interval,
-    handleTicker,
     handleTrade,
     handleOrderBook,
     setConnectionState,
     setCandles,
+    addCandle,
     setKlineLoading,
     setDepthSnapshot,
     resetKlineData,

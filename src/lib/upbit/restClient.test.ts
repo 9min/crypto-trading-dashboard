@@ -104,6 +104,46 @@ describe('fetchUpbitCandles', () => {
     expect(result[0].time).toBeLessThan(result[1].time);
   });
 
+  it('parses candle_date_time_utc as UTC (not local time)', async () => {
+    const mockCandles = [
+      {
+        market: 'KRW-BTC',
+        candle_date_time_utc: '2024-06-15T12:00:00',
+        opening_price: 90000000,
+        high_price: 91000000,
+        low_price: 89000000,
+        trade_price: 90500000,
+        timestamp: 1718452800000,
+        candle_acc_trade_price: 50000000,
+        candle_acc_trade_volume: 0.5,
+      },
+    ];
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(mockCandles),
+    });
+
+    const result = await fetchUpbitCandles('KRW-BTC', '1m');
+
+    // 2024-06-15T12:00:00 UTC = 1718452800 seconds since epoch
+    // This must NOT vary with the local timezone
+    expect(result[0].time).toBe(1718452800);
+  });
+
+  it('passes the to parameter as a query string', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
+
+    await fetchUpbitCandles('KRW-BTC', '15m', 200, '2024-06-15T12:00:00Z');
+
+    const calledUrl = mockFetch.mock.calls[0][0] as string;
+    expect(calledUrl).toContain('to=');
+    expect(calledUrl).toContain('2024-06-15T12');
+  });
+
   it('throws on 4xx error without retry', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
