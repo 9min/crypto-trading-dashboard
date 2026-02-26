@@ -241,6 +241,9 @@ export class DepthChartRenderer implements CanvasRenderer {
       if (process.env.NODE_ENV === 'development') {
         performance.mark('depth-chart-draw-end');
         performance.measure('depth-chart-draw', 'depth-chart-draw-start', 'depth-chart-draw-end');
+        performance.clearMarks('depth-chart-draw-start');
+        performance.clearMarks('depth-chart-draw-end');
+        performance.clearMeasures('depth-chart-draw');
       }
       return;
     }
@@ -266,6 +269,9 @@ export class DepthChartRenderer implements CanvasRenderer {
       if (process.env.NODE_ENV === 'development') {
         performance.mark('depth-chart-draw-end');
         performance.measure('depth-chart-draw', 'depth-chart-draw-start', 'depth-chart-draw-end');
+        performance.clearMarks('depth-chart-draw-start');
+        performance.clearMarks('depth-chart-draw-end');
+        performance.clearMeasures('depth-chart-draw');
       }
       return;
     }
@@ -329,6 +335,9 @@ export class DepthChartRenderer implements CanvasRenderer {
     if (process.env.NODE_ENV === 'development') {
       performance.mark('depth-chart-draw-end');
       performance.measure('depth-chart-draw', 'depth-chart-draw-start', 'depth-chart-draw-end');
+      performance.clearMarks('depth-chart-draw-start');
+      performance.clearMarks('depth-chart-draw-end');
+      performance.clearMeasures('depth-chart-draw');
     }
   }
 
@@ -568,22 +577,22 @@ export class DepthChartRenderer implements CanvasRenderer {
   ): number {
     // Check if price is in the bid range (bids sorted descending)
     if (bidCount > 0 && price <= bids[0].price) {
-      // Binary search in bids (descending order)
+      // Binary search in bids (descending order) — find last bid with price >= target
       let lo = 0;
       let hi = bidCount - 1;
       while (lo <= hi) {
         const mid = (lo + hi) >> 1;
-        if (bids[mid].price > price) {
+        if (bids[mid].price >= price) {
           lo = mid + 1;
         } else {
           hi = mid - 1;
         }
       }
-      // lo is the index of first bid with price <= our target
-      if (lo < bidCount) {
-        return this.bidCumulativeBuf[lo];
+      // hi is the last bid with price >= our target
+      if (hi >= 0) {
+        return this.bidCumulativeBuf[hi];
       }
-      return this.bidCumulativeBuf[bidCount - 1];
+      return 0;
     }
 
     // Check if price is in the ask range (asks sorted ascending)
