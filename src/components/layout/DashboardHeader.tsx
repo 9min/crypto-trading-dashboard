@@ -21,17 +21,19 @@ export const DashboardHeader = memo(function DashboardHeader() {
   return (
     <header
       data-testid="dashboard-header"
-      className="border-border bg-background-secondary flex h-12 shrink-0 items-center justify-between border-b px-4"
+      className="border-border bg-background-secondary flex h-11 shrink-0 items-center justify-between border-b px-3 shadow-[var(--shadow-header)]"
     >
-      <div className="flex items-center gap-4">
-        <h1 className="text-accent text-sm font-bold tracking-wide">CryptoDash - 9min</h1>
-        <div className="bg-border h-5 w-px" />
+      <div className="flex items-center gap-3">
+        <h1 className="text-accent text-xs font-bold tracking-wide">CryptoDash</h1>
+        <div className="bg-border h-4 w-px" />
         <ExchangeSelector />
-        <span className="font-mono-num text-foreground text-sm font-semibold">{displaySymbol}</span>
+        <span className="font-mono-num text-foreground text-xs font-semibold">{displaySymbol}</span>
+        <div className="bg-border h-4 w-px" />
         <IntervalSelector />
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-1.5">
         <ConnectionStatus />
+        <div className="bg-border mx-1 h-4 w-px" />
         <PriceAlertPopover />
         <ThemeToggle />
         <UserMenu />

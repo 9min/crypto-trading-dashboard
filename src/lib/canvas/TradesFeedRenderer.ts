@@ -49,7 +49,7 @@ const FONT_FAMILY = "'JetBrains Mono', 'Fira Code', monospace";
 const PADDING_X = 8;
 const COLUMN_RATIOS = [0.28, 0.38, 0.34]; // time, price, quantity
 
-const DEFAULT_COLORS: TradesFeedColors = {
+const DARK_COLORS: TradesFeedColors = {
   background: '#12161c',
   foreground: '#eaecef',
   foregroundSecondary: '#848e9c',
@@ -59,6 +59,23 @@ const DEFAULT_COLORS: TradesFeedColors = {
   rowHover: 'rgba(255, 255, 255, 0.02)',
   border: '#252930',
 };
+
+const LIGHT_COLORS: TradesFeedColors = {
+  background: '#ffffff',
+  foreground: '#1e2329',
+  foregroundSecondary: '#707a8a',
+  headerBg: '#f5f5f5',
+  buyText: '#0b8f63',
+  sellText: '#d9304a',
+  rowHover: 'rgba(0, 0, 0, 0.02)',
+  border: '#e0e3e8',
+};
+
+const DEFAULT_COLORS = DARK_COLORS;
+
+export function getTradesFeedColors(theme: 'dark' | 'light'): TradesFeedColors {
+  return theme === 'light' ? LIGHT_COLORS : DARK_COLORS;
+}
 
 // -----------------------------------------------------------------------------
 // Renderer

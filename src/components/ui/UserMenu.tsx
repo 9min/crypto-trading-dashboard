@@ -105,7 +105,7 @@ export const UserMenu = memo(function UserMenu() {
         // Logged-in: Avatar button
         <button
           onClick={handleToggle}
-          className="hover:bg-background-tertiary flex items-center gap-2 rounded-md p-1 transition-colors"
+          className="hover:bg-background-tertiary flex cursor-pointer items-center gap-2 rounded-md p-1 transition-colors"
           aria-label="User menu"
           aria-expanded={isOpen}
           type="button"
@@ -160,7 +160,7 @@ export const UserMenu = memo(function UserMenu() {
             <div className="flex flex-col gap-1">
               <button
                 onClick={handleSignInGoogle}
-                className="text-foreground hover:bg-background-tertiary flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors"
+                className="text-foreground hover:bg-background-tertiary flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors"
                 type="button"
               >
                 <GoogleIcon />

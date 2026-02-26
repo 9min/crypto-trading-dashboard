@@ -49,7 +49,7 @@ const PADDING_X = 8;
 const SPREAD_HEIGHT = 24;
 const BAR_OPACITY = 0.25;
 
-const DEFAULT_COLORS: OrderBookColors = {
+const DARK_COLORS: OrderBookColors = {
   background: '#12161c',
   foreground: '#eaecef',
   foregroundSecondary: '#848e9c',
@@ -60,6 +60,24 @@ const DEFAULT_COLORS: OrderBookColors = {
   border: '#252930',
   spreadBg: '#1a1f27',
 };
+
+const LIGHT_COLORS: OrderBookColors = {
+  background: '#ffffff',
+  foreground: '#1e2329',
+  foregroundSecondary: '#707a8a',
+  buyBar: '#00c087',
+  sellBar: '#f6465d',
+  buyText: '#0b8f63',
+  sellText: '#d9304a',
+  border: '#e0e3e8',
+  spreadBg: '#f5f5f5',
+};
+
+const DEFAULT_COLORS = DARK_COLORS;
+
+export function getOrderBookColors(theme: 'dark' | 'light'): OrderBookColors {
+  return theme === 'light' ? LIGHT_COLORS : DARK_COLORS;
+}
 
 // -----------------------------------------------------------------------------
 // Renderer

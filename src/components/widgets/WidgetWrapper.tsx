@@ -32,7 +32,7 @@ export const WidgetWrapper = memo(function WidgetWrapper({
   headerActions,
 }: WidgetWrapperProps) {
   return (
-    <div className="border-border bg-background-secondary flex h-full flex-col rounded-lg border">
+    <div className="border-border bg-background-secondary flex h-full flex-col rounded-lg border shadow-[var(--shadow-widget)]">
       <div className="widget-drag-handle border-border bg-background-tertiary relative z-10 flex h-8 shrink-0 cursor-grab items-center justify-between border-b px-3 transition-colors active:cursor-grabbing">
         <span
           data-testid="widget-title"
