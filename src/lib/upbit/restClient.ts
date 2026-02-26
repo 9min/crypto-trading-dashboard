@@ -5,7 +5,6 @@
 // All functions include exponential backoff retry for transient failures.
 // =============================================================================
 
-import { EXCHANGES } from '@/types/exchange';
 import type { UpbitKlineCandle, UpbitOrderBookResponse, UpbitTickerResponse } from '@/types/upbit';
 import type { CandleData } from '@/types/chart';
 
@@ -13,7 +12,9 @@ import type { CandleData } from '@/types/chart';
 // Constants
 // -----------------------------------------------------------------------------
 
-const UPBIT_REST_BASE_URL = EXCHANGES.upbit.restBaseUrl;
+// Use Next.js rewrite proxy (/api/upbit/:path*) to avoid CORS issues.
+// The proxy forwards requests to https://api.upbit.com/v1/:path* server-side.
+const UPBIT_REST_BASE_URL = '/api/upbit';
 
 // -----------------------------------------------------------------------------
 // Interval Mapping
