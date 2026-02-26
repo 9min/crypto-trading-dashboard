@@ -599,11 +599,11 @@ export class DepthChartRenderer implements CanvasRenderer {
           hi = mid - 1;
         }
       }
-      // hi is the last ask with price < our target
-      if (hi >= 0) {
-        return this.askCumulativeBuf[hi];
+      // lo is the first ask with price >= our target
+      if (lo < askCount) {
+        return this.askCumulativeBuf[lo];
       }
-      return 0;
+      return this.askCumulativeBuf[askCount - 1];
     }
 
     return 0;
