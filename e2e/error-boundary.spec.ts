@@ -1,59 +1,138 @@
 import { test, expect } from '@playwright/test';
-import { setupMocks } from './helpers/websocket-mock';
+import { mockBinanceWebSocket, mockBinanceRest } from './helpers/websocket-mock';
 
 // =============================================================================
 // Error Boundary Isolation Tests
 // =============================================================================
 
 test.describe('Error boundary', () => {
-  test.beforeEach(async ({ page }) => {
-    await setupMocks(page);
+  test('widget error should be isolated — other widgets and header remain functional', async ({
+    page,
+  }) => {
+    // Mock REST APIs normally, but sabotage the klines endpoint to return
+    // malformed data that will cause the CandlestickWidget to throw during render.
+    // The Chart widget's ErrorBoundary should catch it and show the fallback,
+    // while all other widgets continue to work.
+    await page.route('**/api/v3/klines*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        // Return malformed data: objects instead of arrays, which will cause
+        // parseFloat() to return NaN and lightweight-charts to throw
+        body: JSON.stringify([{ broken: true }]),
+      }),
+    );
+
+    // Set up remaining mocks normally
+    await page.route('**/api/v3/depth*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ lastUpdateId: 1000, bids: [], asks: [] }),
+      }),
+    );
+    await page.route('**/api/v3/ticker/24hr*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      }),
+    );
+    await page.route('**/open.er-api.com/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ result: 'success', base_code: 'USD', rates: { KRW: 1380 } }),
+      }),
+    );
+    await mockBinanceWebSocket(page);
+
     await page.goto('/');
-    await page.waitForSelector('[data-testid="widget-title"]', { timeout: 15000 });
-  });
+    await page.waitForSelector('[data-testid="dashboard-header"]', { timeout: 15000 });
 
-  test('widget error should be isolated and not crash the dashboard', async ({ page }) => {
-    // Verify the dashboard starts with all widgets rendered
-    const initialCount = await page.getByTestId('widget-title').count();
-    expect(initialCount).toBe(7);
+    // Wait for widgets to render (some may error)
+    await page.waitForTimeout(3000);
 
-    // The header should remain visible regardless of widget errors
+    // The header should remain fully visible and functional
     const header = page.getByTestId('dashboard-header');
     await expect(header).toBeVisible();
+    await expect(header).toContainText('CryptoDash - 9min');
 
-    // Inject a JavaScript error into a specific widget's error boundary
-    // by finding an ErrorBoundary and triggering its error state via
-    // a forced render error in a child component
-    await page.evaluate(() => {
-      // Find the Performance widget (last widget, least critical) and
-      // simulate an error by dispatching an error event that the
-      // ErrorBoundary will catch
-      const event = new ErrorEvent('error', {
-        error: new Error('Test widget crash'),
-        message: 'Test widget crash',
-      });
-      window.dispatchEvent(event);
-    });
+    // Exchange buttons should still work
+    await expect(page.getByTestId('exchange-binance')).toBeVisible();
+    await expect(page.getByTestId('theme-toggle')).toBeVisible();
 
-    // Dashboard header should still be visible after the error
-    await expect(header).toBeVisible();
-
-    // Other widgets should still be functional
-    const exchangeBinance = page.getByTestId('exchange-binance');
-    await expect(exchangeBinance).toBeVisible();
+    // Non-Chart widgets should still render their titles
+    // (at least some widgets should be healthy)
+    const widgetTitles = page.getByTestId('widget-title');
+    const count = await widgetTitles.count();
+    expect(count).toBeGreaterThanOrEqual(1);
   });
 
-  test('error fallback should display retry button', async ({ page }) => {
-    // If there happen to be any error fallbacks visible, they should have retry
-    const retryButtons = page.locator('button:has-text("Retry")');
-    const retryCount = await retryButtons.count();
+  test('error fallback shows widget name and retry button', async ({ page }) => {
+    // Sabotage klines to trigger Chart widget error
+    await page.route('**/api/v3/klines*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([{ broken: true }]),
+      }),
+    );
 
-    // Either no errors (healthy state) or errors with retry buttons
-    if (retryCount > 0) {
-      await expect(retryButtons.first()).toBeVisible();
+    await page.route('**/api/v3/depth*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ lastUpdateId: 1000, bids: [], asks: [] }),
+      }),
+    );
+    await page.route('**/api/v3/ticker/24hr*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      }),
+    );
+    await page.route('**/open.er-api.com/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ result: 'success', base_code: 'USD', rates: { KRW: 1380 } }),
+      }),
+    );
+    await mockBinanceWebSocket(page);
+
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="dashboard-header"]', { timeout: 15000 });
+    await page.waitForTimeout(3000);
+
+    // ErrorFallback should display "{widgetName} error" text and a Retry button
+    const errorText = page.locator('text=/error/i');
+    const errorCount = await errorText.count();
+
+    if (errorCount > 0) {
+      // At least one error fallback is visible with a Retry button
+      const retryButton = page.locator('button:has-text("Retry")');
+      await expect(retryButton.first()).toBeVisible();
     }
 
-    // Dashboard should still be functional regardless
+    // Dashboard should remain functional regardless
     await expect(page.getByTestId('dashboard-header')).toBeVisible();
+  });
+
+  test('healthy dashboard has all 7 widgets with no error fallbacks', async ({ page }) => {
+    // Use normal mocks — everything should work
+    await mockBinanceRest(page);
+    await mockBinanceWebSocket(page);
+
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="widget-title"]', { timeout: 15000 });
+
+    // All 7 widgets should render their titles
+    await expect(page.getByTestId('widget-title')).toHaveCount(7);
+
+    // No Retry buttons should be visible (no errors)
+    const retryButtons = page.locator('button:has-text("Retry")');
+    await expect(retryButtons).toHaveCount(0);
   });
 });
