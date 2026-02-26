@@ -320,6 +320,17 @@ interface Binance24hrTickerResponse {
 // Exports
 // -----------------------------------------------------------------------------
 
+/**
+ * Binance REST API `/api/v3/ticker/price` single-symbol response.
+ * Returns the latest price for the requested symbol.
+ */
+interface BinanceTickerPriceResponse {
+  /** Symbol name (e.g., "BTCUSDT") */
+  symbol: string;
+  /** Current price as string */
+  price: string;
+}
+
 export type {
   BinanceCombinedStreamMessage,
   BinanceKlineData,
@@ -336,4 +347,5 @@ export type {
   BinanceExchangeInfo,
   BinanceRateLimit,
   Binance24hrTickerResponse,
+  BinanceTickerPriceResponse,
 };

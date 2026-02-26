@@ -1,24 +1,25 @@
 // =============================================================================
 // usePremiumStream Hook
 // =============================================================================
-// Subscribes to both Binance and Upbit ticker data simultaneously for the
-// current symbol, fetches the USD/KRW exchange rate, and updates the
-// premium store for kimchi premium calculation.
+// Polls Binance and Upbit REST APIs for the current symbol's price and fetches
+// the USD/KRW exchange rate to compute the kimchi premium.
+// Uses REST polling instead of WebSocket for reliable operation on Vercel.
 // =============================================================================
 
 import { useEffect } from 'react';
-import { parseCombinedStreamMessage } from '@/lib/websocket/messageRouter';
 import { fetchUsdKrwRate } from '@/lib/exchange/exchangeRateService';
 import { usePremiumStore } from '@/stores/premiumStore';
 import { useUiStore } from '@/stores/uiStore';
 import { toUpbitSymbol } from '@/utils/symbolMap';
-import { getMiniTickerStream, buildStreamUrl } from '@/lib/binance/streamUrls';
-import type { BinanceMiniTickerEvent } from '@/types/binance';
-import type { UpbitTickerEvent, UpbitWebSocketMessage } from '@/types/upbit';
+import type { BinanceTickerPriceResponse } from '@/types/binance';
+import type { UpbitTickerResponse } from '@/types/upbit';
 
 // -----------------------------------------------------------------------------
 // Constants
 // -----------------------------------------------------------------------------
+
+/** Price polling interval (5 seconds) */
+const PRICE_POLL_INTERVAL_MS = 5_000;
 
 /** Exchange rate polling interval (60 seconds) */
 const RATE_POLL_INTERVAL_MS = 60_000;
@@ -37,82 +38,46 @@ export function usePremiumStream(): void {
   useEffect(() => {
     let isActive = true;
 
-    // symbol is always Binance format — convert for Upbit API
     const binanceSymbol = symbol;
     const upbitSymbol = toUpbitSymbol(symbol);
 
     resetPremium();
 
-    // -- Binance: subscribe to miniTicker for USD price --
-    const binanceWsUrl = buildStreamUrl([getMiniTickerStream(binanceSymbol)]);
-    const binanceWs = new WebSocket(binanceWsUrl);
+    // -- Binance price polling (via proxy to avoid CORS) --
+    const fetchBinancePrice = async (): Promise<void> => {
+      try {
+        const response = await fetch(
+          `/api/binance/ticker/price?symbol=${encodeURIComponent(binanceSymbol)}`,
+          { signal: AbortSignal.timeout(10_000) },
+        );
+        if (!response.ok) return;
 
-    const handleBinanceMessage = (event: MessageEvent): void => {
-      if (!isActive) return;
-      const rawData = event.data;
-      if (typeof rawData !== 'string') return;
-
-      const message = parseCombinedStreamMessage(rawData);
-      if (!message || message.e !== '24hrMiniTicker') return;
-
-      const ticker = message as BinanceMiniTickerEvent;
-      setBinancePrice(parseFloat(ticker.c));
-    };
-
-    binanceWs.addEventListener('message', handleBinanceMessage);
-
-    // -- Upbit: subscribe to ticker for KRW price --
-    const upbitWs = new WebSocket('wss://api.upbit.com/websocket/v1');
-
-    const handleUpbitOpen = (): void => {
-      if (!isActive) return;
-      const subMessage = [
-        { ticket: `premium-${Date.now()}` },
-        { type: 'ticker', codes: [upbitSymbol], isOnlyRealtime: true },
-      ];
-      upbitWs.send(JSON.stringify(subMessage));
-    };
-
-    const handleUpbitMessage = (event: MessageEvent): void => {
-      if (!isActive) return;
-
-      const rawData = event.data;
-      if (rawData instanceof Blob) {
-        rawData
-          .text()
-          .then((text) => {
-            if (!isActive) return;
-            try {
-              const parsed = JSON.parse(text) as UpbitWebSocketMessage;
-              if (parsed.type === 'ticker') {
-                const ticker = parsed as UpbitTickerEvent;
-                setUpbitPrice(ticker.trade_price);
-              }
-            } catch {
-              // Ignore parse errors
-            }
-          })
-          .catch(() => {
-            // Ignore blob read errors
-          });
-        return;
-      }
-
-      if (typeof rawData === 'string') {
-        try {
-          const parsed = JSON.parse(rawData) as UpbitWebSocketMessage;
-          if (parsed.type === 'ticker') {
-            const ticker = parsed as UpbitTickerEvent;
-            setUpbitPrice(ticker.trade_price);
-          }
-        } catch {
-          // Ignore parse errors
+        const data = (await response.json()) as BinanceTickerPriceResponse;
+        if (isActive && data.price) {
+          setBinancePrice(parseFloat(data.price));
         }
+      } catch {
+        // Silently ignore — will retry on next interval
       }
     };
 
-    upbitWs.addEventListener('open', handleUpbitOpen);
-    upbitWs.addEventListener('message', handleUpbitMessage);
+    // -- Upbit price polling (via existing proxy) --
+    const fetchUpbitPrice = async (): Promise<void> => {
+      try {
+        const response = await fetch(
+          `/api/upbit/ticker?markets=${encodeURIComponent(upbitSymbol)}`,
+          { signal: AbortSignal.timeout(10_000) },
+        );
+        if (!response.ok) return;
+
+        const data = (await response.json()) as UpbitTickerResponse[];
+        if (isActive && data.length > 0 && data[0].trade_price > 0) {
+          setUpbitPrice(data[0].trade_price);
+        }
+      } catch {
+        // Silently ignore — will retry on next interval
+      }
+    };
 
     // -- Exchange rate polling --
     const fetchRate = (): void => {
@@ -127,27 +92,24 @@ export function usePremiumStream(): void {
         });
     };
 
+    // Initial fetch — all three in parallel
+    void fetchBinancePrice();
+    void fetchUpbitPrice();
     fetchRate();
+
+    // Periodic polling
+    const priceInterval = setInterval(() => {
+      void fetchBinancePrice();
+      void fetchUpbitPrice();
+    }, PRICE_POLL_INTERVAL_MS);
+
     const rateInterval = setInterval(fetchRate, RATE_POLL_INTERVAL_MS);
 
     // -- Cleanup --
     return () => {
       isActive = false;
+      clearInterval(priceInterval);
       clearInterval(rateInterval);
-
-      binanceWs.removeEventListener('message', handleBinanceMessage);
-      if (
-        binanceWs.readyState === WebSocket.OPEN ||
-        binanceWs.readyState === WebSocket.CONNECTING
-      ) {
-        binanceWs.close();
-      }
-
-      upbitWs.removeEventListener('open', handleUpbitOpen);
-      upbitWs.removeEventListener('message', handleUpbitMessage);
-      if (upbitWs.readyState === WebSocket.OPEN || upbitWs.readyState === WebSocket.CONNECTING) {
-        upbitWs.close();
-      }
     };
   }, [symbol, setBinancePrice, setUpbitPrice, setUsdKrwRate, resetPremium]);
 }

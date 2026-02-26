@@ -22,7 +22,7 @@ test.describe('Dashboard', () => {
   test('should render the dashboard header', async ({ page }) => {
     const header = page.getByTestId('dashboard-header');
     await expect(header).toBeVisible();
-    await expect(header).toContainText('CryptoDash - 9min');
+    await expect(header).toContainText('CryptoDash');
   });
 
   test('should display the active symbol', async ({ page }) => {

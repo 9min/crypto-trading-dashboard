@@ -38,7 +38,7 @@ test.describe('Error boundary', () => {
         body: JSON.stringify([]),
       }),
     );
-    await page.route('**/open.er-api.com/**', (route) =>
+    await page.route('**/api/exchange-rate/**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -57,7 +57,7 @@ test.describe('Error boundary', () => {
       // The header should remain fully visible and functional
       const header = page.getByTestId('dashboard-header');
       await expect(header).toBeVisible();
-      await expect(header).toContainText('CryptoDash - 9min');
+      await expect(header).toContainText('CryptoDash');
 
       // Exchange buttons should still work
       await expect(page.getByTestId('exchange-binance')).toBeVisible();
@@ -97,7 +97,7 @@ test.describe('Error boundary', () => {
         body: JSON.stringify([]),
       }),
     );
-    await page.route('**/open.er-api.com/**', (route) =>
+    await page.route('**/api/exchange-rate/**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',

@@ -140,14 +140,15 @@ export class TradesFeedRenderer implements CanvasRenderer {
   // -- Drawing ----------------------------------------------------------------
 
   private draw(): void {
-    if (process.env.NODE_ENV === 'development') {
-      performance.mark('trades-draw-start');
-    }
-
     const { buffer } = useTradeStore.getState();
     const { ctx, width, height, colors } = this;
 
     if (width === 0 || height === 0) return;
+
+    performance.clearMarks('tradesfeed-draw-start');
+    performance.clearMarks('tradesfeed-draw-end');
+    performance.clearMeasures('tradesfeed-draw');
+    performance.mark('tradesfeed-draw-start');
 
     // Clear
     ctx.fillStyle = colors.background;
@@ -186,10 +187,8 @@ export class TradesFeedRenderer implements CanvasRenderer {
       this.drawTradeRowFromFields(price, quantity, time, isBuyerMaker === 1, y, col1X, col2X);
     }
 
-    if (process.env.NODE_ENV === 'development') {
-      performance.mark('trades-draw-end');
-      performance.measure('trades-draw', 'trades-draw-start', 'trades-draw-end');
-    }
+    performance.mark('tradesfeed-draw-end');
+    performance.measure('tradesfeed-draw', 'tradesfeed-draw-start', 'tradesfeed-draw-end');
   }
 
   private drawHeader(col1X: number, col2X: number): void {

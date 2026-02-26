@@ -16,8 +16,8 @@ const CACHE_TTL_MS = 60_000;
 /** Fallback rate when all API calls fail */
 const FALLBACK_RATE = 1350;
 
-/** Exchange rate API endpoint (free, no API key required) */
-const EXCHANGE_RATE_API_URL = 'https://open.er-api.com/v6/latest/USD';
+/** Exchange rate API endpoint — proxied through Next.js rewrites to avoid CORS */
+const EXCHANGE_RATE_API_URL = '/api/exchange-rate/latest/USD';
 
 // -----------------------------------------------------------------------------
 // Types
