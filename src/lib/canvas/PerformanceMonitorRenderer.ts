@@ -162,6 +162,7 @@ export class PerformanceMonitorRenderer implements CanvasRenderer {
     }
 
     if (!this.isDirty) return;
+    if (this.width === 0 || this.height === 0) return;
 
     this.draw();
     this.isDirty = false;
@@ -275,7 +276,6 @@ export class PerformanceMonitorRenderer implements CanvasRenderer {
 
   private draw(): void {
     const { ctx, width, height, colors } = this;
-    if (width === 0 || height === 0) return;
 
     // Clear background
     ctx.fillStyle = colors.background;
