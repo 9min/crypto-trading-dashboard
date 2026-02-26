@@ -18,6 +18,8 @@ import { useUiStore } from '@/stores/uiStore';
 import type { CandleData } from '@/types/chart';
 import type { Theme } from '@/stores/uiStore';
 import { WidgetWrapper } from './WidgetWrapper';
+import { useIndicatorSeries } from '@/hooks/useIndicatorSeries';
+import { IndicatorToggle } from '@/components/ui/IndicatorToggle';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -36,6 +38,8 @@ interface ChartColors {
   grid: string;
   border: string;
   crosshair: string;
+  separator: string;
+  separatorHover: string;
   upColor: string;
   downColor: string;
   wickUpColor: string;
@@ -52,6 +56,8 @@ const DARK_COLORS: ChartColors = {
   grid: '#1a1f27',
   border: '#252930',
   crosshair: '#5e6673',
+  separator: '#1e2329',
+  separatorHover: 'rgba(94, 102, 115, 0.3)',
   upColor: '#00c087',
   downColor: '#f6465d',
   wickUpColor: '#00c087',
@@ -64,6 +70,8 @@ const LIGHT_COLORS: ChartColors = {
   grid: '#f5f5f5',
   border: '#eaecef',
   crosshair: '#a3a8b3',
+  separator: '#eaecef',
+  separatorHover: 'rgba(163, 168, 179, 0.3)',
   upColor: '#00c087',
   downColor: '#f6465d',
   wickUpColor: '#00c087',
@@ -121,6 +129,9 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
 
   const colors = useMemo(() => getColorsForTheme(theme), [theme]);
 
+  // Technical indicator series lifecycle
+  useIndicatorSeries({ chartRef, isChartReady });
+
   // Keep colorsRef in sync so the mount effect can read current colors
   colorsRef.current = colors;
 
@@ -141,6 +152,10 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
         layout: {
           background: { color: c.background },
           textColor: c.text,
+          panes: {
+            separatorColor: c.separator,
+            separatorHoverColor: c.separatorHover,
+          },
         },
         grid: {
           vertLines: { color: c.grid },
@@ -195,6 +210,10 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
       layout: {
         background: { color: colors.background },
         textColor: colors.text,
+        panes: {
+          separatorColor: colors.separator,
+          separatorHoverColor: colors.separatorHover,
+        },
       },
       grid: {
         vertLines: { color: colors.grid },
@@ -265,7 +284,7 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
   }, [candles, isChartReady]);
 
   return (
-    <WidgetWrapper title="Chart">
+    <WidgetWrapper title="Chart" headerActions={<IndicatorToggle />}>
       <div ref={containerRef} className="h-full w-full">
         {isLoading && (
           <div className="bg-background-secondary/80 absolute inset-0 z-10 flex items-center justify-center">
