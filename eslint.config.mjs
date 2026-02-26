@@ -36,6 +36,12 @@ const eslintConfig = defineConfig([
       '@typescript-eslint/no-explicit-any': 'off',
     },
   },
+  {
+    files: ['e2e/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ]);
 
 export default eslintConfig;

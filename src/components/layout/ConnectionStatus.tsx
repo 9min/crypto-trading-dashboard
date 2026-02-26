@@ -42,7 +42,7 @@ export const ConnectionStatus = memo(function ConnectionStatus() {
   const isFailed = connectionState.status === 'failed';
 
   return (
-    <div className="flex items-center gap-2">
+    <div data-testid="connection-status" className="flex items-center gap-2">
       <div className="relative flex h-2 w-2">
         {config.pulse && (
           <span

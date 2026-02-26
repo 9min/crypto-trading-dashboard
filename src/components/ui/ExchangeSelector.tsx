@@ -36,6 +36,7 @@ export const ExchangeSelector = memo(function ExchangeSelector() {
       {(['binance', 'upbit'] as const).map((id) => (
         <button
           key={id}
+          data-testid={`exchange-${id}`}
           type="button"
           onClick={() => handleSelect(id)}
           className={`px-2.5 py-1 text-xs font-medium transition-colors ${

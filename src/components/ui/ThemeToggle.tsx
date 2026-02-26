@@ -67,6 +67,7 @@ export const ThemeToggle = memo(function ThemeToggle() {
 
   return (
     <button
+      data-testid="theme-toggle"
       onClick={handleToggle}
       className="text-foreground-secondary hover:bg-background-tertiary hover:text-foreground flex h-8 w-8 items-center justify-center rounded-md transition-colors"
       aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}

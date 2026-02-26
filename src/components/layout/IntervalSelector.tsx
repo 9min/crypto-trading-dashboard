@@ -61,6 +61,7 @@ const IntervalButton = memo(function IntervalButton({
 
   return (
     <button
+      data-testid={`interval-${value}`}
       type="button"
       aria-pressed={isActive}
       onClick={handleClick}
