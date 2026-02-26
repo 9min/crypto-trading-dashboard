@@ -5,6 +5,7 @@
 // =============================================================================
 // Root container for the trading dashboard. Orchestrates:
 // - WebSocket connection lifecycle (via useWebSocket hook)
+// - Price alert monitoring across all streams (via usePriceAlertMonitor)
 // - Dashboard header with symbol display and connection status
 // - Responsive widget grid with drag/resize capabilities
 // =============================================================================
@@ -13,6 +14,7 @@ import { memo, useEffect } from 'react';
 import { DashboardHeader } from './DashboardHeader';
 import { DashboardGrid } from './DashboardGrid';
 import { useExchangeWebSocket } from '@/hooks/useExchangeWebSocket';
+import { usePriceAlertMonitor } from '@/hooks/usePriceAlertMonitor';
 import { useUiStore } from '@/stores/uiStore';
 
 export const DashboardShell = memo(function DashboardShell() {
@@ -25,6 +27,9 @@ export const DashboardShell = memo(function DashboardShell() {
   }, [hydrateExchange]);
 
   useExchangeWebSocket(isExchangeHydrated);
+
+  // Monitor price alerts across all streams and send browser notifications
+  usePriceAlertMonitor();
 
   return (
     <div className="bg-background flex h-screen flex-col">
