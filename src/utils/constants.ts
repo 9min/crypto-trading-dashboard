@@ -52,3 +52,17 @@ export const COLORS = {
   RECONNECTING: '#F0B90B',
   DISCONNECTED: '#F6465D',
 } as const;
+
+export const INDICATOR_COLORS = {
+  SMA_20: '#e6a817',
+  SMA_50: '#8b5cf6',
+  EMA_12: '#06b6d4',
+  EMA_26: '#ec4899',
+  BB_UPPER: '#6366f1',
+  BB_MIDDLE: '#a5b4fc',
+  BB_LOWER: '#6366f1',
+  RSI: '#f59e0b',
+  VOLUME_MA: '#8b5cf6',
+  VOLUME_UP: 'rgba(0, 192, 135, 0.5)',
+  VOLUME_DOWN: 'rgba(246, 70, 93, 0.5)',
+} as const;
