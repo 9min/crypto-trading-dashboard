@@ -1,5 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useAlertStore, MAX_ALERTS, ALERTS_STORAGE_KEY, isAlertTriggered } from './alertStore';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  useAlertStore,
+  MAX_ALERTS,
+  ALERTS_STORAGE_KEY,
+  ACTIVATION_GRACE_MS,
+  isAlertTriggered,
+} from './alertStore';
 import type { PriceAlert } from './alertStore';
 
 // -----------------------------------------------------------------------------
@@ -29,8 +35,8 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
 // -----------------------------------------------------------------------------
 
 function createTestAlert(
-  overrides: Partial<Omit<PriceAlert, 'id' | 'createdAt'>> = {},
-): Omit<PriceAlert, 'id' | 'createdAt'> {
+  overrides: Partial<Omit<PriceAlert, 'id' | 'createdAt' | 'activatedAt'>> = {},
+): Omit<PriceAlert, 'id' | 'createdAt' | 'activatedAt'> {
   return {
     symbol: 'BTCUSDT',
     targetPrice: 50000,
@@ -57,7 +63,7 @@ describe('alertStore', () => {
   // ---------------------------------------------------------------------------
 
   describe('addAlert', () => {
-    it('adds an alert with generated id and createdAt', () => {
+    it('adds an alert with generated id, createdAt, and activatedAt', () => {
       const success = useAlertStore.getState().addAlert(createTestAlert());
 
       expect(success).toBe(true);
@@ -69,6 +75,7 @@ describe('alertStore', () => {
       expect(alerts[0].isActive).toBe(true);
       expect(alerts[0].id).toMatch(/^alert-/);
       expect(alerts[0].createdAt).toBeGreaterThan(0);
+      expect(alerts[0].activatedAt).toBeGreaterThan(0);
     });
 
     it('saves alerts to localStorage after adding', () => {
@@ -169,6 +176,30 @@ describe('alertStore', () => {
 
       expect(localStorageMock.setItem).toHaveBeenCalled();
     });
+
+    it('sets activatedAt when toggling ON', () => {
+      useAlertStore.getState().addAlert(createTestAlert({ isActive: false }));
+      const alertId = useAlertStore.getState().alerts[0].id;
+      const beforeToggle = Date.now();
+
+      useAlertStore.getState().toggleAlert(alertId);
+
+      const alert = useAlertStore.getState().alerts[0];
+      expect(alert.isActive).toBe(true);
+      expect(alert.activatedAt).toBeGreaterThanOrEqual(beforeToggle);
+    });
+
+    it('does not update activatedAt when toggling OFF', () => {
+      useAlertStore.getState().addAlert(createTestAlert({ isActive: true }));
+      const alertId = useAlertStore.getState().alerts[0].id;
+      const originalActivatedAt = useAlertStore.getState().alerts[0].activatedAt;
+
+      useAlertStore.getState().toggleAlert(alertId);
+
+      const alert = useAlertStore.getState().alerts[0];
+      expect(alert.isActive).toBe(false);
+      expect(alert.activatedAt).toBe(originalActivatedAt);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -176,6 +207,14 @@ describe('alertStore', () => {
   // ---------------------------------------------------------------------------
 
   describe('checkAlerts', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('triggers alert when price is above target (direction: above)', () => {
       useAlertStore.getState().addAlert(
         createTestAlert({
@@ -185,6 +224,7 @@ describe('alertStore', () => {
         }),
       );
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
 
       expect(triggered).toHaveLength(1);
@@ -199,6 +239,7 @@ describe('alertStore', () => {
         }),
       );
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 50000);
       expect(triggered).toHaveLength(1);
     });
@@ -211,6 +252,7 @@ describe('alertStore', () => {
         }),
       );
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 49000);
       expect(triggered).toHaveLength(0);
     });
@@ -223,6 +265,7 @@ describe('alertStore', () => {
         }),
       );
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 49000);
 
       expect(triggered).toHaveLength(1);
@@ -237,6 +280,7 @@ describe('alertStore', () => {
         }),
       );
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 50000);
       expect(triggered).toHaveLength(1);
     });
@@ -249,6 +293,7 @@ describe('alertStore', () => {
         }),
       );
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
       expect(triggered).toHaveLength(0);
     });
@@ -261,6 +306,7 @@ describe('alertStore', () => {
         }),
       );
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
 
       expect(useAlertStore.getState().alerts[0].isActive).toBe(false);
@@ -275,6 +321,7 @@ describe('alertStore', () => {
         }),
       );
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
       expect(triggered).toHaveLength(0);
     });
@@ -295,6 +342,7 @@ describe('alertStore', () => {
         }),
       );
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
 
       expect(triggered).toHaveLength(1);
@@ -315,6 +363,7 @@ describe('alertStore', () => {
         }),
       );
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
       expect(triggered).toHaveLength(2);
     });
@@ -328,6 +377,7 @@ describe('alertStore', () => {
       );
       localStorageMock.setItem.mockClear();
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
 
       expect(localStorageMock.setItem).toHaveBeenCalled();
@@ -342,9 +392,93 @@ describe('alertStore', () => {
       );
       localStorageMock.setItem.mockClear();
 
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
       useAlertStore.getState().checkAlerts('BTCUSDT', 49000);
 
       expect(localStorageMock.setItem).not.toHaveBeenCalled();
+    });
+
+    // -- Grace period tests ---------------------------------------------------
+
+    it('does not trigger during activation grace period', () => {
+      useAlertStore.getState().addAlert(
+        createTestAlert({
+          targetPrice: 50000,
+          direction: 'above',
+        }),
+      );
+
+      // Check immediately (within grace period)
+      const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
+      expect(triggered).toHaveLength(0);
+      // Alert remains active
+      expect(useAlertStore.getState().alerts[0].isActive).toBe(true);
+    });
+
+    it('triggers after grace period elapses', () => {
+      useAlertStore.getState().addAlert(
+        createTestAlert({
+          targetPrice: 50000,
+          direction: 'above',
+        }),
+      );
+
+      // Still within grace period
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS - 100);
+      const triggeredEarly = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
+      expect(triggeredEarly).toHaveLength(0);
+
+      // Now past grace period
+      vi.advanceTimersByTime(200);
+      const triggeredLate = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
+      expect(triggeredLate).toHaveLength(1);
+    });
+
+    it('resets grace period when alert is toggled back on', () => {
+      useAlertStore.getState().addAlert(
+        createTestAlert({
+          targetPrice: 50000,
+          direction: 'above',
+        }),
+      );
+
+      // Advance past grace period
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
+
+      // Toggle off, then back on
+      const alertId = useAlertStore.getState().alerts[0].id;
+      useAlertStore.getState().toggleAlert(alertId); // OFF
+      useAlertStore.getState().toggleAlert(alertId); // ON — new grace period
+
+      // Check immediately after re-activation — should NOT trigger
+      const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
+      expect(triggered).toHaveLength(0);
+
+      // Advance past new grace period — should trigger
+      vi.advanceTimersByTime(ACTIVATION_GRACE_MS + 1);
+      const triggeredAfter = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
+      expect(triggeredAfter).toHaveLength(1);
+    });
+
+    it('allows alerts without activatedAt (backward compatibility)', () => {
+      // Simulate loading an alert from localStorage without activatedAt
+      const stored: PriceAlert[] = [
+        {
+          id: 'legacy-alert',
+          symbol: 'BTCUSDT',
+          targetPrice: 50000,
+          direction: 'above',
+          isActive: true,
+          createdAt: Date.now() - 60_000, // Created 1 minute ago
+          // No activatedAt field
+        },
+      ];
+      localStorageMock.getItem.mockReturnValueOnce(JSON.stringify(stored));
+      useAlertStore.getState().loadAlerts();
+
+      // Should trigger immediately (no grace period for legacy alerts)
+      const triggered = useAlertStore.getState().checkAlerts('BTCUSDT', 51000);
+      expect(triggered).toHaveLength(1);
     });
   });
 

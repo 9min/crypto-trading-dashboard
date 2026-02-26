@@ -14,6 +14,14 @@ import { create } from 'zustand';
 const ALERTS_STORAGE_KEY = 'dashboard-alerts';
 const MAX_ALERTS = 20;
 
+/**
+ * Grace period (ms) after an alert is created or toggled ON.
+ * During this window, checkAlerts() will not trigger the alert.
+ * This prevents immediate re-deactivation when the current price
+ * already satisfies the condition at the moment of activation.
+ */
+const ACTIVATION_GRACE_MS = 5_000;
+
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
@@ -34,6 +42,14 @@ interface PriceAlert {
   isActive: boolean;
   /** Timestamp when the alert was created (ms) */
   createdAt: number;
+  /**
+   * Timestamp when the alert was last activated (created or toggled ON).
+   * Used for grace period — alerts are not checked within ACTIVATION_GRACE_MS
+   * of activation to prevent immediate triggering when the current price
+   * already satisfies the condition.
+   * Optional for backward compatibility with persisted alerts.
+   */
+  activatedAt?: number;
 }
 
 interface AlertStoreState {
@@ -43,7 +59,7 @@ interface AlertStoreState {
 
 interface AlertStoreActions {
   /** Add a new alert. Returns false if at max capacity. */
-  addAlert: (alert: Omit<PriceAlert, 'id' | 'createdAt'>) => boolean;
+  addAlert: (alert: Omit<PriceAlert, 'id' | 'createdAt' | 'activatedAt'>) => boolean;
   /** Remove an alert by ID */
   removeAlert: (id: string) => void;
   /** Toggle an alert's active state */
@@ -138,10 +154,12 @@ export const useAlertStore = create<AlertStore>()((set, get) => ({
     const { alerts } = get();
     if (alerts.length >= MAX_ALERTS) return false;
 
+    const now = Date.now();
     const newAlert: PriceAlert = {
       ...alertData,
       id: generateAlertId(),
-      createdAt: Date.now(),
+      createdAt: now,
+      activatedAt: now,
     };
 
     const newAlerts = [...alerts, newAlert];
@@ -157,9 +175,16 @@ export const useAlertStore = create<AlertStore>()((set, get) => ({
   },
 
   toggleAlert: (id): void => {
-    const newAlerts = get().alerts.map((alert) =>
-      alert.id === id ? { ...alert, isActive: !alert.isActive } : alert,
-    );
+    const newAlerts = get().alerts.map((alert) => {
+      if (alert.id !== id) return alert;
+      const willBeActive = !alert.isActive;
+      return {
+        ...alert,
+        isActive: willBeActive,
+        // Reset grace period when toggling ON to prevent immediate triggering
+        ...(willBeActive ? { activatedAt: Date.now() } : {}),
+      };
+    });
     set({ alerts: newAlerts });
     saveAlertsToStorage(newAlerts);
   },
@@ -167,9 +192,18 @@ export const useAlertStore = create<AlertStore>()((set, get) => ({
   checkAlerts: (symbol, price): PriceAlert[] => {
     const { alerts } = get();
     const triggered: PriceAlert[] = [];
+    const now = Date.now();
 
     const newAlerts = alerts.map((alert) => {
-      if (alert.isActive && alert.symbol === symbol && isAlertTriggered(alert, price)) {
+      if (!alert.isActive || alert.symbol !== symbol) return alert;
+
+      // Grace period: skip recently activated alerts to prevent
+      // immediate triggering when the current price already meets the condition
+      if (alert.activatedAt && now - alert.activatedAt < ACTIVATION_GRACE_MS) {
+        return alert;
+      }
+
+      if (isAlertTriggered(alert, price)) {
         triggered.push(alert);
         return { ...alert, isActive: false };
       }
@@ -198,5 +232,5 @@ export const useAlertStore = create<AlertStore>()((set, get) => ({
 // Exports
 // -----------------------------------------------------------------------------
 
-export { MAX_ALERTS, ALERTS_STORAGE_KEY, isAlertTriggered };
+export { MAX_ALERTS, ALERTS_STORAGE_KEY, ACTIVATION_GRACE_MS, isAlertTriggered };
 export type { PriceAlert, AlertDirection, AlertStoreState, AlertStoreActions, AlertStore };
