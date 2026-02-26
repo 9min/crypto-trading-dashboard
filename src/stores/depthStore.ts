@@ -83,16 +83,20 @@ function applyLevelUpdates(existing: PriceLevel[], updates: PriceLevel[]): Price
 
 /**
  * Sorts bids descending by price (highest first) and caps at MAX_DEPTH_LEVELS.
+ * **Mutates** the input array — callers must pass a freshly created array.
  */
 function sortAndCapBids(levels: PriceLevel[]): PriceLevel[] {
-  return [...levels].sort((a, b) => b.price - a.price).slice(0, MAX_DEPTH_LEVELS);
+  levels.sort((a, b) => b.price - a.price);
+  return levels.length > MAX_DEPTH_LEVELS ? levels.slice(0, MAX_DEPTH_LEVELS) : levels;
 }
 
 /**
  * Sorts asks ascending by price (lowest first) and caps at MAX_DEPTH_LEVELS.
+ * **Mutates** the input array — callers must pass a freshly created array.
  */
 function sortAndCapAsks(levels: PriceLevel[]): PriceLevel[] {
-  return [...levels].sort((a, b) => a.price - b.price).slice(0, MAX_DEPTH_LEVELS);
+  levels.sort((a, b) => a.price - b.price);
+  return levels.length > MAX_DEPTH_LEVELS ? levels.slice(0, MAX_DEPTH_LEVELS) : levels;
 }
 
 // -----------------------------------------------------------------------------

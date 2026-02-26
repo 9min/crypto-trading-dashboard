@@ -85,14 +85,13 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
   // -- OrderBook handler: full snapshot each time (Upbit sends complete book) --
   const handleOrderBook = useCallback(
     (event: UpbitOrderBookEvent): void => {
-      const bids: PriceLevel[] = event.orderbook_units.map((unit) => ({
-        price: unit.bid_price,
-        quantity: unit.bid_size,
-      }));
-      const asks: PriceLevel[] = event.orderbook_units.map((unit) => ({
-        price: unit.ask_price,
-        quantity: unit.ask_size,
-      }));
+      const units = event.orderbook_units;
+      const bids: PriceLevel[] = [];
+      const asks: PriceLevel[] = [];
+      for (const unit of units) {
+        bids.push({ price: unit.bid_price, quantity: unit.bid_size });
+        asks.push({ price: unit.ask_price, quantity: unit.ask_size });
+      }
 
       setDepthSnapshot(bids, asks, event.timestamp);
     },
@@ -168,14 +167,13 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
     fetchUpbitOrderBook(symbol)
       .then((snapshot) => {
         if (!isActive) return;
-        const bids: PriceLevel[] = snapshot.orderbook_units.map((unit) => ({
-          price: unit.bid_price,
-          quantity: unit.bid_size,
-        }));
-        const asks: PriceLevel[] = snapshot.orderbook_units.map((unit) => ({
-          price: unit.ask_price,
-          quantity: unit.ask_size,
-        }));
+        const units = snapshot.orderbook_units;
+        const bids: PriceLevel[] = [];
+        const asks: PriceLevel[] = [];
+        for (const unit of units) {
+          bids.push({ price: unit.bid_price, quantity: unit.bid_size });
+          asks.push({ price: unit.ask_price, quantity: unit.ask_size });
+        }
         setDepthSnapshot(bids, asks, snapshot.timestamp);
       })
       .catch((error: unknown) => {
