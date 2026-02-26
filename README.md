@@ -8,7 +8,7 @@ Binance WebSocket API를 브라우저에서 직접 연결하여 서버 중계 �
 
 | Area               | Technology                     | Purpose                            |
 | ------------------ | ------------------------------ | ---------------------------------- |
-| Framework          | Next.js 16 (App Router)        | SSG 기반 초기 로딩 최적화          |
+| Framework          | Next.js 16.1.6 (App Router)    | SSG 기반 초기 로딩 최적화          |
 | Language           | TypeScript (strict)            | WebSocket 메시지 타입 안전성       |
 | State              | Zustand                        | selector 기반 구독, 리렌더 최소화  |
 | Chart              | TradingView Lightweight Charts | Canvas 기반 캔들스틱 차트          |
