@@ -95,17 +95,14 @@ describe('PerformanceMonitorRenderer', () => {
     expect(renderer.getIsDirty()).toBe(true);
   });
 
-  it('does not draw when size is zero', () => {
+  it('does not draw when size is zero and preserves dirty flag', () => {
     renderer.setSize(0, 0);
     renderer.markDirty();
     renderer.onFrame();
 
-    // fillRect should not be called for zero-size canvas
-    // (onFrame will call draw, but draw exits early)
-    // Actually the first draw IS triggered, but the draw body returns early
-    // before filling cards. We verify no card backgrounds were drawn.
-    // fillRect IS called for background clear check — let's just verify no crash
-    expect(renderer.getIsDirty()).toBe(false);
+    // onFrame skips draw when width/height is zero and preserves the dirty flag
+    // so the renderer will draw on the next frame after receiving a valid size.
+    expect(renderer.getIsDirty()).toBe(true);
   });
 
   // -- markDirty --------------------------------------------------------------

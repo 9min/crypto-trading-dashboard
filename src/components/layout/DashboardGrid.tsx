@@ -11,7 +11,7 @@
 // and ResponsiveGridLayout for responsive breakpoint handling.
 // =============================================================================
 
-import { memo, useMemo, useState, useCallback, type ReactNode } from 'react';
+import { memo, useMemo, useState, useCallback, useSyncExternalStore, type ReactNode } from 'react';
 import {
   ResponsiveGridLayout,
   useContainerWidth,
@@ -85,11 +85,24 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
 };
 
 // -----------------------------------------------------------------------------
+// useSyncExternalStore helpers (stable references to avoid re-subscriptions)
+// -----------------------------------------------------------------------------
+
+const emptySubscribe = (): (() => void) => () => {};
+const getClientSnapshot = (): boolean => true;
+const getServerSnapshot = (): boolean => false;
+
+// -----------------------------------------------------------------------------
 // Component
 // -----------------------------------------------------------------------------
 
 export const DashboardGrid = memo(function DashboardGrid() {
-  const { width, containerRef, mounted } = useContainerWidth();
+  const { width, containerRef } = useContainerWidth();
+
+  // Gate grid rendering to client-only. Server snapshot returns false so the
+  // server HTML is always an empty <div>, preventing hydration mismatch from
+  // react-grid-layout computing positions with a default width vs actual width.
+  const isMounted = useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
 
   const [layouts] = useState<ResponsiveLayouts<'lg' | 'md' | 'sm'>>(
     () => loadLayout() ?? DEFAULT_LAYOUTS,
@@ -117,7 +130,7 @@ export const DashboardGrid = memo(function DashboardGrid() {
 
   return (
     <div ref={containerRef}>
-      {mounted && (
+      {isMounted && width > 0 && (
         <ResponsiveGridLayout
           className="layout"
           width={width}
