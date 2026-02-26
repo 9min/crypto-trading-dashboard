@@ -166,6 +166,9 @@ export function applyCloudLayout(layouts: ResponsiveLayouts): void {
  * Returns an unsubscribe function.
  */
 export function onCloudLayoutApplied(callback: (layouts: ResponsiveLayouts) => void): () => void {
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
   const handler = (event: Event): void => {
     callback((event as CustomEvent<ResponsiveLayouts>).detail);
   };

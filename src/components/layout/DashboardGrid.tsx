@@ -145,7 +145,12 @@ export const DashboardGrid = memo(function DashboardGrid() {
       debouncedCloudSaveRef.current = setTimeout(() => {
         const user = useAuthStore.getState().user;
         if (user) {
-          void upsertPreferences(user.id, { layout: allLayouts });
+          void upsertPreferences(user.id, { layout: allLayouts }).catch((error) => {
+            console.error('[DashboardGrid] Failed to sync layout to cloud', {
+              timestamp: Date.now(),
+              error,
+            });
+          });
         }
       }, 500);
     },
