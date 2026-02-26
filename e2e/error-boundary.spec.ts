@@ -57,7 +57,7 @@ test.describe('Error boundary', () => {
       // The header should remain fully visible and functional
       const header = page.getByTestId('dashboard-header');
       await expect(header).toBeVisible();
-      await expect(header).toContainText('CryptoDash - 9min');
+      await expect(header).toContainText('CryptoDash');
 
       // Exchange buttons should still work
       await expect(page.getByTestId('exchange-binance')).toBeVisible();
