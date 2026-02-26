@@ -36,8 +36,10 @@ const ToggleSwitch = memo(function ToggleSwitch({ checked, onChange }: ToggleSwi
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={checked}
       onClick={onChange}
-      className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
+      className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
         checked ? 'bg-buy' : 'bg-foreground-tertiary'
       }`}
       aria-label={checked ? 'Disable alert' : 'Enable alert'}
@@ -143,7 +145,7 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
       <button
         type="button"
         onClick={handleToggle}
-        className="text-foreground-secondary hover:text-foreground relative p-1 transition-colors"
+        className="text-foreground-secondary hover:bg-background-tertiary hover:text-foreground relative flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors"
         aria-label="Price alerts"
       >
         <svg
@@ -160,14 +162,14 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
           />
         </svg>
         {activeAlertCount > 0 && (
-          <span className="bg-accent absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-bold text-white">
+          <span className="bg-accent text-accent-text absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-bold">
             {activeAlertCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="border-border bg-background-secondary absolute top-full right-0 z-50 mt-2 w-80 overflow-hidden rounded-lg border shadow-xl">
+        <div className="border-border bg-background-secondary absolute top-full right-0 z-50 mt-2 w-96 overflow-hidden rounded-lg border shadow-xl">
           {/* Header */}
           <div className="border-border flex items-center justify-between border-b px-4 py-2.5">
             <div className="flex items-center gap-2">
@@ -210,11 +212,11 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
                 onChange={handlePriceChange}
                 className="border-border bg-background text-foreground placeholder:text-foreground-tertiary font-mono-num focus:border-accent flex-1 rounded-md border px-2.5 py-1.5 text-xs transition-colors outline-none"
               />
-              <div className="border-border flex overflow-hidden rounded-md border">
+              <div className="border-border flex shrink-0 overflow-hidden rounded-md border">
                 <button
                   type="button"
                   onClick={() => handleDirectionChange('above')}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors ${
+                  className={`flex cursor-pointer items-center gap-1 px-2.5 py-1.5 text-xs transition-colors ${
                     form.direction === 'above'
                       ? 'bg-buy/20 text-buy font-medium'
                       : 'text-foreground-secondary hover:text-foreground'
@@ -239,7 +241,7 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
                 <button
                   type="button"
                   onClick={() => handleDirectionChange('below')}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors ${
+                  className={`flex cursor-pointer items-center gap-1 px-2.5 py-1.5 text-xs transition-colors ${
                     form.direction === 'below'
                       ? 'bg-sell/20 text-sell font-medium'
                       : 'text-foreground-secondary hover:text-foreground'
@@ -264,7 +266,7 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
             </div>
             <button
               type="submit"
-              className="bg-accent hover:bg-accent-hover mt-2.5 w-full rounded-md py-1.5 text-xs font-semibold text-white transition-colors"
+              className="bg-accent hover:bg-accent-hover mt-2.5 w-full cursor-pointer rounded-md py-1.5 text-xs font-semibold text-white transition-colors"
             >
               Add Alert
             </button>
@@ -347,7 +349,7 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
                     <button
                       type="button"
                       onClick={handleAlertRemove(alert.id)}
-                      className="text-foreground-tertiary hover:text-sell rounded p-0.5 opacity-0 transition-all group-hover:opacity-100"
+                      className="text-foreground-tertiary hover:text-sell cursor-pointer rounded p-0.5 opacity-0 transition-all group-hover:opacity-100 focus:opacity-100"
                       aria-label="Remove alert"
                     >
                       <svg

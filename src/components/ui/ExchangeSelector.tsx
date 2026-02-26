@@ -39,7 +39,7 @@ export const ExchangeSelector = memo(function ExchangeSelector() {
           data-testid={`exchange-${id}`}
           type="button"
           onClick={() => handleSelect(id)}
-          className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+          className={`cursor-pointer px-2 py-0.5 text-[11px] font-medium transition-colors ${
             exchange === id
               ? 'bg-accent text-background shadow-accent/30 shadow-sm'
               : 'text-foreground-secondary hover:text-foreground'

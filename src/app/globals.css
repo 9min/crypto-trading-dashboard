@@ -31,6 +31,11 @@
   /* Accent */
   --color-accent: #f0b90b;
   --color-accent-hover: #d4a50a;
+  --color-accent-text: #ffffff;
+
+  /* Shadows */
+  --shadow-widget: none;
+  --shadow-header: none;
 
   /* Spacing base unit */
   --spacing-unit: 4px;
@@ -52,11 +57,15 @@
   --foreground-secondary: #707a8a;
   --foreground-tertiary: #a3a8b3;
 
-  --border: #eaecef;
+  --border: #e0e3e8;
   --border-hover: #d4d7dc;
 
   --color-buy-bg: rgba(0, 192, 135, 0.08);
   --color-sell-bg: rgba(246, 70, 93, 0.08);
+
+  --color-accent-text: #1e2329;
+  --shadow-widget: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-header: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 /* =============================================================================
@@ -85,6 +94,7 @@
 
   --color-accent: var(--color-accent);
   --color-accent-hover: var(--color-accent-hover);
+  --color-accent-text: var(--color-accent-text);
 
   --font-sans: var(--font-inter);
   --font-mono: var(--font-jetbrains-mono);
@@ -298,4 +308,20 @@ body {
 
 .status-dot-glow {
   box-shadow: 0 0 6px 1px var(--color-connected);
+}
+
+[data-theme='light'] .status-dot-glow {
+  box-shadow: 0 0 8px 2px var(--color-connected);
+}
+
+/* =============================================================================
+   Scrollbar — Light Mode Override
+   ============================================================================= */
+
+[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: #b0b5bd;
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: #8c929c;
 }

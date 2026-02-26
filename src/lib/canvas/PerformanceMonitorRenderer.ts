@@ -63,7 +63,7 @@ const LABEL_FONT_SIZE = 9;
 const FPS_HISTORY_CAPACITY = 60;
 const SLOW_POLL_INTERVAL_MS = 5_000;
 
-const DEFAULT_COLORS: PerformanceMonitorColors = {
+const DARK_COLORS: PerformanceMonitorColors = {
   background: '#12161c',
   cardBg: '#1a1f27',
   foreground: '#eaecef',
@@ -75,6 +75,25 @@ const DEFAULT_COLORS: PerformanceMonitorColors = {
   graphFill: 'rgba(0, 192, 135, 0.15)',
   border: '#252930',
 };
+
+const LIGHT_COLORS: PerformanceMonitorColors = {
+  background: '#ffffff',
+  cardBg: '#f5f5f5',
+  foreground: '#1e2329',
+  foregroundSecondary: '#707a8a',
+  good: '#00c087',
+  warning: '#d4a50a',
+  critical: '#f6465d',
+  graphLine: '#00c087',
+  graphFill: 'rgba(0, 192, 135, 0.1)',
+  border: '#e0e3e8',
+};
+
+const DEFAULT_COLORS = DARK_COLORS;
+
+export function getPerformanceMonitorColors(theme: 'dark' | 'light'): PerformanceMonitorColors {
+  return theme === 'light' ? LIGHT_COLORS : DARK_COLORS;
+}
 
 // Known performance.measure entry names from other renderers
 const DRAW_MEASURE_NAMES = ['orderbook-draw', 'tradesfeed-draw', 'depth-chart-draw'] as const;
@@ -177,6 +196,13 @@ export class PerformanceMonitorRenderer implements CanvasRenderer {
       this.perfObserver.disconnect();
       this.perfObserver = null;
     }
+  }
+
+  // -- Public -----------------------------------------------------------------
+
+  setColors(colors: Partial<PerformanceMonitorColors>): void {
+    this.colors = { ...this.colors, ...colors };
+    this.isDirty = true;
   }
 
   // -- Internals ---------------------------------------------------------------

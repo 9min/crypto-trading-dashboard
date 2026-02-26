@@ -53,7 +53,7 @@ export const ConnectionStatus = memo(function ConnectionStatus() {
           className={`relative inline-flex h-2 w-2 rounded-full ${config.color} ${connectionState.status === 'connected' ? 'status-dot-glow' : ''}`}
         />
       </div>
-      <span className="text-foreground-secondary text-xs">{config.label}</span>
+      <span className="text-foreground-secondary text-[11px]">{config.label}</span>
       {isFailed && (
         <Button variant="ghost" size="sm" onClick={handleReconnect}>
           Reconnect

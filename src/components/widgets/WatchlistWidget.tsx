@@ -76,7 +76,8 @@ const SymbolRow = memo(function SymbolRow({
     <button
       type="button"
       onClick={handleClick}
-      className={`border-border/30 flex w-full items-center border-b px-3 py-2.5 text-left transition-colors ${
+      aria-current={isActive ? 'true' : undefined}
+      className={`border-border/30 flex w-full cursor-pointer items-center border-b px-3 py-2.5 text-left transition-colors ${
         isActive
           ? 'border-accent bg-background-tertiary border-l-2'
           : 'hover:border-l-foreground-tertiary hover:bg-background-tertiary/50 border-l-2 border-l-transparent'

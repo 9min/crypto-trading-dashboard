@@ -66,17 +66,15 @@ const IndicatorRow = memo(function IndicatorRow({ config, onToggle }: IndicatorR
   return (
     <button
       type="button"
+      role="checkbox"
+      aria-checked={config.visible}
       onClick={onToggle}
       className="hover:bg-background-tertiary flex w-full cursor-pointer items-center gap-1.5 px-2.5 py-[5px] transition-colors"
     >
       {/* Checkbox */}
       <div
-        className="flex shrink-0 items-center justify-center rounded-sm border"
-        style={{
-          width: 12,
-          height: 12,
-          ...(config.visible ? { borderColor: color, backgroundColor: color } : {}),
-        }}
+        className="flex h-3 w-3 shrink-0 items-center justify-center rounded-sm border"
+        style={config.visible ? { borderColor: color, backgroundColor: color } : undefined}
       >
         {config.visible && (
           <svg
@@ -94,15 +92,11 @@ const IndicatorRow = memo(function IndicatorRow({ config, onToggle }: IndicatorR
       </div>
 
       {/* Color swatch */}
-      <span
-        className="shrink-0 rounded-full"
-        style={{ width: 10, height: 3, backgroundColor: color }}
-      />
+      <span className="h-[3px] w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
 
       {/* Label */}
       <span
-        style={{ fontSize: 11, lineHeight: '16px' }}
-        className={`flex-1 text-left ${
+        className={`flex-1 text-left text-[11px] leading-4 ${
           config.visible ? 'text-foreground font-medium' : 'text-foreground-secondary'
         }`}
       >
@@ -168,16 +162,15 @@ export const IndicatorToggle = memo(function IndicatorToggle() {
   const activeCount = Object.values(indicators).filter((c) => c.visible).length;
 
   return (
-    <div ref={popoverRef} className="relative" style={{ fontSize: 11 }}>
+    <div ref={popoverRef} className="relative text-[11px]">
       <button
         type="button"
         onClick={handleToggleOpen}
-        className={`flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 transition-colors ${
+        className={`flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors ${
           activeCount > 0
             ? 'text-accent hover:text-accent/80'
             : 'text-foreground-secondary hover:text-foreground'
         }`}
-        style={{ fontSize: 10 }}
         aria-label="Toggle indicators"
         aria-expanded={isOpen}
       >
@@ -198,26 +191,17 @@ export const IndicatorToggle = memo(function IndicatorToggle() {
         </svg>
         <span>Indicators</span>
         {activeCount > 0 && (
-          <span
-            className="bg-accent flex items-center justify-center rounded-full font-bold text-white"
-            style={{ fontSize: 9, height: 14, minWidth: 14, padding: '0 3px' }}
-          >
+          <span className="bg-accent text-accent-text flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-[3px] text-[9px] font-bold">
             {activeCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div
-          className="border-border bg-background-secondary absolute top-full right-0 z-50 mt-1 overflow-hidden rounded-md border shadow-xl"
-          style={{ width: 160, fontSize: 11 }}
-        >
+        <div className="border-border bg-background-secondary absolute top-full right-0 z-50 mt-1 w-40 overflow-hidden rounded-md border text-[11px] shadow-xl">
           {/* Overlays Section */}
           <div className="border-border border-b">
-            <div
-              className="text-foreground-tertiary px-2.5 pt-1.5 pb-0.5 font-semibold uppercase"
-              style={{ fontSize: 9, letterSpacing: '0.05em' }}
-            >
+            <div className="text-foreground-tertiary px-2.5 pt-1.5 pb-0.5 text-[9px] font-semibold tracking-[0.05em] uppercase">
               Overlays
             </div>
             {overlays.map((config) => (
@@ -231,10 +215,7 @@ export const IndicatorToggle = memo(function IndicatorToggle() {
 
           {/* Oscillators Section */}
           <div>
-            <div
-              className="text-foreground-tertiary px-2.5 pt-1.5 pb-0.5 font-semibold uppercase"
-              style={{ fontSize: 9, letterSpacing: '0.05em' }}
-            >
+            <div className="text-foreground-tertiary px-2.5 pt-1.5 pb-0.5 text-[9px] font-semibold tracking-[0.05em] uppercase">
               Oscillators
             </div>
             {oscillators.map((config) => (
@@ -244,7 +225,7 @@ export const IndicatorToggle = memo(function IndicatorToggle() {
                 onToggle={handleToggleIndicator(config.id)}
               />
             ))}
-            <div style={{ height: 2 }} />
+            <div className="h-0.5" />
           </div>
         </div>
       )}

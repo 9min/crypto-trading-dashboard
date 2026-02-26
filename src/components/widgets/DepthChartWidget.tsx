@@ -14,9 +14,10 @@
 // - Cleanup on unmount
 // =============================================================================
 
-import { memo, useRef, useCallback } from 'react';
+import { memo, useRef, useCallback, useEffect } from 'react';
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer';
-import { DepthChartRenderer } from '@/lib/canvas/DepthChartRenderer';
+import { DepthChartRenderer, getDepthChartColors } from '@/lib/canvas/DepthChartRenderer';
+import { useUiStore } from '@/stores/uiStore';
 import { WidgetWrapper } from './WidgetWrapper';
 
 // -----------------------------------------------------------------------------
@@ -26,16 +27,24 @@ import { WidgetWrapper } from './WidgetWrapper';
 export const DepthChartWidget = memo(function DepthChartWidget() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const theme = useUiStore((state) => state.theme);
 
   const createRenderer = useCallback((ctx: CanvasRenderingContext2D) => {
     return new DepthChartRenderer(ctx, ctx.canvas);
   }, []);
 
-  useCanvasRenderer({
+  const rendererRef = useCanvasRenderer({
     canvasRef,
     containerRef,
     createRenderer,
   });
+
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    renderer.setColors(getDepthChartColors(theme));
+    renderer.markDirty();
+  }, [theme, rendererRef]);
 
   return (
     <WidgetWrapper title="Depth Chart">

@@ -181,7 +181,7 @@ export const Toast = memo(function Toast({ toast }: ToastProps) {
       <p className="text-foreground flex-1 text-xs leading-relaxed">{toast.message}</p>
       <button
         onClick={handleClose}
-        className="text-foreground-tertiary hover:text-foreground mt-0.5 shrink-0 transition-colors"
+        className="text-foreground-tertiary hover:text-foreground mt-0.5 shrink-0 cursor-pointer transition-colors"
         aria-label="Dismiss notification"
         type="button"
       >

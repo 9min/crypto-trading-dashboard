@@ -14,9 +14,13 @@
 // - Cleanup on unmount
 // =============================================================================
 
-import { memo, useRef, useCallback } from 'react';
+import { memo, useRef, useCallback, useEffect } from 'react';
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer';
-import { PerformanceMonitorRenderer } from '@/lib/canvas/PerformanceMonitorRenderer';
+import {
+  PerformanceMonitorRenderer,
+  getPerformanceMonitorColors,
+} from '@/lib/canvas/PerformanceMonitorRenderer';
+import { useUiStore } from '@/stores/uiStore';
 import { WidgetWrapper } from './WidgetWrapper';
 
 // -----------------------------------------------------------------------------
@@ -26,16 +30,24 @@ import { WidgetWrapper } from './WidgetWrapper';
 export const PerformanceMonitorWidget = memo(function PerformanceMonitorWidget() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const theme = useUiStore((state) => state.theme);
 
   const createRenderer = useCallback((ctx: CanvasRenderingContext2D) => {
     return new PerformanceMonitorRenderer(ctx);
   }, []);
 
-  useCanvasRenderer({
+  const rendererRef = useCanvasRenderer({
     canvasRef,
     containerRef,
     createRenderer,
   });
+
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    renderer.setColors(getPerformanceMonitorColors(theme));
+    renderer.markDirty();
+  }, [theme, rendererRef]);
 
   return (
     <WidgetWrapper title="Performance">

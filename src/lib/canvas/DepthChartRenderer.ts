@@ -63,7 +63,7 @@ const LINE_WIDTH = 1.5;
 const CROSSHAIR_DASH = [4, 3];
 const Y_TICK_COUNT = 5;
 
-const DEFAULT_COLORS: DepthChartColors = {
+const DARK_COLORS: DepthChartColors = {
   background: '#12161c',
   foreground: '#eaecef',
   foregroundSecondary: '#848e9c',
@@ -75,6 +75,25 @@ const DEFAULT_COLORS: DepthChartColors = {
   labelBg: '#1a1f27',
   gridLine: 'rgba(37, 41, 48, 0.5)',
 };
+
+const LIGHT_COLORS: DepthChartColors = {
+  background: '#ffffff',
+  foreground: '#1e2329',
+  foregroundSecondary: '#707a8a',
+  bidLine: '#00c087',
+  bidFill: 'rgba(0, 192, 135, 0.1)',
+  askLine: '#f6465d',
+  askFill: 'rgba(246, 70, 93, 0.1)',
+  crosshair: 'rgba(30, 35, 41, 0.2)',
+  labelBg: '#f5f5f5',
+  gridLine: 'rgba(224, 227, 232, 0.8)',
+};
+
+const DEFAULT_COLORS = DARK_COLORS;
+
+export function getDepthChartColors(theme: 'dark' | 'light'): DepthChartColors {
+  return theme === 'light' ? LIGHT_COLORS : DARK_COLORS;
+}
 
 // -----------------------------------------------------------------------------
 // Renderer
