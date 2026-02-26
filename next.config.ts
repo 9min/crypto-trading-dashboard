@@ -10,10 +10,9 @@ const nextConfig: NextConfig = {
     remotePatterns: [{ protocol: 'https', hostname: 'lh3.googleusercontent.com' }],
   },
   rewrites: async () => [
-    {
-      source: '/api/upbit/:path*',
-      destination: 'https://api.upbit.com/v1/:path*',
-    },
+    { source: '/api/upbit/candles/:path*', destination: 'https://api.upbit.com/v1/candles/:path*' },
+    { source: '/api/upbit/orderbook', destination: 'https://api.upbit.com/v1/orderbook' },
+    { source: '/api/upbit/ticker', destination: 'https://api.upbit.com/v1/ticker' },
   ],
 };
 
