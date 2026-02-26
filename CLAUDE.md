@@ -13,7 +13,7 @@
 
 | 영역               | 기술                           | 용도                                       |
 | ------------------ | ------------------------------ | ------------------------------------------ |
-| 프레임워크         | Next.js 14+ (App Router)       | SSG 기반 초기 로딩 최적화, 라우팅          |
+| 프레임워크         | Next.js 16.1.6 (App Router)    | SSG 기반 초기 로딩 최적화, 라우팅          |
 | 언어               | TypeScript (strict mode)       | 타입 안전성, WebSocket 메시지 타입 정의    |
 | 상태 관리          | Zustand                        | selector 기반 구독, 불필요한 리렌더 최소화 |
 | 차트               | TradingView Lightweight Charts | Canvas 기반 고성능 캔들스틱 차트           |
@@ -29,51 +29,118 @@
 ```
 src/
 ├── app/                  # Next.js App Router 페이지
+│   ├── auth/             # 인증 관련
+│   │   └── callback/
+│   │       └── route.ts  # OAuth 콜백 핸들러
 │   ├── layout.tsx        # 루트 레이아웃
 │   ├── page.tsx          # 메인 대시보드 페이지
+│   ├── providers.tsx     # 클라이언트 프로바이더
 │   └── globals.css       # 글로벌 스타일
 ├── components/           # React 컴포넌트
 │   ├── widgets/          # 대시보드 위젯 컴포넌트
 │   │   ├── CandlestickWidget.tsx
+│   │   ├── DepthChartWidget.tsx
+│   │   ├── KimchiPremiumWidget.tsx
 │   │   ├── OrderBookWidget.tsx
+│   │   ├── PerformanceMonitorWidget.tsx
 │   │   ├── TradesFeedWidget.tsx
-│   │   └── WatchlistWidget.tsx
+│   │   ├── WatchlistWidget.tsx
+│   │   └── WidgetWrapper.tsx
 │   ├── ui/               # 재사용 가능한 UI 프리미티브
 │   │   ├── Button.tsx
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── ErrorFallback.tsx
+│   │   ├── ExchangeSelector.tsx
+│   │   ├── IndicatorToggle.tsx
+│   │   ├── PriceAlertPopover.tsx
+│   │   ├── ResetLayoutButton.tsx
+│   │   ├── Sparkline.tsx
+│   │   ├── ThemeToggle.tsx
 │   │   ├── Toast.tsx
-│   │   └── ErrorBoundary.tsx
+│   │   ├── ToastContainer.tsx
+│   │   ├── UserMenu.tsx
+│   │   ├── WatchlistManagePopover.tsx
+│   │   └── WidgetSelector.tsx
 │   └── layout/           # 레이아웃 컴포넌트
+│       ├── ConnectionStatus.tsx
 │       ├── DashboardGrid.tsx
-│       ├── Header.tsx
-│       └── ConnectionStatus.tsx
+│       ├── DashboardHeader.tsx
+│       ├── DashboardShell.tsx
+│       └── IntervalSelector.tsx
 ├── hooks/                # 커스텀 React 훅
-│   ├── useWebSocket.ts
+│   ├── useAuth.ts
 │   ├── useCanvasRenderer.ts
-│   └── useResizeObserver.ts
+│   ├── useExchangeWatchlistStream.ts
+│   ├── useExchangeWebSocket.ts
+│   ├── useHistoricalLoader.ts
+│   ├── useIndicatorSeries.ts
+│   ├── useNotification.ts
+│   ├── usePreferencesSync.ts
+│   ├── usePremiumStream.ts
+│   ├── usePriceAlertMonitor.ts
+│   ├── useResizeObserver.ts
+│   ├── useSparklineData.ts
+│   ├── useSymbolFromUrl.ts
+│   ├── useUpbitStream.ts
+│   ├── useUpbitWatchlistStream.ts
+│   ├── useWatchlistStream.ts
+│   └── useWebSocket.ts
 ├── stores/               # Zustand 스토어
-│   ├── klineStore.ts
+│   ├── alertStore.ts
+│   ├── authStore.ts
 │   ├── depthStore.ts
+│   ├── indicatorStore.ts
+│   ├── klineStore.ts
+│   ├── premiumStore.ts
+│   ├── toastStore.ts
 │   ├── tradeStore.ts
 │   ├── uiStore.ts
-│   └── authStore.ts
+│   ├── watchlistStore.ts
+│   └── widgetStore.ts
 ├── lib/                  # 핵심 라이브러리
 │   ├── websocket/        # WebSocket 매니저
 │   │   ├── WebSocketManager.ts
+│   │   ├── WatchlistStreamManager.ts
 │   │   └── messageRouter.ts
 │   ├── canvas/           # Canvas 렌더러
+│   │   ├── DepthChartRenderer.ts
 │   │   ├── OrderBookRenderer.ts
+│   │   ├── PerformanceMonitorRenderer.ts
 │   │   └── TradesFeedRenderer.ts
+│   ├── binance/          # Binance API 클라이언트
+│   │   ├── restApi.ts
+│   │   └── streamUrls.ts
+│   ├── upbit/            # Upbit API 클라이언트
+│   │   ├── UpbitWebSocketManager.ts
+│   │   ├── messageRouter.ts
+│   │   └── restClient.ts
+│   ├── exchange/         # 환율 서비스
+│   │   └── exchangeRateService.ts
 │   └── supabase/         # Supabase 클라이언트
-│       └── client.ts
+│       ├── client.ts
+│       └── preferencesService.ts
 ├── types/                # TypeScript 타입 정의
 │   ├── binance.ts        # Binance API 응답 타입
-│   ├── websocket.ts      # WebSocket 메시지 타입
-│   ├── store.ts          # 스토어 상태 타입
+│   ├── chart.ts          # 차트 관련 타입 (CandleData, ConnectionState 등)
+│   ├── exchange.ts       # 거래소 공통 타입
+│   ├── indicator.ts      # 차트 지표 타입
+│   ├── supabase.ts       # Supabase 데이터베이스 타입
+│   ├── upbit.ts          # Upbit API 응답 타입
 │   └── widget.ts         # 위젯 관련 타입
 └── utils/                # 유틸리티 함수
+    ├── constants.ts
+    ├── debounce.ts
     ├── formatPrice.ts
+    ├── formatSymbol.ts
     ├── formatTime.ts
-    └── ringBuffer.ts
+    ├── indicators.ts
+    ├── intervalAlign.ts
+    ├── layoutStorage.ts
+    ├── localPreferences.ts
+    ├── ringBuffer.ts
+    ├── symbolMap.ts
+    ├── symbolSearch.ts
+    └── widgetStorage.ts
 ```
 
 ---
@@ -412,13 +479,19 @@ useEffect(() => {
 
 - **도메인별로 스토어를 분리한다.** 하나의 거대한 스토어에 모든 상태를 넣지 않는다.
 
-| 스토어       | 역할                                   |
-| ------------ | -------------------------------------- |
-| `klineStore` | 캔들스틱 데이터, 타임프레임, 차트 상태 |
-| `depthStore` | 오더북 데이터 (bids/asks), 최고 호가   |
-| `tradeStore` | 체결 내역 링 버퍼, 최근 체결가         |
-| `uiStore`    | 현재 심볼, 테마, 레이아웃, 연결 상태   |
-| `authStore`  | 사용자 인증 상태, 프로필 정보          |
+| 스토어           | 역할                                       |
+| ---------------- | ------------------------------------------ |
+| `klineStore`     | 캔들스틱 데이터, 타임프레임, 차트 상태     |
+| `depthStore`     | 오더북 데이터 (bids/asks), 최고 호가       |
+| `tradeStore`     | 체결 내역 링 버퍼, 최근 체결가             |
+| `uiStore`        | 현재 심볼, 테마, 레이아웃, 연결 상태       |
+| `authStore`      | 사용자 인증 상태, 프로필 정보              |
+| `alertStore`     | 가격 알림 관리, 조건 및 트리거 상태        |
+| `indicatorStore` | 차트 지표 설정 (이동평균, 볼린저밴드 등)   |
+| `premiumStore`   | 김치 프리미엄 데이터, Binance-Upbit 가격차 |
+| `toastStore`     | 토스트 알림 메시지 큐 및 표시 상태         |
+| `watchlistStore` | 관심 종목 목록, 실시간 가격 업데이트       |
+| `widgetStore`    | 위젯 표시 설정, 활성/비활성 상태           |
 
 - **스토어의 모든 액션은 named function으로 정의한다.** 인라인 함수를 사용하지 않는다.
 
