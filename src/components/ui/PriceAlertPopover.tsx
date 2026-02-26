@@ -134,6 +134,10 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
     setForm((prev) => ({ ...prev, targetPrice: event.target.value }));
   }, []);
 
+  const handleAlertToggle = useCallback((id: string) => () => toggleAlert(id), [toggleAlert]);
+
+  const handleAlertRemove = useCallback((id: string) => () => removeAlert(id), [removeAlert]);
+
   return (
     <div ref={popoverRef} className="relative">
       <button
@@ -339,10 +343,10 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
 
                   {/* Controls */}
                   <div className="flex items-center gap-2">
-                    <ToggleSwitch checked={alert.isActive} onChange={() => toggleAlert(alert.id)} />
+                    <ToggleSwitch checked={alert.isActive} onChange={handleAlertToggle(alert.id)} />
                     <button
                       type="button"
-                      onClick={() => removeAlert(alert.id)}
+                      onClick={handleAlertRemove(alert.id)}
                       className="text-foreground-tertiary hover:text-sell rounded p-0.5 opacity-0 transition-all group-hover:opacity-100"
                       aria-label="Remove alert"
                     >
