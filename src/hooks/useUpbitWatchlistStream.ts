@@ -45,6 +45,7 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
 
     let isActive = true;
     let pollIntervalId: ReturnType<typeof setInterval> | null = null;
+    let pollingInFlight = false;
 
     const manager = UpbitWebSocketManager.getInstance();
 
@@ -83,7 +84,8 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
       if (pollIntervalId !== null) return; // Already polling
 
       pollIntervalId = setInterval(() => {
-        if (!isActive) return;
+        if (!isActive || pollingInFlight) return;
+        pollingInFlight = true;
 
         fetchUpbitTickers(symbols)
           .then((responses) => {
@@ -98,8 +100,18 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
               });
             }
           })
-          .catch(() => {
-            // Silently ignore polling errors to avoid toast spam
+          .catch((error: unknown) => {
+            if (!isActive) return;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('[useUpbitWatchlistStream] Polling tickers failed', {
+              action: 'poll_tickers',
+              symbols,
+              timestamp: Date.now(),
+              errorMessage,
+            });
+          })
+          .finally(() => {
+            pollingInFlight = false;
           });
       }, REST_POLL_TICKER_INTERVAL_MS);
     };
@@ -109,6 +121,7 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
         clearInterval(pollIntervalId);
         pollIntervalId = null;
       }
+      pollingInFlight = false;
     };
 
     // -----------------------------------------------------------------------

@@ -135,6 +135,7 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
 
     let isActive = true;
     let pollIntervalId: ReturnType<typeof setInterval> | null = null;
+    let pollingInFlight = false;
     const manager = UpbitWebSocketManager.getInstance();
 
     // Reset stores
@@ -161,69 +162,93 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
       setConnectionState({ status: 'polling', startedAt: Date.now() });
 
       pollIntervalId = setInterval(() => {
-        if (!isActive) return;
+        if (!isActive || pollingInFlight) return;
+        pollingInFlight = true;
 
-        // Poll latest candle (count=1) to update the chart
-        fetchUpbitCandles(symbol, interval, 1)
-          .then((candles) => {
-            if (!isActive || candles.length === 0) return;
-            const latestCandle = candles[candles.length - 1];
-            const { candles: currentCandles } = useKlineStore.getState();
-            const lastCandle =
-              currentCandles.length > 0 ? currentCandles[currentCandles.length - 1] : undefined;
+        void Promise.allSettled([
+          // Poll latest candle (count=1) to update the chart
+          fetchUpbitCandles(symbol, interval, 1)
+            .then((candles) => {
+              if (!isActive || candles.length === 0) return;
+              const latestCandle = candles[candles.length - 1];
+              const { candles: currentCandles } = useKlineStore.getState();
+              const lastCandle =
+                currentCandles.length > 0 ? currentCandles[currentCandles.length - 1] : undefined;
 
-            if (!lastCandle || latestCandle.time > lastCandle.time) {
-              addCandle(latestCandle);
-            } else if (latestCandle.time === lastCandle.time) {
-              updateLastCandle(latestCandle);
-            }
-          })
-          .catch(() => {
-            // Silently ignore polling errors to avoid toast spam
-          });
-
-        // Poll orderbook
-        fetchUpbitOrderBook(symbol)
-          .then((snapshot) => {
-            if (!isActive) return;
-            const units = snapshot.orderbook_units;
-            const bids: PriceLevel[] = [];
-            const asks: PriceLevel[] = [];
-            for (const unit of units) {
-              bids.push({ price: unit.bid_price, quantity: unit.bid_size });
-              asks.push({ price: unit.ask_price, quantity: unit.ask_size });
-            }
-            setDepthSnapshot(bids, asks, snapshot.timestamp);
-          })
-          .catch(() => {
-            // Silently ignore polling errors
-          });
-
-        // Poll recent trades (newest first from API)
-        fetchUpbitTrades(symbol, 20)
-          .then((trades) => {
-            if (!isActive) return;
-            // Filter out already-seen trades and process newest-first → oldest-first
-            const newTrades = trades
-              .filter((t) => t.sequential_id > lastTradeSeqIdRef.current)
-              .reverse();
-
-            for (const trade of newTrades) {
-              addTrade({
-                id: trade.sequential_id,
-                price: trade.trade_price,
-                quantity: trade.trade_volume,
-                time: trade.timestamp,
-                isBuyerMaker: trade.ask_bid === 'ASK',
-              });
-              if (trade.sequential_id > lastTradeSeqIdRef.current) {
-                lastTradeSeqIdRef.current = trade.sequential_id;
+              if (!lastCandle || latestCandle.time > lastCandle.time) {
+                addCandle(latestCandle);
+              } else if (latestCandle.time === lastCandle.time) {
+                updateLastCandle(latestCandle);
               }
-            }
-          })
-          .catch(() => {
-            // Silently ignore polling errors
-          });
+            })
+            .catch((error: unknown) => {
+              if (!isActive) return;
+              console.error('[useUpbitStream] Polling candle fetch failed', {
+                action: 'poll_candles',
+                symbol,
+                interval,
+                timestamp: Date.now(),
+                error,
+              });
+            }),
+
+          // Poll orderbook
+          fetchUpbitOrderBook(symbol)
+            .then((snapshot) => {
+              if (!isActive) return;
+              const units = snapshot.orderbook_units;
+              const bids: PriceLevel[] = [];
+              const asks: PriceLevel[] = [];
+              for (const unit of units) {
+                bids.push({ price: unit.bid_price, quantity: unit.bid_size });
+                asks.push({ price: unit.ask_price, quantity: unit.ask_size });
+              }
+              setDepthSnapshot(bids, asks, snapshot.timestamp);
+            })
+            .catch((error: unknown) => {
+              if (!isActive) return;
+              console.error('[useUpbitStream] Polling orderbook fetch failed', {
+                action: 'poll_orderbook',
+                symbol,
+                timestamp: Date.now(),
+                error,
+              });
+            }),
+
+          // Poll recent trades (newest first from API)
+          fetchUpbitTrades(symbol, 20)
+            .then((trades) => {
+              if (!isActive) return;
+              // Filter out already-seen trades and process newest-first → oldest-first
+              const newTrades = trades
+                .filter((t) => t.sequential_id > lastTradeSeqIdRef.current)
+                .reverse();
+
+              for (const trade of newTrades) {
+                addTrade({
+                  id: trade.sequential_id,
+                  price: trade.trade_price,
+                  quantity: trade.trade_volume,
+                  time: trade.timestamp,
+                  isBuyerMaker: trade.ask_bid === 'ASK',
+                });
+                if (trade.sequential_id > lastTradeSeqIdRef.current) {
+                  lastTradeSeqIdRef.current = trade.sequential_id;
+                }
+              }
+            })
+            .catch((error: unknown) => {
+              if (!isActive) return;
+              console.error('[useUpbitStream] Polling trades fetch failed', {
+                action: 'poll_trades',
+                symbol,
+                timestamp: Date.now(),
+                error,
+              });
+            }),
+        ]).finally(() => {
+          pollingInFlight = false;
+        });
       }, REST_POLL_INTERVAL_MS);
     };
 
@@ -318,9 +343,11 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
     fetchUpbitTrades(symbol, 50)
       .then((trades) => {
         if (!isActive) return;
-        // Process oldest-first for correct feed ordering
-        const sorted = [...trades].reverse();
-        for (const trade of sorted) {
+        // Deduplicate against WS trades that may have arrived first
+        const newTrades = trades
+          .filter((t) => t.sequential_id > lastTradeSeqIdRef.current)
+          .reverse();
+        for (const trade of newTrades) {
           addTrade({
             id: trade.sequential_id,
             price: trade.trade_price,
