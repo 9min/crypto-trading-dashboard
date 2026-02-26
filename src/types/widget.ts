@@ -12,7 +12,14 @@
  * All supported widget types in the dashboard.
  * Uses `const` assertion to derive a narrow literal union type.
  */
-const WIDGET_TYPES = ['candlestick', 'orderbook', 'trades', 'watchlist', 'premium'] as const;
+const WIDGET_TYPES = [
+  'candlestick',
+  'orderbook',
+  'trades',
+  'watchlist',
+  'premium',
+  'depth',
+] as const;
 
 /**
  * Union type of all valid widget type identifiers.
