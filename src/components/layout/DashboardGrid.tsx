@@ -26,6 +26,7 @@ import { TradesFeedWidget } from '@/components/widgets/TradesFeedWidget';
 import { WatchlistWidget } from '@/components/widgets/WatchlistWidget';
 import { KimchiPremiumWidget } from '@/components/widgets/KimchiPremiumWidget';
 import { DepthChartWidget } from '@/components/widgets/DepthChartWidget';
+import { PerformanceMonitorWidget } from '@/components/widgets/PerformanceMonitorWidget';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -49,14 +50,15 @@ const GRID_MARGIN: [number, number] = [8, 8];
 // Default layouts for each breakpoint
 const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
   lg: [
-    // Row 1: Chart + OrderBook — primary data
-    { i: 'candlestick', x: 0, y: 0, w: 8, h: 14 },
-    { i: 'orderbook', x: 8, y: 0, w: 4, h: 14 },
-    // Row 2: 4 widgets evenly spread (3 cols each)
+    // Row 1: Chart(9) + OrderBook(3) — primary data
+    { i: 'candlestick', x: 0, y: 0, w: 9, h: 14 },
+    { i: 'orderbook', x: 9, y: 0, w: 3, h: 14 },
+    // Row 2: Watchlist(3) Trades(2) Depth(2) Premium(2) Perf(3) = 12
     { i: 'watchlist', x: 0, y: 14, w: 3, h: 10 },
-    { i: 'trades', x: 3, y: 14, w: 3, h: 10 },
-    { i: 'depth', x: 6, y: 14, w: 3, h: 10 },
-    { i: 'premium', x: 9, y: 14, w: 3, h: 10 },
+    { i: 'trades', x: 3, y: 14, w: 2, h: 10 },
+    { i: 'depth', x: 5, y: 14, w: 2, h: 10 },
+    { i: 'premium', x: 7, y: 14, w: 2, h: 10 },
+    { i: 'perf', x: 9, y: 14, w: 3, h: 10 },
   ],
   md: [
     // Row 1: Chart full-width
@@ -64,10 +66,11 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
     // Row 2: OrderBook + Depth side by side
     { i: 'orderbook', x: 0, y: 12, w: 5, h: 12 },
     { i: 'depth', x: 5, y: 12, w: 5, h: 12 },
-    // Row 3: Watchlist + Trades + Premium
-    { i: 'watchlist', x: 0, y: 24, w: 3, h: 10 },
-    { i: 'trades', x: 3, y: 24, w: 4, h: 10 },
-    { i: 'premium', x: 7, y: 24, w: 3, h: 10 },
+    // Row 3: Watchlist + Trades + Premium + Perf
+    { i: 'watchlist', x: 0, y: 24, w: 2, h: 10 },
+    { i: 'trades', x: 2, y: 24, w: 3, h: 10 },
+    { i: 'premium', x: 5, y: 24, w: 2, h: 10 },
+    { i: 'perf', x: 7, y: 24, w: 3, h: 10 },
   ],
   sm: [
     // Single column stack — ordered by priority
@@ -77,6 +80,7 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
     { i: 'trades', x: 0, y: 28, w: 6, h: 8 },
     { i: 'depth', x: 0, y: 36, w: 6, h: 8 },
     { i: 'premium', x: 0, y: 44, w: 6, h: 8 },
+    { i: 'perf', x: 0, y: 52, w: 6, h: 8 },
   ],
 };
 
@@ -99,6 +103,7 @@ export const DashboardGrid = memo(function DashboardGrid() {
       { key: 'watchlist', title: 'Watchlist', component: <WatchlistWidget /> },
       { key: 'premium', title: 'Kimchi Premium', component: <KimchiPremiumWidget /> },
       { key: 'depth', title: 'Depth Chart', component: <DepthChartWidget /> },
+      { key: 'perf', title: 'Performance', component: <PerformanceMonitorWidget /> },
     ],
     [],
   );

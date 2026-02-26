@@ -19,6 +19,7 @@ const WIDGET_TYPES = [
   'watchlist',
   'premium',
   'depth',
+  'perf',
 ] as const;
 
 /**

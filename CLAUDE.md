@@ -11,18 +11,18 @@
 
 ### 기술 스택 요약
 
-| 영역 | 기술 | 용도 |
-|------|------|------|
-| 프레임워크 | Next.js 14+ (App Router) | SSG 기반 초기 로딩 최적화, 라우팅 |
-| 언어 | TypeScript (strict mode) | 타입 안전성, WebSocket 메시지 타입 정의 |
-| 상태 관리 | Zustand | selector 기반 구독, 불필요한 리렌더 최소화 |
-| 차트 | TradingView Lightweight Charts | Canvas 기반 고성능 캔들스틱 차트 |
-| 오더북/체결 렌더링 | Canvas 2D API | DOM 완전 우회, Reflow/Repaint 비용 Zero |
-| 대시보드 레이아웃 | React Grid Layout | 드래그/리사이즈/반응형 그리드 |
-| 인증 + DB | Supabase | Google/GitHub OAuth, 레이아웃/관심종목 영속화 |
-| 배포 | Vercel | Next.js 최적 배포, 글로벌 CDN |
-| 테스트 | Vitest + Playwright | 단위 테스트 + E2E 테스트 |
-| 코드 품질 | ESLint + Prettier + Husky | 린트, 포맷팅, Git 훅 |
+| 영역               | 기술                           | 용도                                       |
+| ------------------ | ------------------------------ | ------------------------------------------ |
+| 프레임워크         | Next.js 14+ (App Router)       | SSG 기반 초기 로딩 최적화, 라우팅          |
+| 언어               | TypeScript (strict mode)       | 타입 안전성, WebSocket 메시지 타입 정의    |
+| 상태 관리          | Zustand                        | selector 기반 구독, 불필요한 리렌더 최소화 |
+| 차트               | TradingView Lightweight Charts | Canvas 기반 고성능 캔들스틱 차트           |
+| 오더북/체결 렌더링 | Canvas 2D API                  | DOM 완전 우회, Reflow/Repaint 비용 Zero    |
+| 대시보드 레이아웃  | React Grid Layout              | 드래그/리사이즈/반응형 그리드              |
+| 인증 + DB          | Supabase                       | Google OAuth, 레이아웃/관심종목 영속화     |
+| 배포               | Vercel                         | Next.js 최적 배포, 글로벌 CDN              |
+| 테스트             | Vitest + Playwright            | 단위 테스트 + E2E 테스트                   |
+| 코드 품질          | ESLint + Prettier + Husky      | 린트, 포맷팅, Git 훅                       |
 
 ### 디렉터리 구조
 
@@ -103,19 +103,19 @@ type WebSocketMessage = KlineMessage | DepthMessage | TradeMessage;
 ```typescript
 interface BinanceKlineEvent {
   e: 'kline';
-  E: number;        // Event time
-  s: string;        // Symbol
+  E: number; // Event time
+  s: string; // Symbol
   k: {
-    t: number;      // Kline start time
-    T: number;      // Kline close time
-    s: string;      // Symbol
-    i: string;      // Interval
-    o: string;      // Open price
-    c: string;      // Close price
-    h: string;      // High price
-    l: string;      // Low price
-    v: string;      // Volume
-    x: boolean;     // Is this kline closed?
+    t: number; // Kline start time
+    T: number; // Kline close time
+    s: string; // Symbol
+    i: string; // Interval
+    o: string; // Open price
+    c: string; // Close price
+    h: string; // High price
+    l: string; // Low price
+    v: string; // Volume
+    x: boolean; // Is this kline closed?
   };
 }
 ```
@@ -177,7 +177,9 @@ export const OrderBookWidget = memo(({ symbol }: OrderBookWidgetProps) => {
 });
 
 // ❌ BAD
-export default function OrderBookWidget() { /* ... */ }
+export default function OrderBookWidget() {
+  /* ... */
+}
 ```
 
 - **파일 네이밍 규칙**:
@@ -267,7 +269,7 @@ class OrderBookRenderer {
   // rAF 루프
   private loop = (): void => {
     if (this.isDirty) {
-      this.draw();       // dirty일 때만 렌더링
+      this.draw(); // dirty일 때만 렌더링
       this.isDirty = false;
     }
     this.rafId = requestAnimationFrame(this.loop);
@@ -394,10 +396,10 @@ useEffect(() => {
   resizeObserver.observe(containerRef.current);
 
   return () => {
-    unsubscribe();                           // WebSocket 구독 해제
-    cancelAnimationFrame(rafId);             // rAF 취소
-    resizeObserver.disconnect();             // ResizeObserver 해제
-    chartInstance?.remove();                 // 차트 인스턴스 정리
+    unsubscribe(); // WebSocket 구독 해제
+    cancelAnimationFrame(rafId); // rAF 취소
+    resizeObserver.disconnect(); // ResizeObserver 해제
+    chartInstance?.remove(); // 차트 인스턴스 정리
   };
 }, []);
 ```
@@ -410,13 +412,13 @@ useEffect(() => {
 
 - **도메인별로 스토어를 분리한다.** 하나의 거대한 스토어에 모든 상태를 넣지 않는다.
 
-| 스토어 | 역할 |
-|--------|------|
+| 스토어       | 역할                                   |
+| ------------ | -------------------------------------- |
 | `klineStore` | 캔들스틱 데이터, 타임프레임, 차트 상태 |
-| `depthStore` | 오더북 데이터 (bids/asks), 최고 호가 |
-| `tradeStore` | 체결 내역 링 버퍼, 최근 체결가 |
-| `uiStore` | 현재 심볼, 테마, 레이아웃, 연결 상태 |
-| `authStore` | 사용자 인증 상태, 프로필 정보 |
+| `depthStore` | 오더북 데이터 (bids/asks), 최고 호가   |
+| `tradeStore` | 체결 내역 링 버퍼, 최근 체결가         |
+| `uiStore`    | 현재 심볼, 테마, 레이아웃, 연결 상태   |
+| `authStore`  | 사용자 인증 상태, 프로필 정보          |
 
 - **스토어의 모든 액션은 named function으로 정의한다.** 인라인 함수를 사용하지 않는다.
 
@@ -467,10 +469,10 @@ const useDepthStore = create<DepthStore>()((set, get) => ({
 - **수치 데이터 버퍼에 반드시 Typed Array(`Float64Array`)를 사용한다.** GC 압박을 최소화한다.
 - **데이터 컬렉션에 반드시 상한(cap)을 적용한다:**
 
-| 데이터 | 최대 용량 |
-|--------|-----------|
-| 캔들 (kline) | 2,000개 |
-| 체결 내역 (trades) | 200건 |
+| 데이터              | 최대 용량           |
+| ------------------- | ------------------- |
+| 캔들 (kline)        | 2,000개             |
+| 체결 내역 (trades)  | 200건               |
 | 오더북 레벨 (depth) | 매수/매도 각 50레벨 |
 
 - **WebSocket에서 수신한 raw JSON을 절대 저장하지 않는다.** 즉시 파싱하고, 필요한 필드만 추출한 뒤 원본 JSON 문자열은 폐기한다.
@@ -495,10 +497,7 @@ const useDepthStore = create<DepthStore>()((set, get) => ({
 - **API fetch 에러 시 지수 백오프로 최대 3회 재시도한다.**
 
 ```typescript
-async function fetchWithRetry<T>(
-  url: string,
-  maxRetries = 3,
-): Promise<T> {
+async function fetchWithRetry<T>(url: string, maxRetries = 3): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await fetch(url);
@@ -506,9 +505,7 @@ async function fetchWithRetry<T>(
       return await response.json();
     } catch (error) {
       if (attempt === maxRetries - 1) throw error;
-      await new Promise((resolve) =>
-        setTimeout(resolve, 1000 * Math.pow(2, attempt))
-      );
+      await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
     }
   }
   throw new Error('Unreachable');
@@ -600,24 +597,24 @@ describe('depthStore', () => {
 
 아래 패턴은 **어떤 상황에서도 절대 사용하지 않는다.**
 
-| 금지 패턴 | 이유 | 대안 |
-|-----------|------|------|
-| `setInterval`로 렌더링 | 프레임 타이밍과 불일치, CPU 낭비 | `requestAnimationFrame` 사용 |
-| React render 안에서 동기 무거운 계산 | Jank(프레임 드롭) 유발 | `useMemo` 또는 Web Worker 사용 |
-| Zustand 스토어에 DOM 참조 저장 | 메모리 누수, React 생명주기 충돌 | React ref 사용 |
-| `innerHTML` 사용 | XSS 취약점 | React JSX 또는 Canvas 렌더링 |
-| `var` 키워드 | 스코프 혼동, 호이스팅 문제 | `const` 또는 `let` 사용 |
-| `==` 비교 연산자 | 타입 강제 변환으로 인한 버그 | `===` 사용 |
-| 상태 직접 변경(mutation) | React 리렌더 누락, 상태 불일치 | 새 참조 생성 (spread, map 등) |
-| `@ts-ignore` | 타입 에러를 숨겨 런타임 버그 유발 | `@ts-expect-error`와 설명 주석 (불가피한 경우에만) |
-| `window.location.reload()` 에러 복구 | 사용자 경험 파괴, 상태 손실 | Error Boundary + 재시도 로직 |
-| `.env` 파일 커밋 | 민감 정보 노출 | `.gitignore`에 등록, 환경변수로 관리 |
-| `any` 타입 | 타입 안전성 무력화 | 명시적 타입/인터페이스 정의 |
-| 클래스 컴포넌트 | 레거시 패턴, 훅 사용 불가 | 함수형 컴포넌트 + 훅 |
-| `Array.unshift`/`splice`로 고빈도 데이터 처리 | O(n) 복사 비용, GC 압박 | 링 버퍼 (`Float64Array`) |
-| `document.getElementById` | React 생명주기 무시 | `useRef` 사용 |
-| default export (page.tsx 제외) | 리팩터링 시 이름 추적 불가 | named export |
-| 인라인 props 타입 | 재사용성 저하, 가독성 감소 | 명시적 인터페이스 정의 |
+| 금지 패턴                                     | 이유                              | 대안                                               |
+| --------------------------------------------- | --------------------------------- | -------------------------------------------------- |
+| `setInterval`로 렌더링                        | 프레임 타이밍과 불일치, CPU 낭비  | `requestAnimationFrame` 사용                       |
+| React render 안에서 동기 무거운 계산          | Jank(프레임 드롭) 유발            | `useMemo` 또는 Web Worker 사용                     |
+| Zustand 스토어에 DOM 참조 저장                | 메모리 누수, React 생명주기 충돌  | React ref 사용                                     |
+| `innerHTML` 사용                              | XSS 취약점                        | React JSX 또는 Canvas 렌더링                       |
+| `var` 키워드                                  | 스코프 혼동, 호이스팅 문제        | `const` 또는 `let` 사용                            |
+| `==` 비교 연산자                              | 타입 강제 변환으로 인한 버그      | `===` 사용                                         |
+| 상태 직접 변경(mutation)                      | React 리렌더 누락, 상태 불일치    | 새 참조 생성 (spread, map 등)                      |
+| `@ts-ignore`                                  | 타입 에러를 숨겨 런타임 버그 유발 | `@ts-expect-error`와 설명 주석 (불가피한 경우에만) |
+| `window.location.reload()` 에러 복구          | 사용자 경험 파괴, 상태 손실       | Error Boundary + 재시도 로직                       |
+| `.env` 파일 커밋                              | 민감 정보 노출                    | `.gitignore`에 등록, 환경변수로 관리               |
+| `any` 타입                                    | 타입 안전성 무력화                | 명시적 타입/인터페이스 정의                        |
+| 클래스 컴포넌트                               | 레거시 패턴, 훅 사용 불가         | 함수형 컴포넌트 + 훅                               |
+| `Array.unshift`/`splice`로 고빈도 데이터 처리 | O(n) 복사 비용, GC 압박           | 링 버퍼 (`Float64Array`)                           |
+| `document.getElementById`                     | React 생명주기 무시               | `useRef` 사용                                      |
+| default export (page.tsx 제외)                | 리팩터링 시 이름 추적 불가        | named export                                       |
+| 인라인 props 타입                             | 재사용성 저하, 가독성 감소        | 명시적 인터페이스 정의                             |
 
 ---
 
@@ -630,6 +627,7 @@ wss://stream.binance.com:9443/stream?streams=<stream1>/<stream2>/<stream3>
 ```
 
 예시:
+
 ```
 wss://stream.binance.com:9443/stream?streams=btcusdt@kline_1m/btcusdt@depth@100ms/btcusdt@trade
 ```
@@ -665,27 +663,27 @@ class RingBuffer {
 
 ### C. 색상 코딩 표준
 
-| 의미 | 색상 | HEX |
-|------|------|-----|
-| 매수 (Buy) | 녹색 | `#00C087` |
+| 의미        | 색상   | HEX       |
+| ----------- | ------ | --------- |
+| 매수 (Buy)  | 녹색   | `#00C087` |
 | 매도 (Sell) | 빨간색 | `#F6465D` |
-| 연결됨 | 녹색 | `#00C087` |
-| 재연결 중 | 노란색 | `#F0B90B` |
-| 연결 끊김 | 빨간색 | `#F6465D` |
+| 연결됨      | 녹색   | `#00C087` |
+| 재연결 중   | 노란색 | `#F0B90B` |
+| 연결 끊김   | 빨간색 | `#F6465D` |
 
 ### D. 성능 목표 요약
 
-| 지표 | 목표 |
-|------|------|
-| 프레임 레이트 | 60fps (최소 55fps) |
-| Canvas 단일 redraw | < 4ms |
-| Long Task (>50ms) 비율 | < 0.5% |
-| JS Heap (1시간 후) | < 200MB |
-| Heap 증가율 | < 2MB/hr |
-| LCP | < 2.0s |
-| FCP | < 1.0s |
-| TTI | < 3.0s |
-| 초기 JS 번들 (gzip) | < 150KB |
-| WebSocket 재연결 | < 3s |
-| DOM 노드 수 | < 500개 |
-| Detached DOM Nodes | 0개 |
+| 지표                   | 목표               |
+| ---------------------- | ------------------ |
+| 프레임 레이트          | 60fps (최소 55fps) |
+| Canvas 단일 redraw     | < 4ms              |
+| Long Task (>50ms) 비율 | < 0.5%             |
+| JS Heap (1시간 후)     | < 200MB            |
+| Heap 증가율            | < 2MB/hr           |
+| LCP                    | < 2.0s             |
+| FCP                    | < 1.0s             |
+| TTI                    | < 3.0s             |
+| 초기 JS 번들 (gzip)    | < 150KB            |
+| WebSocket 재연결       | < 3s               |
+| DOM 노드 수            | < 500개            |
+| Detached DOM Nodes     | 0개                |
