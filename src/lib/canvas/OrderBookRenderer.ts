@@ -134,9 +134,10 @@ export class OrderBookRenderer implements CanvasRenderer {
   // -- Drawing ----------------------------------------------------------------
 
   private draw(): void {
-    if (process.env.NODE_ENV === 'development') {
-      performance.mark('orderbook-draw-start');
-    }
+    performance.clearMarks('orderbook-draw-start');
+    performance.clearMarks('orderbook-draw-end');
+    performance.clearMeasures('orderbook-draw');
+    performance.mark('orderbook-draw-start');
 
     const { bids, asks } = useDepthStore.getState();
     const { ctx, width, height, colors } = this;
@@ -198,10 +199,8 @@ export class OrderBookRenderer implements CanvasRenderer {
     ctx.lineTo(halfWidth, height);
     ctx.stroke();
 
-    if (process.env.NODE_ENV === 'development') {
-      performance.mark('orderbook-draw-end');
-      performance.measure('orderbook-draw', 'orderbook-draw-start', 'orderbook-draw-end');
-    }
+    performance.mark('orderbook-draw-end');
+    performance.measure('orderbook-draw', 'orderbook-draw-start', 'orderbook-draw-end');
   }
 
   private drawSpread(bids: PriceLevel[], asks: PriceLevel[]): void {

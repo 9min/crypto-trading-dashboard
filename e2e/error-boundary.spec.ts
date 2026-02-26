@@ -38,7 +38,7 @@ test.describe('Error boundary', () => {
         body: JSON.stringify([]),
       }),
     );
-    await page.route('**/open.er-api.com/**', (route) =>
+    await page.route('**/api/exchange-rate/**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -97,7 +97,7 @@ test.describe('Error boundary', () => {
         body: JSON.stringify([]),
       }),
     );
-    await page.route('**/open.er-api.com/**', (route) =>
+    await page.route('**/api/exchange-rate/**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',

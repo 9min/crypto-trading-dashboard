@@ -238,9 +238,10 @@ export class DepthChartRenderer implements CanvasRenderer {
   // -- Drawing ----------------------------------------------------------------
 
   private draw(): void {
-    if (process.env.NODE_ENV === 'development') {
-      performance.mark('depth-chart-draw-start');
-    }
+    performance.clearMarks('depth-chart-draw-start');
+    performance.clearMarks('depth-chart-draw-end');
+    performance.clearMeasures('depth-chart-draw');
+    performance.mark('depth-chart-draw-start');
 
     const { bids, asks } = useDepthStore.getState();
     const { ctx, width, height } = this;
@@ -257,13 +258,8 @@ export class DepthChartRenderer implements CanvasRenderer {
 
     if (bidCount === 0 && askCount === 0) {
       this.drawEmptyState();
-      if (process.env.NODE_ENV === 'development') {
-        performance.mark('depth-chart-draw-end');
-        performance.measure('depth-chart-draw', 'depth-chart-draw-start', 'depth-chart-draw-end');
-        performance.clearMarks('depth-chart-draw-start');
-        performance.clearMarks('depth-chart-draw-end');
-        performance.clearMeasures('depth-chart-draw');
-      }
+      performance.mark('depth-chart-draw-end');
+      performance.measure('depth-chart-draw', 'depth-chart-draw-start', 'depth-chart-draw-end');
       return;
     }
 
@@ -285,13 +281,8 @@ export class DepthChartRenderer implements CanvasRenderer {
 
     if (minPrice >= maxPrice) {
       this.drawEmptyState();
-      if (process.env.NODE_ENV === 'development') {
-        performance.mark('depth-chart-draw-end');
-        performance.measure('depth-chart-draw', 'depth-chart-draw-start', 'depth-chart-draw-end');
-        performance.clearMarks('depth-chart-draw-start');
-        performance.clearMarks('depth-chart-draw-end');
-        performance.clearMeasures('depth-chart-draw');
-      }
+      performance.mark('depth-chart-draw-end');
+      performance.measure('depth-chart-draw', 'depth-chart-draw-start', 'depth-chart-draw-end');
       return;
     }
 
@@ -351,13 +342,8 @@ export class DepthChartRenderer implements CanvasRenderer {
       );
     }
 
-    if (process.env.NODE_ENV === 'development') {
-      performance.mark('depth-chart-draw-end');
-      performance.measure('depth-chart-draw', 'depth-chart-draw-start', 'depth-chart-draw-end');
-      performance.clearMarks('depth-chart-draw-start');
-      performance.clearMarks('depth-chart-draw-end');
-      performance.clearMeasures('depth-chart-draw');
-    }
+    performance.mark('depth-chart-draw-end');
+    performance.measure('depth-chart-draw', 'depth-chart-draw-start', 'depth-chart-draw-end');
   }
 
   private drawEmptyState(): void {

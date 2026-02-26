@@ -192,8 +192,8 @@ export async function mockBinanceRest(page: Page): Promise<void> {
     }),
   );
 
-  // Exchange rate API for kimchi premium
-  await page.route('**/open.er-api.com/**', (route) =>
+  // Exchange rate API for kimchi premium (proxied via Next.js rewrite)
+  await page.route('**/api/exchange-rate/**', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -202,6 +202,24 @@ export async function mockBinanceRest(page: Page): Promise<void> {
         base_code: 'USD',
         rates: { KRW: 1380.0 },
       }),
+    }),
+  );
+
+  // Binance ticker price API for kimchi premium (proxied via Next.js rewrite)
+  await page.route('**/api/binance/ticker/price*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ symbol: 'BTCUSDT', price: '67500.00000000' }),
+    }),
+  );
+
+  // Upbit ticker API for kimchi premium (proxied via Next.js rewrite)
+  await page.route('**/api/upbit/ticker*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ market: 'KRW-BTC', trade_price: 93150000, opening_price: 93000000 }]),
     }),
   );
 }
