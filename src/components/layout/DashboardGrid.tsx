@@ -11,14 +11,25 @@
 // and ResponsiveGridLayout for responsive breakpoint handling.
 // =============================================================================
 
-import { memo, useMemo, useState, useCallback, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  memo,
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import {
   ResponsiveGridLayout,
   useContainerWidth,
   type Layout,
   type ResponsiveLayouts,
 } from 'react-grid-layout';
-import { saveLayout, loadLayout } from '@/utils/layoutStorage';
+import { saveLayout, loadLayout, onCloudLayoutApplied } from '@/utils/layoutStorage';
+import { useAuthStore } from '@/stores/authStore';
+import { upsertPreferences } from '@/lib/supabase/preferencesService';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { CandlestickWidget } from '@/components/widgets/CandlestickWidget';
 import { OrderBookWidget } from '@/components/widgets/OrderBookWidget';
@@ -104,7 +115,7 @@ export const DashboardGrid = memo(function DashboardGrid() {
   // react-grid-layout computing positions with a default width vs actual width.
   const isMounted = useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
 
-  const [layouts] = useState<ResponsiveLayouts<'lg' | 'md' | 'sm'>>(
+  const [layouts, setLayouts] = useState<ResponsiveLayouts<'lg' | 'md' | 'sm'>>(
     () => loadLayout() ?? DEFAULT_LAYOUTS,
   );
 
@@ -121,12 +132,46 @@ export const DashboardGrid = memo(function DashboardGrid() {
     [],
   );
 
+  const debouncedCloudSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleLayoutChange = useCallback(
     (_layout: Layout, allLayouts: ResponsiveLayouts<'lg' | 'md' | 'sm'>) => {
       saveLayout(allLayouts);
+
+      // Sync to Supabase if user is logged in (debounced)
+      if (debouncedCloudSaveRef.current) {
+        clearTimeout(debouncedCloudSaveRef.current);
+      }
+      debouncedCloudSaveRef.current = setTimeout(() => {
+        const user = useAuthStore.getState().user;
+        if (user) {
+          void upsertPreferences(user.id, { layout: allLayouts }).catch((error) => {
+            console.error('[DashboardGrid] Failed to sync layout to cloud', {
+              timestamp: Date.now(),
+              error,
+            });
+          });
+        }
+      }, 500);
     },
     [],
   );
+
+  // Listen for cloud-loaded layout changes (e.g., on login)
+  useEffect(() => {
+    return onCloudLayoutApplied((cloudLayouts) => {
+      setLayouts(cloudLayouts as ResponsiveLayouts<'lg' | 'md' | 'sm'>);
+    });
+  }, []);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debouncedCloudSaveRef.current) {
+        clearTimeout(debouncedCloudSaveRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div ref={containerRef}>
