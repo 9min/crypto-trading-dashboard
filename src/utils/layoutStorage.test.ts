@@ -1,8 +1,28 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { saveLayout, loadLayout, STORAGE_KEY } from './layoutStorage';
+import {
+  saveLayout,
+  loadLayout,
+  STORAGE_KEY,
+  VERSION_KEY,
+  LAYOUT_VERSION,
+  REQUIRED_WIDGET_KEYS,
+} from './layoutStorage';
 
 describe('layoutStorage', () => {
   const mockStorage = new Map<string, string>();
+
+  /** Helper: creates a valid layout containing all required widget keys. */
+  function makeValidLayout() {
+    return {
+      lg: REQUIRED_WIDGET_KEYS.map((key, i) => ({
+        i: key,
+        x: i * 3,
+        y: 0,
+        w: 3,
+        h: 10,
+      })),
+    };
+  }
 
   beforeEach(() => {
     mockStorage.clear();
@@ -23,14 +43,13 @@ describe('layoutStorage', () => {
   });
 
   describe('saveLayout', () => {
-    it('serializes and stores layouts under the correct key', () => {
-      const layouts = {
-        lg: [{ i: 'chart', x: 0, y: 0, w: 8, h: 14 }],
-      };
+    it('serializes and stores layouts with version under the correct keys', () => {
+      const layouts = makeValidLayout();
 
       saveLayout(layouts);
 
       expect(localStorage.setItem).toHaveBeenCalledWith(STORAGE_KEY, JSON.stringify(layouts));
+      expect(localStorage.setItem).toHaveBeenCalledWith(VERSION_KEY, String(LAYOUT_VERSION));
     });
 
     it('does not throw when localStorage.setItem throws', () => {
@@ -43,51 +62,57 @@ describe('layoutStorage', () => {
   });
 
   describe('loadLayout', () => {
-    it('returns parsed layouts when valid data exists', () => {
-      const layouts = {
-        lg: [{ i: 'chart', x: 0, y: 0, w: 8, h: 14 }],
-        md: [{ i: 'chart', x: 0, y: 0, w: 10, h: 12 }],
-      };
+    it('returns parsed layouts when valid data exists with matching version', () => {
+      const layouts = makeValidLayout();
 
       mockStorage.set(STORAGE_KEY, JSON.stringify(layouts));
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
 
       const result = loadLayout();
       expect(result).toEqual(layouts);
     });
 
     it('returns null when no data exists', () => {
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       expect(loadLayout()).toBeNull();
     });
 
     it('returns null for invalid JSON', () => {
       mockStorage.set(STORAGE_KEY, '{invalid json!!!}');
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       expect(loadLayout()).toBeNull();
     });
 
     it('returns null for non-object values', () => {
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       mockStorage.set(STORAGE_KEY, '"just a string"');
       expect(loadLayout()).toBeNull();
 
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       mockStorage.set(STORAGE_KEY, '42');
       expect(loadLayout()).toBeNull();
 
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       mockStorage.set(STORAGE_KEY, 'null');
       expect(loadLayout()).toBeNull();
     });
 
     it('returns null for array values', () => {
       mockStorage.set(STORAGE_KEY, '[1, 2, 3]');
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       expect(loadLayout()).toBeNull();
     });
 
     it('returns null when breakpoint value is not an array', () => {
       mockStorage.set(STORAGE_KEY, JSON.stringify({ lg: 'not-an-array' }));
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       expect(loadLayout()).toBeNull();
     });
 
     it('returns null when layout item has missing fields', () => {
       // Missing 'w' and 'h'
-      mockStorage.set(STORAGE_KEY, JSON.stringify({ lg: [{ i: 'chart', x: 0, y: 0 }] }));
+      mockStorage.set(STORAGE_KEY, JSON.stringify({ lg: [{ i: 'candlestick', x: 0, y: 0 }] }));
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       expect(loadLayout()).toBeNull();
     });
 
@@ -95,15 +120,73 @@ describe('layoutStorage', () => {
       // 'x' should be number, not string
       mockStorage.set(
         STORAGE_KEY,
-        JSON.stringify({ lg: [{ i: 'chart', x: '0', y: 0, w: 8, h: 14 }] }),
+        JSON.stringify({ lg: [{ i: 'candlestick', x: '0', y: 0, w: 8, h: 14 }] }),
       );
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
       expect(loadLayout()).toBeNull();
     });
 
-    it('accepts valid layouts with empty breakpoint arrays', () => {
-      const layouts = { lg: [], md: [] };
+    it('returns null when version mismatches and removes stale data', () => {
+      const layouts = makeValidLayout();
+
       mockStorage.set(STORAGE_KEY, JSON.stringify(layouts));
-      expect(loadLayout()).toEqual(layouts);
+      mockStorage.set(VERSION_KEY, '1'); // Old version
+
+      const result = loadLayout();
+      expect(result).toBeNull();
+      expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
+      expect(localStorage.removeItem).toHaveBeenCalledWith(VERSION_KEY);
+    });
+
+    it('returns null when no version is saved', () => {
+      const layouts = makeValidLayout();
+
+      mockStorage.set(STORAGE_KEY, JSON.stringify(layouts));
+      // No VERSION_KEY set
+
+      expect(loadLayout()).toBeNull();
+    });
+
+    it('returns null when a required widget key is missing and cleans up storage', () => {
+      const layouts = {
+        lg: [
+          { i: 'candlestick', x: 0, y: 0, w: 8, h: 14 },
+          // Missing other required keys
+        ],
+      };
+
+      mockStorage.set(STORAGE_KEY, JSON.stringify(layouts));
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
+
+      expect(loadLayout()).toBeNull();
+      expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
+      expect(localStorage.removeItem).toHaveBeenCalledWith(VERSION_KEY);
+    });
+
+    it('cleans up storage when layout structure is invalid', () => {
+      mockStorage.set(STORAGE_KEY, JSON.stringify({ lg: 'not-an-array' }));
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
+
+      expect(loadLayout()).toBeNull();
+      expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
+    });
+
+    it('returns null and cleans up when layout is an empty object', () => {
+      mockStorage.set(STORAGE_KEY, JSON.stringify({}));
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
+
+      expect(loadLayout()).toBeNull();
+      expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
+      expect(localStorage.removeItem).toHaveBeenCalledWith(VERSION_KEY);
+    });
+
+    it('cleans up corrupted data on parse failure', () => {
+      mockStorage.set(STORAGE_KEY, '{invalid json!!!}');
+      mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
+
+      expect(loadLayout()).toBeNull();
+      expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
+      expect(localStorage.removeItem).toHaveBeenCalledWith(VERSION_KEY);
     });
   });
 });

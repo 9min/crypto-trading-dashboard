@@ -12,6 +12,9 @@ import type { ExchangeId } from '@/types/exchange';
 import { DEFAULT_SYMBOL } from '@/utils/constants';
 import { loadExchange, saveExchange } from '@/utils/localPreferences';
 
+/** Default exchange used for SSR and initial hydration */
+const DEFAULT_EXCHANGE: ExchangeId = 'binance';
+
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
@@ -25,6 +28,8 @@ interface UiStoreState {
   symbol: string;
   /** Currently selected exchange */
   exchange: ExchangeId;
+  /** Whether the persisted exchange has been hydrated from localStorage */
+  isExchangeHydrated: boolean;
   /** WebSocket connection state (discriminated union) */
   connectionState: ConnectionState;
   /** Current dashboard widget layout configuration */
@@ -40,6 +45,8 @@ interface UiStoreActions {
   setSymbol: (symbol: string) => void;
   /** Change the active exchange */
   setExchange: (exchange: ExchangeId) => void;
+  /** Hydrate exchange from localStorage after mount (SSR-safe) */
+  hydrateExchange: () => void;
   /** Update WebSocket connection state */
   setConnectionState: (state: ConnectionState) => void;
   /** Replace the entire dashboard layout */
@@ -72,6 +79,10 @@ export const useUiStore = create<UiStore>()((set) => {
     set({ exchange });
   }
 
+  function hydrateExchange(): void {
+    set({ exchange: loadExchange(), isExchangeHydrated: true });
+  }
+
   function setConnectionState(connectionState: ConnectionState): void {
     set({ connectionState });
   }
@@ -84,7 +95,8 @@ export const useUiStore = create<UiStore>()((set) => {
     // -- State ----------------------------------------------------------------
     theme: 'dark',
     symbol: DEFAULT_SYMBOL,
-    exchange: loadExchange(),
+    exchange: DEFAULT_EXCHANGE,
+    isExchangeHydrated: false,
     connectionState: { status: 'idle' },
     layout: [],
 
@@ -93,6 +105,7 @@ export const useUiStore = create<UiStore>()((set) => {
     toggleTheme,
     setSymbol,
     setExchange,
+    hydrateExchange,
     setConnectionState,
     setLayout,
   };

@@ -21,13 +21,18 @@ import type { BinanceMiniTickerEvent } from '@/types/binance';
 // Hook
 // -----------------------------------------------------------------------------
 
-export function useWatchlistStream(): void {
+export function useWatchlistStream(enabled = true): void {
   const symbols = useWatchlistStore((state) => state.symbols);
   const setTickers = useWatchlistStore((state) => state.setTickers);
   const updateTicker = useWatchlistStore((state) => state.updateTicker);
   const setLoading = useWatchlistStore((state) => state.setLoading);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
     let isActive = true;
 
     const manager = WatchlistStreamManager.getInstance();
@@ -83,6 +88,7 @@ export function useWatchlistStream(): void {
       isActive = false;
       unsubscribe();
       manager.disconnect();
+      setLoading(false);
     };
-  }, [symbols, setTickers, updateTicker, setLoading]);
+  }, [enabled, symbols, setTickers, updateTicker, setLoading]);
 }

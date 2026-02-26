@@ -50,9 +50,9 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
   lg: [
     { i: 'candlestick', x: 0, y: 0, w: 8, h: 14 },
     { i: 'orderbook', x: 8, y: 0, w: 4, h: 14 },
-    { i: 'watchlist', x: 0, y: 14, w: 3, h: 10 },
-    { i: 'trades', x: 3, y: 14, w: 6, h: 10 },
-    { i: 'premium', x: 9, y: 14, w: 3, h: 10 },
+    { i: 'watchlist', x: 0, y: 14, w: 3, h: 11 },
+    { i: 'trades', x: 3, y: 14, w: 6, h: 11 },
+    { i: 'premium', x: 9, y: 14, w: 3, h: 11 },
   ],
   md: [
     { i: 'candlestick', x: 0, y: 0, w: 10, h: 12 },

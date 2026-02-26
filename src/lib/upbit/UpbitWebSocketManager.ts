@@ -104,9 +104,12 @@ export class UpbitWebSocketManager {
   }
 
   /**
-   * Closes the WebSocket connection and stops all reconnection attempts.
+   * Closes connection when no message subscribers remain.
+   * Always call this in cleanup functions after unsubscribe().
    */
   disconnect(): void {
+    if (this.messageSubscribers.size > 0) return;
+
     this.cleanup();
     this.currentSubscriptions = [];
     this.reconnectAttempt = 0;
@@ -115,7 +118,7 @@ export class UpbitWebSocketManager {
 
   /**
    * Subscribes to incoming WebSocket messages.
-   * @returns An unsubscribe function.
+   * @returns An unsubscribe function that removes the callback.
    */
   subscribe(callback: UpbitMessageCallback): () => void {
     this.messageSubscribers.add(callback);

@@ -21,6 +21,7 @@ import { useExchangeWatchlistStream } from '@/hooks/useExchangeWatchlistStream';
 import { useSparklineData } from '@/hooks/useSparklineData';
 import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol, formatUpbitSymbol } from '@/utils/formatSymbol';
+import { toUpbitSymbol } from '@/utils/symbolMap';
 import { Sparkline } from '@/components/ui/Sparkline';
 import { WidgetWrapper } from './WidgetWrapper';
 
@@ -55,7 +56,10 @@ const SymbolRow = memo(function SymbolRow({
     onSelect(symbol);
   }, [symbol, onSelect]);
 
-  const displaySymbol = exchange === 'upbit' ? formatUpbitSymbol(symbol) : formatSymbol(symbol);
+  const displaySymbol = useMemo(
+    () => (exchange === 'upbit' ? formatUpbitSymbol(toUpbitSymbol(symbol)) : formatSymbol(symbol)),
+    [exchange, symbol],
+  );
 
   const { price, changePercent, changeColorClass, changeSign } = useMemo(() => {
     const p = ticker?.price ?? 0;
@@ -72,25 +76,26 @@ const SymbolRow = memo(function SymbolRow({
     <button
       type="button"
       onClick={handleClick}
-      className={`flex w-full items-center justify-between px-3 py-2 text-left transition-colors ${
-        isActive ? 'bg-background-tertiary' : 'hover:bg-background-tertiary/50'
+      className={`border-border/30 flex w-full items-center border-b px-3 py-2.5 text-left transition-colors ${
+        isActive
+          ? 'border-accent bg-background-tertiary border-l-2'
+          : 'hover:border-l-foreground-tertiary hover:bg-background-tertiary/50 border-l-2 border-l-transparent'
       }`}
     >
-      <span className={`text-xs font-medium ${isActive ? 'text-accent' : 'text-foreground'}`}>
+      <span
+        className={`min-w-0 flex-1 truncate text-xs font-medium ${isActive ? 'text-accent' : 'text-foreground'}`}
+      >
         {displaySymbol}
       </span>
-      <div className="flex items-center gap-2">
+      <span className="flex w-12 shrink-0 justify-center">
         {sparklineData.length >= 2 && <Sparkline data={sparklineData} width={48} height={16} />}
-        {price > 0 && (
-          <span className="font-mono-num text-foreground text-xs">{formatPrice(price)}</span>
-        )}
-        {price > 0 && (
-          <span className={`font-mono-num text-xs ${changeColorClass}`}>
-            {changeSign}
-            {changePercent.toFixed(2)}%
-          </span>
-        )}
-      </div>
+      </span>
+      <span className="font-mono-num text-foreground w-20 shrink-0 text-right text-xs">
+        {price > 0 ? formatPrice(price) : ''}
+      </span>
+      <span className={`font-mono-num w-16 shrink-0 text-right text-xs ${changeColorClass}`}>
+        {price > 0 ? `${changeSign}${changePercent.toFixed(2)}%` : ''}
+      </span>
     </button>
   );
 });

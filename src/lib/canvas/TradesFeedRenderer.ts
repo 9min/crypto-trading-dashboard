@@ -47,7 +47,7 @@ const HEADER_HEIGHT = 24;
 const FONT_SIZE = 11;
 const FONT_FAMILY = "'JetBrains Mono', 'Fira Code', monospace";
 const PADDING_X = 8;
-const COLUMN_RATIOS = [0.3, 0.38, 0.32]; // time, price, quantity
+const COLUMN_RATIOS = [0.28, 0.38, 0.34]; // time, price, quantity
 
 const DEFAULT_COLORS: TradesFeedColors = {
   background: '#12161c',

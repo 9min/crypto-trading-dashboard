@@ -49,7 +49,9 @@ export const ConnectionStatus = memo(function ConnectionStatus() {
             className={`absolute inline-flex h-full w-full animate-ping rounded-full ${config.color} opacity-75`}
           />
         )}
-        <span className={`relative inline-flex h-2 w-2 rounded-full ${config.color}`} />
+        <span
+          className={`relative inline-flex h-2 w-2 rounded-full ${config.color} ${connectionState.status === 'connected' ? 'status-dot-glow' : ''}`}
+        />
       </div>
       <span className="text-foreground-secondary text-xs">{config.label}</span>
       {isFailed && (
