@@ -74,7 +74,10 @@ export const useKlineStore = create<KlineStore>()((set) => ({
       const oldestExistingTime = state.candles.length > 0 ? state.candles[0].time : Infinity;
       const olderCandles = candles.filter((c) => c.time < oldestExistingTime);
       if (olderCandles.length === 0) return state;
-      return { candles: [...olderCandles, ...state.candles] };
+      const merged = [...olderCandles, ...state.candles];
+      return {
+        candles: merged.length > MAX_CANDLES ? merged.slice(-MAX_CANDLES) : merged,
+      };
     });
   },
 

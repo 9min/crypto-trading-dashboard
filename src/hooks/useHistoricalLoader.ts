@@ -66,9 +66,11 @@ export function useHistoricalLoader({ chartRef, isChartReady }: UseHistoricalLoa
   const isLoadingRef = useRef(false);
   const noMoreDataRef = useRef(false);
   const consecutiveErrorsRef = useRef(0);
+  const requestGenerationRef = useRef(0);
 
   // Reset flags when data context changes (symbol, interval, or exchange switch)
   useEffect(() => {
+    requestGenerationRef.current += 1;
     isLoadingRef.current = false;
     noMoreDataRef.current = false;
     consecutiveErrorsRef.current = 0;
@@ -86,6 +88,7 @@ export function useHistoricalLoader({ chartRef, isChartReady }: UseHistoricalLoa
 
       const oldestTime = candles[0].time;
       isLoadingRef.current = true;
+      const generation = requestGenerationRef.current;
 
       // Read latest state directly to avoid stale closure values
       const currentExchange = useUiStore.getState().exchange;
@@ -113,6 +116,9 @@ export function useHistoricalLoader({ chartRef, isChartReady }: UseHistoricalLoa
 
       fetchPromise
         .then((olderCandles) => {
+          // Discard stale responses after context switch (symbol/interval/exchange changed)
+          if (generation !== requestGenerationRef.current) return;
+
           consecutiveErrorsRef.current = 0;
 
           if (olderCandles.length === 0) {
@@ -129,6 +135,8 @@ export function useHistoricalLoader({ chartRef, isChartReady }: UseHistoricalLoa
           prependCandles(olderCandles);
         })
         .catch((error: unknown) => {
+          if (generation !== requestGenerationRef.current) return;
+
           consecutiveErrorsRef.current += 1;
 
           // Stop retrying after 3 consecutive failures to prevent infinite error loops
@@ -148,7 +156,9 @@ export function useHistoricalLoader({ chartRef, isChartReady }: UseHistoricalLoa
           });
         })
         .finally(() => {
-          isLoadingRef.current = false;
+          if (generation === requestGenerationRef.current) {
+            isLoadingRef.current = false;
+          }
         });
     },
     [prependCandles],

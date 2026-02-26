@@ -149,13 +149,8 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
       }
     });
 
-    // Connect with subscriptions (trade + orderbook only, no ticker needed)
-    manager.connect([
-      { type: 'trade', codes: [symbol], isOnlyRealtime: true },
-      { type: 'orderbook', codes: [symbol], isOnlyRealtime: true },
-    ]);
-
-    // Fetch initial candle data via REST
+    // Fetch initial candle data via REST, then connect WS after data is loaded
+    // to prevent live trades from being overwritten by the REST response.
     setKlineLoading(true);
     fetchUpbitCandles(symbol, interval)
       .then((candles) => {
@@ -174,9 +169,13 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
         useToastStore.getState().addToast(`Failed to load chart data for ${symbol}`, 'error');
       })
       .finally(() => {
-        if (isActive) {
-          setKlineLoading(false);
-        }
+        if (!isActive) return;
+        setKlineLoading(false);
+        // Connect WS after initial candle data is loaded to maintain data consistency
+        manager.connect([
+          { type: 'trade', codes: [symbol], isOnlyRealtime: true },
+          { type: 'orderbook', codes: [symbol], isOnlyRealtime: true },
+        ]);
       });
 
     // Fetch initial orderbook via REST
