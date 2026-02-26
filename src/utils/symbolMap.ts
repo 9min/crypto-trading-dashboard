@@ -2,8 +2,8 @@
 // Symbol Mapping Utility
 // =============================================================================
 // Converts symbols between Binance format (e.g., "BTCUSDT") and Upbit format
-// (e.g., "KRW-BTC"). Only maps watchlist default symbols — not the entire
-// exchange catalog.
+// (e.g., "KRW-BTC"). Covers popular KRW-listed coins on Upbit that also
+// trade as USDT pairs on Binance.
 // =============================================================================
 
 // -----------------------------------------------------------------------------
@@ -11,18 +11,42 @@
 // -----------------------------------------------------------------------------
 
 /**
- * Maps Binance symbols to Upbit market codes.
- * Only covers the default watchlist symbols.
+ * Maps Binance symbols to Upbit KRW market codes.
+ * Covers popular coins listed on both exchanges.
+ * BNB, UNI, MKR, COMP, DYDX etc. are excluded (not on Upbit KRW market).
  */
 const BINANCE_TO_UPBIT_MAP: ReadonlyMap<string, string> = new Map([
+  // --- Default watchlist ---
   ['BTCUSDT', 'KRW-BTC'],
   ['ETHUSDT', 'KRW-ETH'],
-  // BNB is not listed on Upbit (Binance-native token)
   ['SOLUSDT', 'KRW-SOL'],
   ['XRPUSDT', 'KRW-XRP'],
   ['DOGEUSDT', 'KRW-DOGE'],
   ['ADAUSDT', 'KRW-ADA'],
   ['AVAXUSDT', 'KRW-AVAX'],
+  // --- Popular alts verified on Upbit KRW market (2026-02) ---
+  ['DOTUSDT', 'KRW-DOT'],
+  ['LINKUSDT', 'KRW-LINK'],
+  ['SHIBUSDT', 'KRW-SHIB'],
+  ['ATOMUSDT', 'KRW-ATOM'],
+  ['NEARUSDT', 'KRW-NEAR'],
+  ['BCHUSDT', 'KRW-BCH'],
+  ['APTUSDT', 'KRW-APT'],
+  ['ARBUSDT', 'KRW-ARB'],
+  ['XLMUSDT', 'KRW-XLM'],
+  ['VETUSDT', 'KRW-VET'],
+  ['HBARUSDT', 'KRW-HBAR'],
+  ['SANDUSDT', 'KRW-SAND'],
+  ['AXSUSDT', 'KRW-AXS'],
+  ['THETAUSDT', 'KRW-THETA'],
+  ['FLOWUSDT', 'KRW-FLOW'],
+  ['XTZUSDT', 'KRW-XTZ'],
+  ['NEOUSDT', 'KRW-NEO'],
+  ['CHZUSDT', 'KRW-CHZ'],
+  ['GMTUSDT', 'KRW-GMT'],
+  ['SUIUSDT', 'KRW-SUI'],
+  ['SEIUSDT', 'KRW-SEI'],
+  ['AAVEUSDT', 'KRW-AAVE'],
 ]);
 
 /**
@@ -38,7 +62,7 @@ const UPBIT_TO_BINANCE_MAP: ReadonlyMap<string, string> = new Map(
 // -----------------------------------------------------------------------------
 
 /**
- * Converts a Binance symbol to an Upbit market code.
+ * Converts an Upbit market code to a Binance symbol.
  * Returns the original symbol if no mapping exists.
  *
  * @example

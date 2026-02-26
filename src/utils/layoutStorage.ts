@@ -117,10 +117,13 @@ export function loadLayout(): ResponsiveLayouts | null {
         return null;
       }
 
-      // Every breakpoint must contain all required widget keys
-      const itemKeys = new Set((value as Array<{ i: string }>).map((item) => item.i));
-      for (const required of REQUIRED_WIDGET_KEYS) {
-        if (!itemKeys.has(required)) {
+      // Validate that each item's key is a known widget key (structural validation).
+      // We no longer require ALL widget keys to be present — users may intentionally
+      // hide widgets via the widget selector.
+      const validKeys = new Set<string>(REQUIRED_WIDGET_KEYS);
+      const items = value as Array<{ i: string }>;
+      for (const item of items) {
+        if (!validKeys.has(item.i)) {
           clearStoredLayout();
           return null;
         }
@@ -174,6 +177,39 @@ export function onCloudLayoutApplied(callback: (layouts: ResponsiveLayouts) => v
   };
   window.addEventListener(LAYOUT_CHANGE_EVENT, handler);
   return () => window.removeEventListener(LAYOUT_CHANGE_EVENT, handler);
+}
+
+// -----------------------------------------------------------------------------
+// Layout Reset Event
+// -----------------------------------------------------------------------------
+
+/** Custom event name dispatched when user requests a layout reset. */
+const LAYOUT_RESET_EVENT = 'dashboard-layout-reset';
+
+/**
+ * Dispatches a layout reset event. Clears localStorage layout data.
+ * DashboardGrid listens for this event to reset layouts to defaults.
+ */
+export function dispatchLayoutReset(): void {
+  clearStoredLayout();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(LAYOUT_RESET_EVENT));
+  }
+}
+
+/**
+ * Subscribes to layout reset events.
+ * Returns an unsubscribe function.
+ */
+export function onLayoutReset(callback: () => void): () => void {
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+  const handler = (): void => {
+    callback();
+  };
+  window.addEventListener(LAYOUT_RESET_EVENT, handler);
+  return () => window.removeEventListener(LAYOUT_RESET_EVENT, handler);
 }
 
 // -----------------------------------------------------------------------------

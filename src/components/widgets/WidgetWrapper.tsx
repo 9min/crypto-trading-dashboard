@@ -20,6 +20,8 @@ interface WidgetWrapperProps {
   children: ReactNode;
   /** Optional actions rendered at the right side of the header */
   headerActions?: ReactNode;
+  /** Optional close/hide callback. When provided, a close button is rendered. */
+  onClose?: () => void;
 }
 
 // -----------------------------------------------------------------------------
@@ -30,6 +32,7 @@ export const WidgetWrapper = memo(function WidgetWrapper({
   title,
   children,
   headerActions,
+  onClose,
 }: WidgetWrapperProps) {
   return (
     <div className="border-border bg-background-secondary flex h-full flex-col rounded-lg border shadow-[var(--shadow-widget)]">
@@ -40,11 +43,27 @@ export const WidgetWrapper = memo(function WidgetWrapper({
         >
           {title}
         </span>
-        {headerActions ? (
-          <div className="flex items-center" onMouseDown={(e) => e.stopPropagation()}>
-            {headerActions}
-          </div>
-        ) : null}
+        <div className="flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
+          {headerActions}
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-foreground-tertiary hover:text-sell flex h-5 w-5 cursor-pointer items-center justify-center rounded transition-colors"
+              aria-label={`Hide ${title}`}
+            >
+              <svg
+                className="h-3 w-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className="relative min-h-0 flex-1 overflow-hidden">{children}</div>
     </div>

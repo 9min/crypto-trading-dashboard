@@ -7,6 +7,8 @@ import { IntervalSelector } from './IntervalSelector';
 import { ExchangeSelector } from '@/components/ui/ExchangeSelector';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { PriceAlertPopover } from '@/components/ui/PriceAlertPopover';
+import { WidgetSelector } from '@/components/ui/WidgetSelector';
+import { ResetLayoutButton } from '@/components/ui/ResetLayoutButton';
 import { UserMenu } from '@/components/ui/UserMenu';
 import { formatSymbol, formatUpbitSymbol } from '@/utils/formatSymbol';
 import { toUpbitSymbol } from '@/utils/symbolMap';
@@ -34,6 +36,8 @@ export const DashboardHeader = memo(function DashboardHeader() {
       <div className="flex items-center gap-1.5">
         <ConnectionStatus />
         <div className="bg-border mx-1 h-4 w-px" />
+        <WidgetSelector />
+        <ResetLayoutButton />
         <PriceAlertPopover />
         <ThemeToggle />
         <UserMenu />

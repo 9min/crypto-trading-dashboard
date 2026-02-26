@@ -147,20 +147,18 @@ describe('layoutStorage', () => {
       expect(loadLayout()).toBeNull();
     });
 
-    it('returns null when a required widget key is missing and cleans up storage', () => {
+    it('accepts layout with subset of widget keys (user may hide widgets)', () => {
       const layouts = {
         lg: [
           { i: 'candlestick', x: 0, y: 0, w: 8, h: 14 },
-          // Missing other required keys
+          // Only one widget — valid because users can hide widgets
         ],
       };
 
       mockStorage.set(STORAGE_KEY, JSON.stringify(layouts));
       mockStorage.set(VERSION_KEY, String(LAYOUT_VERSION));
 
-      expect(loadLayout()).toBeNull();
-      expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
-      expect(localStorage.removeItem).toHaveBeenCalledWith(VERSION_KEY);
+      expect(loadLayout()).toEqual(layouts);
     });
 
     it('cleans up storage when layout structure is invalid', () => {

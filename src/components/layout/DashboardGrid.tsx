@@ -25,11 +25,14 @@ import {
   ResponsiveGridLayout,
   useContainerWidth,
   type Layout,
+  type LayoutItem as RGLLayoutItem,
   type ResponsiveLayouts,
 } from 'react-grid-layout';
-import { saveLayout, loadLayout, onCloudLayoutApplied } from '@/utils/layoutStorage';
+import { saveLayout, loadLayout, onCloudLayoutApplied, onLayoutReset } from '@/utils/layoutStorage';
 import { useAuthStore } from '@/stores/authStore';
 import { upsertPreferences } from '@/lib/supabase/preferencesService';
+import { useWidgetStore } from '@/stores/widgetStore';
+import { WIDGET_METADATA, type WidgetType } from '@/types/widget';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { CandlestickWidget } from '@/components/widgets/CandlestickWidget';
 import { OrderBookWidget } from '@/components/widgets/OrderBookWidget';
@@ -58,8 +61,8 @@ const GRID_COLS = { lg: 12, md: 10, sm: 6 } as const;
 const GRID_ROW_HEIGHT = 30;
 const GRID_MARGIN: [number, number] = [8, 8];
 
-// Default layouts for each breakpoint
-const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
+// Default layouts for each breakpoint (exported for reset functionality)
+export const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
   lg: [
     // Row 1: Chart(9) + OrderBook(3) — primary data
     { i: 'candlestick', x: 0, y: 0, w: 9, h: 14 },
@@ -107,6 +110,21 @@ const getServerSnapshot = (): boolean => false;
 // Component
 // -----------------------------------------------------------------------------
 
+/**
+ * Creates a default layout item for a widget being re-shown.
+ * Places it at the bottom of the grid (y = 100 lets react-grid-layout compact it).
+ */
+function createDefaultLayoutItem(key: string, breakpointCols: number): RGLLayoutItem {
+  const meta = WIDGET_METADATA[key as WidgetType];
+  return {
+    i: key,
+    x: 0,
+    y: 100, // Large y value — react-grid-layout will compact upward
+    w: Math.min(meta?.defaultW ?? 3, breakpointCols),
+    h: meta?.defaultH ?? 10,
+  };
+}
+
 export const DashboardGrid = memo(function DashboardGrid() {
   const { width, containerRef } = useContainerWidth();
 
@@ -119,7 +137,9 @@ export const DashboardGrid = memo(function DashboardGrid() {
     () => loadLayout() ?? DEFAULT_LAYOUTS,
   );
 
-  const widgets: GridWidget[] = useMemo(
+  const visibleWidgets = useWidgetStore((state) => state.visibleWidgets);
+
+  const allWidgets: GridWidget[] = useMemo(
     () => [
       { key: 'candlestick', title: 'Chart', component: <CandlestickWidget /> },
       { key: 'orderbook', title: 'Order Book', component: <OrderBookWidget /> },
@@ -132,10 +152,62 @@ export const DashboardGrid = memo(function DashboardGrid() {
     [],
   );
 
+  // Filter widgets by visibility
+  const widgets = useMemo(
+    () => allWidgets.filter((w) => visibleWidgets.has(w.key as WidgetType)),
+    [allWidgets, visibleWidgets],
+  );
+
+  // Filter layouts to only include visible widget keys, adding defaults for
+  // newly shown widgets that don't have a saved position.
+  const filteredLayouts = useMemo(() => {
+    const result: Record<string, RGLLayoutItem[]> = {};
+
+    for (const bp of ['lg', 'md', 'sm'] as const) {
+      const bpLayouts = layouts[bp] ?? [];
+      const bpCols = GRID_COLS[bp];
+      const filtered: RGLLayoutItem[] = [];
+      const existingKeys = new Set<string>();
+
+      // Keep only layout items for visible widgets
+      for (const item of bpLayouts) {
+        if (visibleWidgets.has(item.i as WidgetType)) {
+          filtered.push({ ...item });
+          existingKeys.add(item.i);
+        }
+      }
+
+      // Add default items for visible widgets that don't have a saved layout
+      for (const type of visibleWidgets) {
+        if (!existingKeys.has(type)) {
+          filtered.push(createDefaultLayoutItem(type, bpCols));
+        }
+      }
+
+      result[bp] = filtered;
+    }
+
+    return result as ResponsiveLayouts<'lg' | 'md' | 'sm'>;
+  }, [layouts, visibleWidgets]);
+
   const debouncedCloudSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleLayoutChange = useCallback(
     (_layout: Layout, allLayouts: ResponsiveLayouts<'lg' | 'md' | 'sm'>) => {
+      // Merge back: keep layout entries for hidden widgets from the previous
+      // layouts so they're restored when the widget is shown again.
+      setLayouts((prev) => {
+        const merged: Record<string, RGLLayoutItem[]> = {};
+        for (const bp of ['lg', 'md', 'sm'] as const) {
+          const newItems = allLayouts[bp] ?? [];
+          const newKeys = new Set(newItems.map((item) => item.i));
+          // Bring forward hidden widget positions from previous layouts
+          const hiddenItems = (prev[bp] ?? []).filter((item) => !newKeys.has(item.i));
+          merged[bp] = [...newItems, ...hiddenItems];
+        }
+        return merged as ResponsiveLayouts<'lg' | 'md' | 'sm'>;
+      });
+
       saveLayout(allLayouts);
 
       // Sync to Supabase if user is logged in (debounced)
@@ -164,6 +236,24 @@ export const DashboardGrid = memo(function DashboardGrid() {
     });
   }, []);
 
+  // Listen for layout reset events (from ResetLayoutButton)
+  useEffect(() => {
+    return onLayoutReset(() => {
+      setLayouts(DEFAULT_LAYOUTS);
+
+      // Sync reset to Supabase if logged in
+      const user = useAuthStore.getState().user;
+      if (user) {
+        void upsertPreferences(user.id, { layout: DEFAULT_LAYOUTS }).catch((error) => {
+          console.error('[DashboardGrid] Failed to sync layout reset to cloud', {
+            timestamp: Date.now(),
+            error,
+          });
+        });
+      }
+    });
+  }, []);
+
   // Cleanup debounce timer on unmount
   useEffect(() => {
     return () => {
@@ -179,7 +269,7 @@ export const DashboardGrid = memo(function DashboardGrid() {
         <ResponsiveGridLayout
           className="layout"
           width={width}
-          layouts={layouts}
+          layouts={filteredLayouts}
           breakpoints={GRID_BREAKPOINTS}
           cols={GRID_COLS}
           rowHeight={GRID_ROW_HEIGHT}
