@@ -5,7 +5,12 @@
 // All functions include exponential backoff retry for transient failures.
 // =============================================================================
 
-import type { UpbitKlineCandle, UpbitOrderBookResponse, UpbitTickerResponse } from '@/types/upbit';
+import type {
+  UpbitKlineCandle,
+  UpbitOrderBookResponse,
+  UpbitTickerResponse,
+  UpbitTradeTickResponse,
+} from '@/types/upbit';
 import type { CandleData } from '@/types/chart';
 
 // -----------------------------------------------------------------------------
@@ -136,6 +141,30 @@ export async function fetchUpbitOrderBook(market: string): Promise<UpbitOrderBoo
     throw new Error(`No orderbook data for ${market}`);
   }
   return raw[0];
+}
+
+// -----------------------------------------------------------------------------
+// Recent Trades (Ticks)
+// -----------------------------------------------------------------------------
+
+/**
+ * Fetches recent trade ticks from the Upbit REST API.
+ * Used as a fallback when WebSocket is unavailable (e.g., on Vercel).
+ *
+ * @param market - Upbit market code (e.g., "KRW-BTC")
+ * @param count - Number of trades to fetch (default: 20, max: 200)
+ * @returns Array of UpbitTradeTickResponse (newest first)
+ */
+export async function fetchUpbitTrades(
+  market: string,
+  count = 20,
+): Promise<UpbitTradeTickResponse[]> {
+  const params = new URLSearchParams({
+    market,
+    count: String(Math.min(count, 200)),
+  });
+  const url = `${UPBIT_REST_BASE_URL}/trades/ticks?${params}`;
+  return fetchWithRetry<UpbitTradeTickResponse[]>(url);
 }
 
 // -----------------------------------------------------------------------------

@@ -178,6 +178,33 @@ interface UpbitOrderBookResponse {
 }
 
 /**
+ * Upbit REST API recent trades (ticks) response.
+ * From `/v1/trades/ticks`.
+ */
+interface UpbitTradeTickResponse {
+  /** Market code (e.g., "KRW-BTC") */
+  market: string;
+  /** Trade date (UTC, e.g., "2024-01-15") */
+  trade_date_utc: string;
+  /** Trade time (UTC, e.g., "12:00:00") */
+  trade_time_utc: string;
+  /** Trade timestamp (ms) */
+  timestamp: number;
+  /** Trade price */
+  trade_price: number;
+  /** Trade volume */
+  trade_volume: number;
+  /** Previous closing price */
+  prev_closing_price: number;
+  /** Absolute change price */
+  change_price: number;
+  /** Ask/bid type: ASK (sell) or BID (buy) */
+  ask_bid: 'ASK' | 'BID';
+  /** Sequential ID for deduplication */
+  sequential_id: number;
+}
+
+/**
  * Upbit REST API ticker response.
  * From `/v1/ticker`.
  */
@@ -219,5 +246,6 @@ export type {
   UpbitSubscription,
   UpbitKlineCandle,
   UpbitOrderBookResponse,
+  UpbitTradeTickResponse,
   UpbitTickerResponse,
 };

@@ -5,6 +5,9 @@
 //   1. Fetches initial ticker data via REST API
 //   2. Connects to Upbit WebSocket for real-time ticker updates
 //   3. Routes ticker events to the watchlist store
+//
+// When WebSocket is unavailable (e.g., on Vercel), automatically falls back
+// to REST API polling for ticker updates.
 // =============================================================================
 
 import { useEffect } from 'react';
@@ -13,6 +16,8 @@ import { createUpbitMessageRouter } from '@/lib/upbit/messageRouter';
 import { fetchUpbitTickers } from '@/lib/upbit/restClient';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { toBinanceSymbol } from '@/utils/symbolMap';
+import { REST_POLL_TICKER_INTERVAL_MS } from '@/utils/constants';
+import type { ConnectionState } from '@/types/chart';
 import type { UpbitTickerEvent } from '@/types/upbit';
 
 // -----------------------------------------------------------------------------
@@ -39,13 +44,9 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
     if (symbols.length === 0) return;
 
     let isActive = true;
+    let pollIntervalId: ReturnType<typeof setInterval> | null = null;
 
-    // We use a separate UpbitWebSocketManager instance for watchlist
-    // to avoid interfering with the main stream. However, since
-    // UpbitWebSocketManager is a singleton, we create a dedicated
-    // manager for watchlist by using a different approach — we subscribe
-    // to ticker events on the same WS connection when available, or
-    // use REST polling as the primary source.
+    const manager = UpbitWebSocketManager.getInstance();
 
     // -- REST API: Initial ticker fetch --
     setLoading(true);
@@ -74,9 +75,45 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
         setLoading(false);
       });
 
-    // -- WebSocket: ticker stream for real-time updates --
-    // Use the singleton manager, subscribe to ticker only for watchlist symbols
-    const manager = UpbitWebSocketManager.getInstance();
+    // -----------------------------------------------------------------------
+    // REST Polling Fallback
+    // -----------------------------------------------------------------------
+
+    const startPolling = (): void => {
+      if (pollIntervalId !== null) return; // Already polling
+
+      pollIntervalId = setInterval(() => {
+        if (!isActive) return;
+
+        fetchUpbitTickers(symbols)
+          .then((responses) => {
+            if (!isActive) return;
+
+            for (const r of responses) {
+              updateTicker(toBinanceSymbol(r.market), {
+                price: r.trade_price,
+                priceChangePercent: r.signed_change_rate * 100,
+                volume: r.acc_trade_price_24h,
+                lastUpdateTime: r.trade_timestamp,
+              });
+            }
+          })
+          .catch(() => {
+            // Silently ignore polling errors to avoid toast spam
+          });
+      }, REST_POLL_TICKER_INTERVAL_MS);
+    };
+
+    const stopPolling = (): void => {
+      if (pollIntervalId !== null) {
+        clearInterval(pollIntervalId);
+        pollIntervalId = null;
+      }
+    };
+
+    // -----------------------------------------------------------------------
+    // WebSocket: ticker stream for real-time updates
+    // -----------------------------------------------------------------------
 
     const handleTicker = (event: UpbitTickerEvent): void => {
       if (!isActive) return;
@@ -93,6 +130,17 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
       onTicker: handleTicker,
     });
 
+    // Track WS state to detect failures and start polling
+    const unsubscribeState = manager.onStateChange((state: ConnectionState): void => {
+      if (!isActive) return;
+
+      if (state.status === 'failed') {
+        startPolling();
+      } else if (state.status === 'connected') {
+        stopPolling();
+      }
+    });
+
     // Connect with ticker subscription for all watchlist symbols
     manager.connect([{ type: 'ticker', codes: symbols, isOnlyRealtime: true }]);
 
@@ -100,7 +148,9 @@ export function useUpbitWatchlistStream(params: UseUpbitWatchlistStreamParams): 
 
     return () => {
       isActive = false;
+      stopPolling();
       unsubscribe();
+      unsubscribeState();
       manager.disconnect();
     };
   }, [symbols, setTickers, updateTicker, setLoading]);

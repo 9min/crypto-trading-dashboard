@@ -98,6 +98,8 @@ interface TradeEntry {
  *   connected -> reconnecting -> connected
  *   reconnecting -> failed
  *   failed -> connecting (manual retry)
+ *   failed -> polling (automatic REST fallback)
+ *   polling -> connecting (manual retry)
  */
 type ConnectionState =
   | { /** No connection has been initiated */ status: 'idle' }
@@ -113,6 +115,10 @@ type ConnectionState =
   | {
       /** All reconnection attempts exhausted or fatal error */ status: 'failed';
       /** Human-readable error description */ error: string;
+    }
+  | {
+      /** WebSocket unavailable, using REST API polling as fallback */ status: 'polling';
+      /** Timestamp when polling started (ms) */ startedAt: number;
     };
 
 // -----------------------------------------------------------------------------

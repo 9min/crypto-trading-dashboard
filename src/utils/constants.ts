@@ -21,6 +21,15 @@ export const RECONNECT_BASE_DELAY_MS = 1000;
 export const HEARTBEAT_TIMEOUT_MS = 30000;
 export const WS_MAX_RECONNECT_ATTEMPTS = 10;
 
+/** Upbit WS uses fewer attempts before falling back to REST polling */
+export const UPBIT_WS_MAX_RECONNECT_ATTEMPTS = 3;
+
+/** REST polling interval for candles, orderbook, and trades (ms) */
+export const REST_POLL_INTERVAL_MS = 3_000;
+
+/** REST polling interval for watchlist tickers (ms) */
+export const REST_POLL_TICKER_INTERVAL_MS = 5_000;
+
 export const DEFAULT_WATCHLIST_SYMBOLS = [
   'BTCUSDT',
   'ETHUSDT',

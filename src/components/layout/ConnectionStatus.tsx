@@ -3,6 +3,7 @@
 import { memo, useCallback } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { WebSocketManager } from '@/lib/websocket/WebSocketManager';
+import { UpbitWebSocketManager } from '@/lib/upbit/UpbitWebSocketManager';
 import { Button } from '@/components/ui/Button';
 
 interface StatusConfig {
@@ -13,10 +14,15 @@ interface StatusConfig {
 
 export const ConnectionStatus = memo(function ConnectionStatus() {
   const connectionState = useUiStore((state) => state.connectionState);
+  const exchange = useUiStore((state) => state.exchange);
 
   const handleReconnect = useCallback(() => {
-    WebSocketManager.getInstance().reconnect();
-  }, []);
+    if (exchange === 'upbit') {
+      UpbitWebSocketManager.getInstance().reconnect();
+    } else {
+      WebSocketManager.getInstance().reconnect();
+    }
+  }, [exchange]);
 
   const getStatusConfig = (): StatusConfig => {
     switch (connectionState.status) {
@@ -30,6 +36,8 @@ export const ConnectionStatus = memo(function ConnectionStatus() {
           label: `Reconnecting (${connectionState.attempt})...`,
           pulse: true,
         };
+      case 'polling':
+        return { color: 'bg-reconnecting', label: 'REST Polling', pulse: false };
       case 'failed':
         return { color: 'bg-disconnected', label: 'Disconnected', pulse: false };
       case 'idle':
@@ -39,7 +47,7 @@ export const ConnectionStatus = memo(function ConnectionStatus() {
   };
 
   const config = getStatusConfig();
-  const isFailed = connectionState.status === 'failed';
+  const showReconnect = connectionState.status === 'failed' || connectionState.status === 'polling';
 
   return (
     <div data-testid="connection-status" className="flex items-center gap-2">
@@ -54,7 +62,7 @@ export const ConnectionStatus = memo(function ConnectionStatus() {
         />
       </div>
       <span className="text-foreground-secondary text-[11px]">{config.label}</span>
-      {isFailed && (
+      {showReconnect && (
         <Button variant="ghost" size="sm" onClick={handleReconnect}>
           Reconnect
         </Button>
