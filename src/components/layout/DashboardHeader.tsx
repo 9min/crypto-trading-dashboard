@@ -19,7 +19,10 @@ export const DashboardHeader = memo(function DashboardHeader() {
     exchange === 'upbit' ? formatUpbitSymbol(toUpbitSymbol(symbol)) : formatSymbol(symbol);
 
   return (
-    <header className="border-border bg-background-secondary flex h-12 shrink-0 items-center justify-between border-b px-4">
+    <header
+      data-testid="dashboard-header"
+      className="border-border bg-background-secondary flex h-12 shrink-0 items-center justify-between border-b px-4"
+    >
       <div className="flex items-center gap-4">
         <h1 className="text-accent text-sm font-bold tracking-wide">CryptoDash - 9min</h1>
         <div className="bg-border h-5 w-px" />

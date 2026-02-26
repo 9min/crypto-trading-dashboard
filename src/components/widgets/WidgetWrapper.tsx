@@ -34,7 +34,10 @@ export const WidgetWrapper = memo(function WidgetWrapper({
   return (
     <div className="border-border bg-background-secondary flex h-full flex-col rounded-lg border">
       <div className="widget-drag-handle border-border bg-background-tertiary relative z-10 flex h-8 shrink-0 cursor-grab items-center justify-between border-b px-3 transition-colors active:cursor-grabbing">
-        <span className="border-accent text-foreground-secondary border-l-2 pl-2 text-xs font-medium">
+        <span
+          data-testid="widget-title"
+          className="border-accent text-foreground-secondary border-l-2 pl-2 text-xs font-medium"
+        >
           {title}
         </span>
         {headerActions ? (
