@@ -238,16 +238,16 @@ export class DepthChartRenderer implements CanvasRenderer {
   // -- Drawing ----------------------------------------------------------------
 
   private draw(): void {
-    performance.clearMarks('depth-chart-draw-start');
-    performance.clearMarks('depth-chart-draw-end');
-    performance.clearMeasures('depth-chart-draw');
-    performance.mark('depth-chart-draw-start');
-
     const { bids, asks } = useDepthStore.getState();
     const { ctx, width, height } = this;
 
     if (width === 0 || height === 0) return;
     if (this.chartWidth <= 0 || this.chartHeight <= 0) return;
+
+    performance.clearMarks('depth-chart-draw-start');
+    performance.clearMarks('depth-chart-draw-end');
+    performance.clearMeasures('depth-chart-draw');
+    performance.mark('depth-chart-draw-start');
 
     // Clear
     ctx.fillStyle = this.colors.background;

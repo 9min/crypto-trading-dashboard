@@ -140,15 +140,15 @@ export class TradesFeedRenderer implements CanvasRenderer {
   // -- Drawing ----------------------------------------------------------------
 
   private draw(): void {
-    performance.clearMarks('tradesfeed-draw-start');
-    performance.clearMarks('tradesfeed-draw-end');
-    performance.clearMeasures('tradesfeed-draw');
-    performance.mark('tradesfeed-draw-start');
-
     const { buffer } = useTradeStore.getState();
     const { ctx, width, height, colors } = this;
 
     if (width === 0 || height === 0) return;
+
+    performance.clearMarks('tradesfeed-draw-start');
+    performance.clearMarks('tradesfeed-draw-end');
+    performance.clearMeasures('tradesfeed-draw');
+    performance.mark('tradesfeed-draw-start');
 
     // Clear
     ctx.fillStyle = colors.background;

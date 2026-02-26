@@ -134,15 +134,15 @@ export class OrderBookRenderer implements CanvasRenderer {
   // -- Drawing ----------------------------------------------------------------
 
   private draw(): void {
-    performance.clearMarks('orderbook-draw-start');
-    performance.clearMarks('orderbook-draw-end');
-    performance.clearMeasures('orderbook-draw');
-    performance.mark('orderbook-draw-start');
-
     const { bids, asks } = useDepthStore.getState();
     const { ctx, width, height, colors } = this;
 
     if (width === 0 || height === 0) return;
+
+    performance.clearMarks('orderbook-draw-start');
+    performance.clearMarks('orderbook-draw-end');
+    performance.clearMeasures('orderbook-draw');
+    performance.mark('orderbook-draw-start');
 
     // Clear
     ctx.fillStyle = colors.background;
