@@ -44,7 +44,7 @@ describe('symbolMap', () => {
     });
 
     it('returns original symbol when no mapping exists', () => {
-      expect(toUpbitSymbol('SHIBUSDT')).toBe('SHIBUSDT');
+      expect(toUpbitSymbol('TRUMPUSDT')).toBe('TRUMPUSDT');
     });
 
     it('returns original for empty string', () => {
@@ -81,7 +81,7 @@ describe('symbolMap', () => {
     });
 
     it('returns original symbol when no mapping exists', () => {
-      expect(toBinanceSymbol('KRW-SHIB')).toBe('KRW-SHIB');
+      expect(toBinanceSymbol('KRW-TRUMP')).toBe('KRW-TRUMP');
     });
 
     it('returns original for empty string', () => {
