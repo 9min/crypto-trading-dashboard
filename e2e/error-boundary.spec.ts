@@ -45,28 +45,32 @@ test.describe('Error boundary', () => {
         body: JSON.stringify({ result: 'success', base_code: 'USD', rates: { KRW: 1380 } }),
       }),
     );
-    await mockBinanceWebSocket(page);
+    const cleanupWs = await mockBinanceWebSocket(page);
 
-    await page.goto('/');
-    await page.waitForSelector('[data-testid="dashboard-header"]', { timeout: 15000 });
+    try {
+      await page.goto('/');
+      await page.waitForSelector('[data-testid="dashboard-header"]', { timeout: 15000 });
 
-    // Wait for widgets to render (some may error)
-    await page.waitForTimeout(3000);
+      // Wait for widgets to render (some may error)
+      await page.waitForTimeout(3000);
 
-    // The header should remain fully visible and functional
-    const header = page.getByTestId('dashboard-header');
-    await expect(header).toBeVisible();
-    await expect(header).toContainText('CryptoDash - 9min');
+      // The header should remain fully visible and functional
+      const header = page.getByTestId('dashboard-header');
+      await expect(header).toBeVisible();
+      await expect(header).toContainText('CryptoDash - 9min');
 
-    // Exchange buttons should still work
-    await expect(page.getByTestId('exchange-binance')).toBeVisible();
-    await expect(page.getByTestId('theme-toggle')).toBeVisible();
+      // Exchange buttons should still work
+      await expect(page.getByTestId('exchange-binance')).toBeVisible();
+      await expect(page.getByTestId('theme-toggle')).toBeVisible();
 
-    // Non-Chart widgets should still render their titles
-    // (at least some widgets should be healthy)
-    const widgetTitles = page.getByTestId('widget-title');
-    const count = await widgetTitles.count();
-    expect(count).toBeGreaterThanOrEqual(1);
+      // Non-Chart widgets should still render their titles
+      // (at least some widgets should be healthy)
+      const widgetTitles = page.getByTestId('widget-title');
+      const count = await widgetTitles.count();
+      expect(count).toBeGreaterThanOrEqual(1);
+    } finally {
+      cleanupWs();
+    }
   });
 
   test('error fallback shows widget name and retry button', async ({ page }) => {
@@ -100,39 +104,43 @@ test.describe('Error boundary', () => {
         body: JSON.stringify({ result: 'success', base_code: 'USD', rates: { KRW: 1380 } }),
       }),
     );
-    await mockBinanceWebSocket(page);
+    const cleanupWs = await mockBinanceWebSocket(page);
 
-    await page.goto('/');
-    await page.waitForSelector('[data-testid="dashboard-header"]', { timeout: 15000 });
-    await page.waitForTimeout(3000);
+    try {
+      await page.goto('/');
+      await page.waitForSelector('[data-testid="dashboard-header"]', { timeout: 15000 });
+      await page.waitForTimeout(3000);
 
-    // ErrorFallback should display "{widgetName} error" text and a Retry button
-    const errorText = page.locator('text=/error/i');
-    const errorCount = await errorText.count();
-
-    if (errorCount > 0) {
-      // At least one error fallback is visible with a Retry button
+      // ErrorFallback must display error text and a Retry button
       const retryButton = page.locator('button:has-text("Retry")');
+      const retryCount = await retryButton.count();
+      expect(retryCount).toBeGreaterThan(0);
       await expect(retryButton.first()).toBeVisible();
-    }
 
-    // Dashboard should remain functional regardless
-    await expect(page.getByTestId('dashboard-header')).toBeVisible();
+      // Dashboard should remain functional regardless
+      await expect(page.getByTestId('dashboard-header')).toBeVisible();
+    } finally {
+      cleanupWs();
+    }
   });
 
   test('healthy dashboard has all 7 widgets with no error fallbacks', async ({ page }) => {
     // Use normal mocks — everything should work
     await mockBinanceRest(page);
-    await mockBinanceWebSocket(page);
+    const cleanupWs = await mockBinanceWebSocket(page);
 
-    await page.goto('/');
-    await page.waitForSelector('[data-testid="widget-title"]', { timeout: 15000 });
+    try {
+      await page.goto('/');
+      await page.waitForSelector('[data-testid="widget-title"]', { timeout: 15000 });
 
-    // All 7 widgets should render their titles
-    await expect(page.getByTestId('widget-title')).toHaveCount(7);
+      // All 7 widgets should render their titles
+      await expect(page.getByTestId('widget-title')).toHaveCount(7);
 
-    // No Retry buttons should be visible (no errors)
-    const retryButtons = page.locator('button:has-text("Retry")');
-    await expect(retryButtons).toHaveCount(0);
+      // No Retry buttons should be visible (no errors)
+      const retryButtons = page.locator('button:has-text("Retry")');
+      await expect(retryButtons).toHaveCount(0);
+    } finally {
+      cleanupWs();
+    }
   });
 });

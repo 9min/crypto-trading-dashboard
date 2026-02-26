@@ -30,10 +30,16 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', 'e2e/**/*.ts'],
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts'],
     rules: {
       'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    files: ['e2e/**/*.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
 ]);
