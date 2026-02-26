@@ -105,6 +105,8 @@ export const WidgetSelector = memo(function WidgetSelector() {
                 <button
                   key={type}
                   type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={isVisible}
                   onClick={() => handleWidgetToggle(type)}
                   disabled={isLastVisible}
                   className={`flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors ${

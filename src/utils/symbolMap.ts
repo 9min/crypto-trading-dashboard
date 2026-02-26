@@ -62,7 +62,7 @@ const UPBIT_TO_BINANCE_MAP: ReadonlyMap<string, string> = new Map(
 // -----------------------------------------------------------------------------
 
 /**
- * Converts a Binance symbol to an Upbit market code.
+ * Converts an Upbit market code to a Binance symbol.
  * Returns the original symbol if no mapping exists.
  *
  * @example
