@@ -70,6 +70,7 @@ export class TradesFeedRenderer implements CanvasRenderer {
   private height = 0;
   private colors: TradesFeedColors;
   private lastRenderedTradeId = -1;
+  private readonly timezoneOffsetMs = new Date().getTimezoneOffset() * -60_000;
 
   constructor(ctx: CanvasRenderingContext2D, colors?: Partial<TradesFeedColors>) {
     this.ctx = ctx;
@@ -122,6 +123,10 @@ export class TradesFeedRenderer implements CanvasRenderer {
   // -- Drawing ----------------------------------------------------------------
 
   private draw(): void {
+    if (process.env.NODE_ENV === 'development') {
+      performance.mark('trades-draw-start');
+    }
+
     const { buffer } = useTradeStore.getState();
     const { ctx, width, height, colors } = this;
 
@@ -162,6 +167,11 @@ export class TradesFeedRenderer implements CanvasRenderer {
       }
 
       this.drawTradeRowFromFields(price, quantity, time, isBuyerMaker === 1, y, col1X, col2X);
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      performance.mark('trades-draw-end');
+      performance.measure('trades-draw', 'trades-draw-start', 'trades-draw-end');
     }
   }
 
@@ -231,11 +241,12 @@ export class TradesFeedRenderer implements CanvasRenderer {
   // -- Helpers ----------------------------------------------------------------
 
   private formatTime(timestamp: number): string {
-    const date = new Date(timestamp);
-    const h = String(date.getHours()).padStart(2, '0');
-    const m = String(date.getMinutes()).padStart(2, '0');
-    const s = String(date.getSeconds()).padStart(2, '0');
-    return `${h}:${m}:${s}`;
+    const local = (timestamp + this.timezoneOffsetMs) % 86_400_000;
+    const totalSeconds = Math.floor(local / 1000);
+    const h = Math.floor(totalSeconds / 3600) % 24;
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${h < 10 ? '0' : ''}${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
   }
 
   private formatQuantity(qty: number): string {
