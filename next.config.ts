@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     { source: '/api/upbit/candles/:path*', destination: 'https://api.upbit.com/v1/candles/:path*' },
     { source: '/api/upbit/orderbook', destination: 'https://api.upbit.com/v1/orderbook' },
     { source: '/api/upbit/ticker', destination: 'https://api.upbit.com/v1/ticker' },
+    { source: '/api/upbit/trades/ticks', destination: 'https://api.upbit.com/v1/trades/ticks' },
   ],
 };
 

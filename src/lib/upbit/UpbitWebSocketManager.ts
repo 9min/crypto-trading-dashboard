@@ -14,7 +14,7 @@ import { EXCHANGES } from '@/types/exchange';
 import {
   RECONNECT_MAX_DELAY_MS,
   RECONNECT_BASE_DELAY_MS,
-  WS_MAX_RECONNECT_ATTEMPTS,
+  UPBIT_WS_MAX_RECONNECT_ATTEMPTS,
 } from '@/utils/constants';
 
 // -----------------------------------------------------------------------------
@@ -293,10 +293,10 @@ export class UpbitWebSocketManager {
   private scheduleReconnect(): void {
     if (this.currentSubscriptions.length === 0) return;
 
-    if (this.reconnectAttempt >= WS_MAX_RECONNECT_ATTEMPTS) {
+    if (this.reconnectAttempt >= UPBIT_WS_MAX_RECONNECT_ATTEMPTS) {
       this.setState({
         status: 'failed',
-        error: `Failed to reconnect after ${WS_MAX_RECONNECT_ATTEMPTS} attempts`,
+        error: `Failed to reconnect after ${UPBIT_WS_MAX_RECONNECT_ATTEMPTS} attempts`,
       });
       return;
     }
