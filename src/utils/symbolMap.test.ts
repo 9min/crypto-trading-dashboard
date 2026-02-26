@@ -34,10 +34,13 @@ describe('symbolMap', () => {
     });
 
     it('converts all default watchlist symbols', () => {
-      expect(toUpbitSymbol('BNBUSDT')).toBe('KRW-BNB');
       expect(toUpbitSymbol('XRPUSDT')).toBe('KRW-XRP');
       expect(toUpbitSymbol('ADAUSDT')).toBe('KRW-ADA');
       expect(toUpbitSymbol('AVAXUSDT')).toBe('KRW-AVAX');
+    });
+
+    it('returns BNBUSDT unchanged (not listed on Upbit)', () => {
+      expect(toUpbitSymbol('BNBUSDT')).toBe('BNBUSDT');
     });
 
     it('returns original symbol when no mapping exists', () => {
@@ -67,11 +70,14 @@ describe('symbolMap', () => {
     });
 
     it('converts all default watchlist symbols', () => {
-      expect(toBinanceSymbol('KRW-BNB')).toBe('BNBUSDT');
       expect(toBinanceSymbol('KRW-XRP')).toBe('XRPUSDT');
       expect(toBinanceSymbol('KRW-DOGE')).toBe('DOGEUSDT');
       expect(toBinanceSymbol('KRW-ADA')).toBe('ADAUSDT');
       expect(toBinanceSymbol('KRW-AVAX')).toBe('AVAXUSDT');
+    });
+
+    it('returns KRW-BNB unchanged (not mapped)', () => {
+      expect(toBinanceSymbol('KRW-BNB')).toBe('KRW-BNB');
     });
 
     it('returns original symbol when no mapping exists', () => {

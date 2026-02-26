@@ -21,7 +21,7 @@ import { useExchangeWatchlistStream } from '@/hooks/useExchangeWatchlistStream';
 import { useSparklineData } from '@/hooks/useSparklineData';
 import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol, formatUpbitSymbol } from '@/utils/formatSymbol';
-import { toUpbitSymbol } from '@/utils/symbolMap';
+import { toUpbitSymbol, BINANCE_TO_UPBIT_MAP } from '@/utils/symbolMap';
 import { Sparkline } from '@/components/ui/Sparkline';
 import { WidgetWrapper } from './WidgetWrapper';
 
@@ -108,7 +108,14 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
   const activeSymbol = useUiStore((state) => state.symbol);
   const setSymbol = useUiStore((state) => state.setSymbol);
   const exchange = useUiStore((state) => state.exchange);
-  const symbols = useWatchlistStore((state) => state.symbols);
+  const allSymbols = useWatchlistStore((state) => state.symbols);
+
+  // Filter out symbols not available on the current exchange (e.g., BNB on Upbit)
+  const symbols = useMemo(
+    () =>
+      exchange === 'upbit' ? allSymbols.filter((s) => BINANCE_TO_UPBIT_MAP.has(s)) : allSymbols,
+    [exchange, allSymbols],
+  );
 
   useExchangeWatchlistStream();
 

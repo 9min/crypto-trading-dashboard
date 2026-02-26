@@ -50,7 +50,8 @@ async function fetchWithRetry<T>(url: string, maxRetries = 3): Promise<T> {
       });
 
       if (!response.ok) {
-        if (response.status >= 400 && response.status < 500) {
+        // 429 (Too Many Requests) is retryable — Upbit rate limits concurrent requests
+        if (response.status >= 400 && response.status < 500 && response.status !== 429) {
           throw new Error(`HTTP ${response.status}: Client error (not retryable)`);
         }
         throw new Error(`HTTP ${response.status}`);
@@ -79,25 +80,33 @@ async function fetchWithRetry<T>(url: string, maxRetries = 3): Promise<T> {
  * @param market - Upbit market code (e.g., "KRW-BTC")
  * @param interval - Kline interval (e.g., "1m", "1h", "1d")
  * @param count - Number of candles to fetch (default: 200, max: 200)
+ * @param to - Optional last candle time (exclusive) in ISO 8601 format
+ *             (e.g., "2024-01-15T12:00:00Z"). Fetches candles before this time.
  * @returns Array of CandleData sorted by time ascending
  */
 export async function fetchUpbitCandles(
   market: string,
   interval: string,
   count = 200,
+  to?: string,
 ): Promise<CandleData[]> {
   const endpoint = getUpbitCandleEndpoint(interval);
   const params = new URLSearchParams({
     market,
     count: String(Math.min(count, 200)),
   });
+  if (to !== undefined) {
+    params.set('to', to);
+  }
   const url = `${UPBIT_REST_BASE_URL}${endpoint}?${params}`;
   const raw = await fetchWithRetry<UpbitKlineCandle[]>(url);
 
-  // Upbit returns newest-first; reverse to get time-ascending order
+  // Upbit returns newest-first; reverse to get time-ascending order.
+  // candle_date_time_utc lacks a Z suffix (e.g., "2026-02-26T10:00:00"),
+  // so Date() would parse it as local time. Appending 'Z' forces UTC.
   return raw
     .map((candle) => ({
-      time: Math.floor(new Date(candle.candle_date_time_utc).getTime() / 1000),
+      time: Math.floor(new Date(candle.candle_date_time_utc + 'Z').getTime() / 1000),
       open: candle.opening_price,
       high: candle.high_price,
       low: candle.low_price,

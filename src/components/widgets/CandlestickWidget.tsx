@@ -19,6 +19,7 @@ import type { CandleData } from '@/types/chart';
 import type { Theme } from '@/stores/uiStore';
 import { WidgetWrapper } from './WidgetWrapper';
 import { useIndicatorSeries } from '@/hooks/useIndicatorSeries';
+import { useHistoricalLoader } from '@/hooks/useHistoricalLoader';
 import { IndicatorToggle } from '@/components/ui/IndicatorToggle';
 
 // -----------------------------------------------------------------------------
@@ -131,6 +132,9 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
 
   // Technical indicator series lifecycle
   useIndicatorSeries({ chartRef, isChartReady });
+
+  // Historical candle loading on left-edge scroll
+  useHistoricalLoader({ chartRef, isChartReady });
 
   // Keep colorsRef in sync so the mount effect can read current colors
   colorsRef.current = colors;
@@ -256,7 +260,15 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
 
     const firstTime = candles[0].time;
 
-    // Detect when a full setData is needed:
+    // Detect historical data prepend: more candles AND earlier first candle time.
+    // This means older candles were loaded via infinite scroll — we must update
+    // the full dataset but NOT call fitContent() to preserve scroll position.
+    const isPrepend =
+      prevCandleCountRef.current > 0 &&
+      candles.length > prevCandleCountRef.current &&
+      firstTime < prevFirstTimeRef.current;
+
+    // Detect when a full setData + fitContent is needed:
     // - Initial load (prevCandleCountRef === 0)
     // - Symbol change (length decreased)
     // - Rolling window shift (first candle's time changed while length stayed the same,
@@ -266,10 +278,15 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
       candles.length < prevCandleCountRef.current ||
       (candles.length === prevCandleCountRef.current && prevFirstTimeRef.current !== firstTime);
 
-    if (needsFullReset) {
+    if (isPrepend) {
+      // Historical data prepended — update all data but preserve scroll position
       // @ts-expect-error — lightweight-charts Time is a branded number type,
       // but our CandleData.time is a plain number (UTC seconds). The values are
       // compatible at runtime; the branded type just prevents direct assignment.
+      series.setData(candles.map(toOhlcData));
+      // DO NOT call fitContent() — user is browsing historical data
+    } else if (needsFullReset) {
+      // @ts-expect-error — same branded type issue as above
       series.setData(candles.map(toOhlcData));
       chartRef.current?.timeScale().fitContent();
     } else {
