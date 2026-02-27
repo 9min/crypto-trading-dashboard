@@ -42,10 +42,11 @@ describe('next.config security headers', () => {
       expect(csp).toContain("default-src 'self'");
     });
 
-    it('excludes unsafe-inline and unsafe-eval from script-src in non-dev mode', () => {
-      // Tests run with NODE_ENV=test, so the strict production CSP applies
+    it('allows unsafe-inline but excludes unsafe-eval from script-src in non-dev mode', () => {
+      // Tests run with NODE_ENV=test, so the production CSP applies.
+      // Next.js App Router requires 'unsafe-inline' for RSC hydration scripts.
       expect(csp).not.toContain('unsafe-eval');
-      expect(csp).toContain("script-src 'self'");
+      expect(csp).toContain("script-src 'self' 'unsafe-inline'");
     });
 
     it('allows Binance REST API in connect-src', () => {

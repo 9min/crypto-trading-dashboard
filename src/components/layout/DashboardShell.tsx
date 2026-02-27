@@ -11,13 +11,53 @@
 // =============================================================================
 
 import { memo, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { DashboardHeader } from './DashboardHeader';
-import { DashboardGrid } from './DashboardGrid';
 import { useExchangeWebSocket } from '@/hooks/useExchangeWebSocket';
 import { usePriceAlertMonitor } from '@/hooks/usePriceAlertMonitor';
 import { useSymbolFromUrl } from '@/hooks/useSymbolFromUrl';
 import { useUiStore } from '@/stores/uiStore';
 import { useWidgetStore } from '@/stores/widgetStore';
+
+const DashboardGrid = dynamic(() => import('./DashboardGrid').then((m) => m.DashboardGrid), {
+  ssr: false,
+  loading: () => <DashboardGridSkeleton />,
+});
+
+function DashboardGridSkeleton() {
+  return (
+    <div className="grid h-full grid-cols-12 gap-2 p-2">
+      <div
+        className="bg-background-secondary col-span-9 animate-pulse rounded-lg"
+        style={{ minHeight: 420 }}
+      />
+      <div
+        className="bg-background-secondary col-span-3 animate-pulse rounded-lg"
+        style={{ minHeight: 420 }}
+      />
+      <div
+        className="bg-background-secondary col-span-3 animate-pulse rounded-lg"
+        style={{ minHeight: 300 }}
+      />
+      <div
+        className="bg-background-secondary col-span-2 animate-pulse rounded-lg"
+        style={{ minHeight: 300 }}
+      />
+      <div
+        className="bg-background-secondary col-span-2 animate-pulse rounded-lg"
+        style={{ minHeight: 300 }}
+      />
+      <div
+        className="bg-background-secondary col-span-2 animate-pulse rounded-lg"
+        style={{ minHeight: 300 }}
+      />
+      <div
+        className="bg-background-secondary col-span-3 animate-pulse rounded-lg"
+        style={{ minHeight: 300 }}
+      />
+    </div>
+  );
+}
 
 export const DashboardShell = memo(function DashboardShell() {
   const hydrateExchange = useUiStore((state) => state.hydrateExchange);
