@@ -121,7 +121,7 @@ describe('usePremiumStream', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('binance/ticker/price'),
+        expect.stringContaining('ticker/price?symbol=BTCUSDT'),
         expect.any(Object),
       );
     });
