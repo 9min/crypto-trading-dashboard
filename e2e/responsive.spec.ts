@@ -10,13 +10,13 @@ test.describe('Responsive layout', () => {
     await setupMocks(page);
   });
 
-  test('desktop (1400x900): all 7 widgets visible', async ({ page }) => {
+  test('desktop (1400x900): all 8 widgets visible', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 900 });
     await page.goto('/');
     await page.waitForSelector('[data-testid="widget-title"]', { timeout: 15000 });
 
     const widgetTitles = page.getByTestId('widget-title');
-    await expect(widgetTitles).toHaveCount(7);
+    await expect(widgetTitles).toHaveCount(8);
 
     // All widgets should be visible without scrolling
     const titles = [
@@ -27,6 +27,7 @@ test.describe('Responsive layout', () => {
       'Kimchi Premium',
       'Depth Chart',
       'Performance',
+      'Portfolio',
     ];
 
     for (const title of titles) {
@@ -36,13 +37,13 @@ test.describe('Responsive layout', () => {
     }
   });
 
-  test('tablet (768x1024): all 7 widgets present and visible', async ({ page }) => {
+  test('tablet (768x1024): all 8 widgets present and visible', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.goto('/');
     await page.waitForSelector('[data-testid="widget-title"]', { timeout: 15000 });
 
     const widgetTitles = page.getByTestId('widget-title');
-    await expect(widgetTitles).toHaveCount(7);
+    await expect(widgetTitles).toHaveCount(8);
 
     // Widgets should all be in the DOM
     for (const title of ['Chart', 'Order Book', 'Watchlist']) {
