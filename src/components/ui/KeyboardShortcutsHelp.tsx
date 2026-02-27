@@ -23,18 +23,23 @@ interface KeyboardShortcutsHelpProps {
 // -----------------------------------------------------------------------------
 
 interface ShortcutEntry {
+  id: string;
   keys: string[];
   description: string;
 }
 
 const SHORTCUTS: readonly ShortcutEntry[] = [
-  { keys: ['1', '–', '6'], description: 'Switch timeframe (1m, 5m, 15m, 1h, 4h, 1d)' },
-  { keys: ['/'], description: 'Open symbol search' },
-  { keys: ['Ctrl', 'K'], description: 'Open symbol search' },
-  { keys: ['E'], description: 'Toggle exchange (Binance / Upbit)' },
-  { keys: ['T'], description: 'Toggle theme (dark / light)' },
-  { keys: ['?'], description: 'Show this help' },
-  { keys: ['Esc'], description: 'Close modal' },
+  {
+    id: 'timeframe',
+    keys: ['1', '–', '6'],
+    description: 'Switch timeframe (1m, 5m, 15m, 1h, 4h, 1d)',
+  },
+  { id: 'search-slash', keys: ['/'], description: 'Open symbol search' },
+  { id: 'search-ctrl-k', keys: ['Ctrl', 'K'], description: 'Open symbol search' },
+  { id: 'exchange', keys: ['E'], description: 'Toggle exchange (Binance / Upbit)' },
+  { id: 'theme', keys: ['T'], description: 'Toggle theme (dark / light)' },
+  { id: 'help', keys: ['?'], description: 'Show this help' },
+  { id: 'close', keys: ['Esc'], description: 'Close modal' },
 ] as const;
 
 // -----------------------------------------------------------------------------
@@ -105,20 +110,20 @@ export const KeyboardShortcutsHelp = memo(function KeyboardShortcutsHelp({
         {/* Shortcut list */}
         <div className="space-y-0.5 px-4 py-3">
           {SHORTCUTS.map((shortcut) => (
-            <div key={shortcut.description} className="flex items-center justify-between py-1.5">
+            <div key={shortcut.id} className="flex items-center justify-between py-1.5">
               <span className="text-foreground-secondary text-sm">{shortcut.description}</span>
               <div className="flex items-center gap-1">
                 {shortcut.keys.map((key) =>
                   key === '–' || key === '+' ? (
                     <span
-                      key={`${shortcut.description}-${key}`}
+                      key={`${shortcut.id}-sep-${key}`}
                       className="text-foreground-tertiary text-xs"
                     >
                       {key}
                     </span>
                   ) : (
                     <kbd
-                      key={`${shortcut.description}-${key}`}
+                      key={`${shortcut.id}-${key}`}
                       className="border-border bg-background-tertiary text-foreground-secondary inline-flex min-w-[1.5rem] items-center justify-center rounded border px-1.5 py-0.5 text-[11px] font-medium"
                     >
                       {key}
