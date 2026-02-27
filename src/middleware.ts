@@ -1,12 +1,10 @@
 // =============================================================================
-// Nonce-based CSP Middleware
+// CSP Middleware
 // =============================================================================
-// Generates a per-request nonce and injects it into the Content-Security-Policy
-// header. Next.js automatically applies this nonce to RSC hydration inline
-// scripts, eliminating the need for 'unsafe-inline' in script-src.
-//
-// The nonce is also forwarded as an x-nonce request header for use by
-// custom inline scripts (e.g., analytics or third-party tags).
+// Sets a Content-Security-Policy header on every page request.
+// Uses 'unsafe-inline' for script-src because the page is statically generated
+// (SSG) — pre-rendered HTML cannot have per-request nonces injected into inline
+// <script> tags. All other directives are strict.
 // =============================================================================
 
 import { NextResponse } from 'next/server';
@@ -17,15 +15,15 @@ import type { NextRequest } from 'next/server';
 // -----------------------------------------------------------------------------
 
 /**
- * Builds the Content-Security-Policy header value with a per-request nonce.
+ * Builds the Content-Security-Policy header value.
  *
  * Development mode additionally includes 'unsafe-eval' for HMR / React Fast
- * Refresh. The nonce replaces 'unsafe-inline' for production safety.
+ * Refresh. Uses 'unsafe-inline' for script-src to support SSG inline scripts.
  */
-export function buildCsp(nonce: string, isDev: boolean): string {
+export function buildCsp(isDev: boolean): string {
   const scriptSrc = isDev
-    ? `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`
-    : `script-src 'self' 'nonce-${nonce}'`;
+    ? `script-src 'self' 'unsafe-inline' 'unsafe-eval'`
+    : `script-src 'self' 'unsafe-inline'`;
 
   const directives = [
     "default-src 'self'",
@@ -44,21 +42,11 @@ export function buildCsp(nonce: string, isDev: boolean): string {
 // Middleware
 // -----------------------------------------------------------------------------
 
-export function middleware(request: NextRequest): NextResponse {
-  // Generate a cryptographic nonce for this request
-  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
-
+export function middleware(_request: NextRequest): NextResponse {
   const isDev = process.env.NODE_ENV === 'development';
-  const csp = buildCsp(nonce, isDev);
+  const csp = buildCsp(isDev);
 
-  // Clone request headers and inject nonce for downstream use
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-nonce', nonce);
-
-  const response = NextResponse.next({
-    request: { headers: requestHeaders },
-  });
-
+  const response = NextResponse.next();
   response.headers.set('Content-Security-Policy', csp);
 
   return response;
