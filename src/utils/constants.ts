@@ -1,5 +1,5 @@
 export const BINANCE_WS_BASE_URL = 'wss://stream.binance.com:9443/stream';
-export const BINANCE_REST_BASE_URL = 'https://api.binance.com/api/v3';
+export const BINANCE_REST_BASE_URL = 'https://data-api.binance.vision/api/v3';
 
 export const DEFAULT_SYMBOL = 'BTCUSDT';
 export const DEFAULT_INTERVAL = '1m';

@@ -4,7 +4,7 @@ import bundleAnalyzer from '@next/bundle-analyzer';
 // =============================================================================
 // Security Headers (non-CSP)
 // =============================================================================
-// Content-Security-Policy is handled by src/middleware.ts (nonce-based).
+// Content-Security-Policy is handled by src/middleware.ts.
 // Only non-CSP security headers are defined here.
 // =============================================================================
 
@@ -48,10 +48,6 @@ const nextConfig: NextConfig = {
     { source: '/api/upbit/ticker', destination: 'https://api.upbit.com/v1/ticker' },
     { source: '/api/upbit/trades/ticks', destination: 'https://api.upbit.com/v1/trades/ticks' },
     { source: '/api/exchange-rate/:path*', destination: 'https://open.er-api.com/v6/:path*' },
-    {
-      source: '/api/binance/ticker/price',
-      destination: 'https://api.binance.com/api/v3/ticker/price',
-    },
   ],
 };
 

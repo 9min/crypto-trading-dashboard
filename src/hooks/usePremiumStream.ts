@@ -44,11 +44,11 @@ export function usePremiumStream(): void {
 
     resetPremium();
 
-    // -- Binance price polling (via proxy to avoid CORS) --
+    // -- Binance price polling (direct CORS-enabled data API) --
     const fetchBinancePrice = async (): Promise<void> => {
       try {
         const response = await fetch(
-          `/api/binance/ticker/price?symbol=${encodeURIComponent(binanceSymbol)}`,
+          `https://data-api.binance.vision/api/v3/ticker/price?symbol=${encodeURIComponent(binanceSymbol)}`,
           { signal: AbortSignal.timeout(10_000) },
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
