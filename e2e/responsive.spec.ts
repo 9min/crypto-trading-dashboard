@@ -52,36 +52,34 @@ test.describe('Responsive layout', () => {
     }
   });
 
-  test('mobile (480x800): vertical stack layout with scroll', async ({ page }) => {
+  test('mobile (480x800): tab-based layout with single active widget', async ({ page }) => {
     await page.setViewportSize({ width: 480, height: 800 });
     await page.goto('/');
-    await page.waitForSelector('[data-testid="widget-title"]', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="mobile-header"]', { timeout: 15000 });
 
+    // Mobile header and tab bar should be visible
+    await expect(page.getByTestId('mobile-header')).toBeVisible();
+    await expect(page.getByTestId('mobile-tab-bar')).toBeVisible();
+
+    // Default tab is "chart" — only 1 widget visible at a time
     const widgetTitles = page.getByTestId('widget-title');
-    await expect(widgetTitles).toHaveCount(7);
-
-    // Main content area should be scrollable
-    const main = page.locator('main');
-    const scrollHeight = await main.evaluate((el) => el.scrollHeight);
-    const clientHeight = await main.evaluate((el) => el.clientHeight);
-
-    // In mobile layout, content should overflow (scrollable)
-    expect(scrollHeight).toBeGreaterThan(clientHeight);
+    await expect(widgetTitles).toHaveCount(1);
+    await expect(widgetTitles.first()).toHaveText('Chart');
   });
 
   test('header remains visible across all viewports', async ({ page }) => {
     const viewports = [
-      { width: 1400, height: 900 },
-      { width: 768, height: 1024 },
-      { width: 480, height: 800 },
+      { width: 1400, height: 900, headerTestId: 'dashboard-header' },
+      { width: 768, height: 1024, headerTestId: 'dashboard-header' },
+      { width: 480, height: 800, headerTestId: 'mobile-header' },
     ];
 
-    for (const viewport of viewports) {
-      await page.setViewportSize(viewport);
+    for (const { width, height, headerTestId } of viewports) {
+      await page.setViewportSize({ width, height });
       await page.goto('/');
-      await page.waitForSelector('[data-testid="dashboard-header"]', { timeout: 15000 });
+      await page.waitForSelector(`[data-testid="${headerTestId}"]`, { timeout: 15000 });
 
-      const header = page.getByTestId('dashboard-header');
+      const header = page.getByTestId(headerTestId);
       await expect(header).toBeVisible();
     }
   });
