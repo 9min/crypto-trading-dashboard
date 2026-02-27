@@ -104,18 +104,21 @@ export const KeyboardShortcutsHelp = memo(function KeyboardShortcutsHelp({
 
         {/* Shortcut list */}
         <div className="space-y-0.5 px-4 py-3">
-          {SHORTCUTS.map((shortcut, index) => (
-            <div key={index} className="flex items-center justify-between py-1.5">
+          {SHORTCUTS.map((shortcut) => (
+            <div key={shortcut.description} className="flex items-center justify-between py-1.5">
               <span className="text-foreground-secondary text-sm">{shortcut.description}</span>
               <div className="flex items-center gap-1">
-                {shortcut.keys.map((key, keyIndex) =>
+                {shortcut.keys.map((key) =>
                   key === '–' || key === '+' ? (
-                    <span key={keyIndex} className="text-foreground-tertiary text-xs">
+                    <span
+                      key={`${shortcut.description}-${key}`}
+                      className="text-foreground-tertiary text-xs"
+                    >
                       {key}
                     </span>
                   ) : (
                     <kbd
-                      key={keyIndex}
+                      key={`${shortcut.description}-${key}`}
                       className="border-border bg-background-tertiary text-foreground-secondary inline-flex min-w-[1.5rem] items-center justify-center rounded border px-1.5 py-0.5 text-[11px] font-medium"
                     >
                       {key}
