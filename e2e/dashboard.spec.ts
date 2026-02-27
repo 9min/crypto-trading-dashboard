@@ -31,9 +31,9 @@ test.describe('Dashboard', () => {
     await expect(header).toContainText('BTC/USDT');
   });
 
-  test('should render all 7 widgets', async ({ page }) => {
+  test('should render all 8 widgets', async ({ page }) => {
     const widgetTitles = page.getByTestId('widget-title');
-    await expect(widgetTitles).toHaveCount(7);
+    await expect(widgetTitles).toHaveCount(8);
 
     const expectedTitles = [
       'Chart',
@@ -43,6 +43,7 @@ test.describe('Dashboard', () => {
       'Kimchi Premium',
       'Depth Chart',
       'Performance',
+      'Portfolio',
     ];
 
     for (const title of expectedTitles) {

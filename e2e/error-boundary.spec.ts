@@ -124,7 +124,7 @@ test.describe('Error boundary', () => {
     }
   });
 
-  test('healthy dashboard has all 7 widgets with no error fallbacks', async ({ page }) => {
+  test('healthy dashboard has all 8 widgets with no error fallbacks', async ({ page }) => {
     // Use normal mocks — everything should work
     await mockBinanceRest(page);
     const cleanupWs = await mockBinanceWebSocket(page);
@@ -133,8 +133,8 @@ test.describe('Error boundary', () => {
       await page.goto('/');
       await page.waitForSelector('[data-testid="widget-title"]', { timeout: 15000 });
 
-      // All 7 widgets should render their titles
-      await expect(page.getByTestId('widget-title')).toHaveCount(7);
+      // All 8 widgets should render their titles
+      await expect(page.getByTestId('widget-title')).toHaveCount(8);
 
       // No Retry buttons should be visible (no errors)
       const retryButtons = page.locator('button:has-text("Retry")');

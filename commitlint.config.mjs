@@ -24,6 +24,7 @@ const config = {
         'upbit',
         'premium',
         'alert',
+        'portfolio',
       ],
     ],
     'scope-empty': [2, 'never'],

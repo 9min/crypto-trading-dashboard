@@ -46,7 +46,10 @@ src/
 │   │   ├── PerformanceMonitorWidget.tsx
 │   │   ├── TradesFeedWidget.tsx
 │   │   ├── WatchlistWidget.tsx
-│   │   └── WidgetWrapper.tsx
+│   │   ├── WidgetWrapper.tsx
+│   │   ├── PortfolioWidget.tsx    # Phase 5: 모의 포트폴리오
+│   │   ├── MultiChartWidget.tsx   # Phase 5: 다중 심볼 차트
+│   │   └── ChartPanel.tsx         # Phase 5: 개별 차트 패널
 │   ├── ui/               # 재사용 가능한 UI 프리미티브
 │   │   ├── Button.tsx
 │   │   ├── ErrorBoundary.tsx
@@ -61,7 +64,9 @@ src/
 │   │   ├── ToastContainer.tsx
 │   │   ├── UserMenu.tsx
 │   │   ├── WatchlistManagePopover.tsx
-│   │   └── WidgetSelector.tsx
+│   │   ├── WidgetSelector.tsx
+│   │   ├── TradePanel.tsx         # Phase 5: 매수/매도 주문 패널
+│   │   └── DrawingToolbar.tsx     # Phase 5: 드로잉 도구 팔레트
 │   └── layout/           # 레이아웃 컴포넌트
 │       ├── ConnectionStatus.tsx
 │       ├── DashboardGrid.tsx
@@ -85,7 +90,9 @@ src/
 │   ├── useUpbitStream.ts
 │   ├── useUpbitWatchlistStream.ts
 │   ├── useWatchlistStream.ts
-│   └── useWebSocket.ts
+│   ├── useWebSocket.ts
+│   ├── useChartSync.ts            # Phase 5: 크로스헤어 동기화
+│   └── useDrawingInteraction.ts   # Phase 5: 드로잉 마우스 이벤트
 ├── stores/               # Zustand 스토어
 │   ├── alertStore.ts
 │   ├── authStore.ts
@@ -97,7 +104,10 @@ src/
 │   ├── tradeStore.ts
 │   ├── uiStore.ts
 │   ├── watchlistStore.ts
-│   └── widgetStore.ts
+│   ├── widgetStore.ts
+│   ├── portfolioStore.ts          # Phase 5: 모의 포트폴리오
+│   ├── multiChartStore.ts         # Phase 5: 멀티차트 상태
+│   └── drawingStore.ts            # Phase 5: 드로잉 상태
 ├── lib/                  # 핵심 라이브러리
 │   ├── websocket/        # WebSocket 매니저
 │   │   ├── WebSocketManager.ts
@@ -107,7 +117,9 @@ src/
 │   │   ├── DepthChartRenderer.ts
 │   │   ├── OrderBookRenderer.ts
 │   │   ├── PerformanceMonitorRenderer.ts
-│   │   └── TradesFeedRenderer.ts
+│   │   ├── TradesFeedRenderer.ts
+│   │   ├── PortfolioChartRenderer.ts  # Phase 5: 자산 비중 차트
+│   │   └── DrawingRenderer.ts         # Phase 5: 드로잉 오버레이
 │   ├── binance/          # Binance API 클라이언트
 │   │   ├── restApi.ts
 │   │   └── streamUrls.ts
@@ -127,7 +139,9 @@ src/
 │   ├── indicator.ts      # 차트 지표 타입
 │   ├── supabase.ts       # Supabase 데이터베이스 타입
 │   ├── upbit.ts          # Upbit API 응답 타입
-│   └── widget.ts         # 위젯 관련 타입
+│   ├── widget.ts         # 위젯 관련 타입
+│   ├── portfolio.ts      # Phase 5: Portfolio 관련 타입
+│   └── drawing.ts        # Phase 5: Drawing 관련 타입
 └── utils/                # 유틸리티 함수
     ├── constants.ts
     ├── debounce.ts
@@ -141,7 +155,8 @@ src/
     ├── ringBuffer.ts
     ├── symbolMap.ts
     ├── symbolSearch.ts
-    └── widgetStorage.ts
+    ├── widgetStorage.ts
+    └── portfolioCalc.ts   # Phase 5: PnL 계산 유틸
 ```
 
 ---
@@ -480,19 +495,22 @@ useEffect(() => {
 
 - **도메인별로 스토어를 분리한다.** 하나의 거대한 스토어에 모든 상태를 넣지 않는다.
 
-| 스토어           | 역할                                       |
-| ---------------- | ------------------------------------------ |
-| `klineStore`     | 캔들스틱 데이터, 타임프레임, 차트 상태     |
-| `depthStore`     | 오더북 데이터 (bids/asks), 최고 호가       |
-| `tradeStore`     | 체결 내역 링 버퍼, 최근 체결가             |
-| `uiStore`        | 현재 심볼, 테마, 레이아웃, 연결 상태       |
-| `authStore`      | 사용자 인증 상태, 프로필 정보              |
-| `alertStore`     | 가격 알림 관리, 조건 및 트리거 상태        |
-| `indicatorStore` | 차트 지표 설정 (이동평균, 볼린저밴드 등)   |
-| `premiumStore`   | 김치 프리미엄 데이터, Binance-Upbit 가격차 |
-| `toastStore`     | 토스트 알림 메시지 큐 및 표시 상태         |
-| `watchlistStore` | 관심 종목 목록, 실시간 가격 업데이트       |
-| `widgetStore`    | 위젯 표시 설정, 활성/비활성 상태           |
+| 스토어            | 역할                                       |
+| ----------------- | ------------------------------------------ |
+| `klineStore`      | 캔들스틱 데이터, 타임프레임, 차트 상태     |
+| `depthStore`      | 오더북 데이터 (bids/asks), 최고 호가       |
+| `tradeStore`      | 체결 내역 링 버퍼, 최근 체결가             |
+| `uiStore`         | 현재 심볼, 테마, 레이아웃, 연결 상태       |
+| `authStore`       | 사용자 인증 상태, 프로필 정보              |
+| `alertStore`      | 가격 알림 관리, 조건 및 트리거 상태        |
+| `indicatorStore`  | 차트 지표 설정 (이동평균, 볼린저밴드 등)   |
+| `premiumStore`    | 김치 프리미엄 데이터, Binance-Upbit 가격차 |
+| `toastStore`      | 토스트 알림 메시지 큐 및 표시 상태         |
+| `watchlistStore`  | 관심 종목 목록, 실시간 가격 업데이트       |
+| `widgetStore`     | 위젯 표시 설정, 활성/비활성 상태           |
+| `portfolioStore`  | 모의 포트폴리오 잔고, 보유자산, 거래내역   |
+| `multiChartStore` | 멀티차트 심볼 배열, 레이아웃 모드, 동기화  |
+| `drawingStore`    | 차트 드로잉 객체, Undo/Redo 히스토리       |
 
 - **스토어의 모든 액션은 named function으로 정의한다.** 인라인 함수를 사용하지 않는다.
 
@@ -654,10 +672,10 @@ describe('depthStore', () => {
 
 현재 프로젝트는 다음과 같은 테스트 구조를 갖추고 있습니다:
 
-- **총 테스트 파일 수**: 51개
+- **총 테스트 파일 수**: 71개
 - **단위 테스트 커버리지**:
-  - 모든 Zustand 스토어 (11/11개) 테스트 완료
-  - 모든 Canvas 렌더러 (4/4개) 테스트 완료
+  - 모든 Zustand 스토어 (12/12개) 테스트 완료
+  - 모든 Canvas 렌더러 (5/5개) 테스트 완료
   - 주요 유틸리티 함수 테스트 완료
   - 주요 커스텀 훅 테스트 완료
 - **테스트 프레임워크**: Vitest (단위 테스트) + Playwright (E2E)
@@ -701,6 +719,102 @@ describe('depthStore', () => {
 | `document.getElementById`                     | React 생명주기 무시               | `useRef` 사용                                      |
 | default export (page.tsx 제외)                | 리팩터링 시 이름 추적 불가        | named export                                       |
 | 인라인 props 타입                             | 재사용성 저하, 가독성 감소        | 명시적 인터페이스 정의                             |
+
+---
+
+## 12. Phase 5 개발 로드맵
+
+> Phase 4(번들 최적화, CSP, 훅 테스트)까지 완료. Phase 5에서는 신규 기능 3개를 순차적으로 구현한다.
+
+### 12.1 구현 순서 및 진행 상태
+
+| #   | 기능              | 상태      | 브랜치 | PR  |
+| --- | ----------------- | --------- | ------ | --- |
+| 1   | Portfolio Tracker | ✅ 완료   | main   | —   |
+| 2   | Multi-Chart Sync  | ⬜ 미시작 | —      | —   |
+| 3   | Drawing Tools     | ⬜ 미시작 | —      | —   |
+
+### 12.2 Portfolio Tracker (모의 포트폴리오)
+
+가상 잔고($100,000 USDT)로 매수/매도 시뮬레이션(Paper Trading). 포트폴리오 PnL 실시간 계산.
+
+**핵심 기능:**
+
+- 가상 잔고 + 시장가 기반 매수/매도 주문 UI
+- 보유 자산 목록 + 실시간 PnL 계산 (watchlistStore 가격 활용)
+- 자산 비중 시각화 (Canvas — `PortfolioChartRenderer`)
+- 거래 내역 테이블 + CSV 내보내기
+- Supabase 영속화 (로그인) / localStorage 폴백 (비로그인)
+
+**신규 파일:**
+
+- `src/stores/portfolioStore.ts` — 잔고, 보유자산, 거래내역 상태
+- `src/components/widgets/PortfolioWidget.tsx` — 포트폴리오 위젯
+- `src/components/ui/TradePanel.tsx` — 매수/매도 주문 패널
+- `src/types/portfolio.ts` — Portfolio 관련 타입
+- `src/lib/canvas/PortfolioChartRenderer.ts` — 자산 비중 차트
+- `src/utils/portfolioCalc.ts` — PnL 계산 유틸
+
+**수정 파일:**
+
+- `src/stores/widgetStore.ts` — portfolio 위젯 ID 추가
+- `src/types/widget.ts` — WidgetId에 `'portfolio'` 추가
+- `src/components/layout/DashboardGrid.tsx` — 기본 레이아웃 배치
+
+**기술 포인트:**
+
+- Supabase 테이블: `portfolio_trades`, `portfolio_holdings`
+- Canvas로 자산 비중 차트 렌더링 (DOM 최소화 원칙 준수)
+
+### 12.3 Multi-Chart Sync (다중 심볼 차트 비교)
+
+2~4개 심볼 차트를 동시 표시하고, 크로스헤어를 동기화.
+
+**핵심 기능:**
+
+- Split View: 2분할 / 4분할 레이아웃
+- 각 패널에 독립적인 심볼 선택
+- 크로스헤어 동기화 (`subscribeCrosshairMove` + `setCrosshairPosition`)
+- 타임프레임 동기화 옵션 (전체 통일 / 개별 설정)
+- 기존 `CandlestickWidget` 패턴 재활용
+
+**신규 파일:**
+
+- `src/components/widgets/MultiChartWidget.tsx` — 멀티차트 컨테이너
+- `src/components/widgets/ChartPanel.tsx` — 개별 차트 패널
+- `src/stores/multiChartStore.ts` — 심볼 배열, 레이아웃 모드 상태
+- `src/hooks/useChartSync.ts` — 크로스헤어 동기화 훅
+
+**기술 포인트:**
+
+- WebSocket 스트림 다중 구독 (심볼 수만큼)
+- 기존 `useExchangeWebSocket` 패턴 심볼 파라미터화
+
+### 12.4 Drawing Tools (차트 드로잉)
+
+추세선, 수평선, 피보나치 되돌림 등 차트 위 드로잉 도구.
+
+**핵심 기능:**
+
+- 도구 팔레트: 추세선, 수평선, 수직선, 피보나치 되돌림
+- 마우스 드래그로 드로잉 생성 / 선택 / 이동 / 삭제
+- 가격↔픽셀 좌표 변환 (`coordinateToPrice` / `priceToCoordinate`)
+- 심볼별 드로잉 저장 (localStorage + Supabase)
+- Undo/Redo (Ctrl+Z / Ctrl+Shift+Z) — Command 패턴
+
+**신규 파일:**
+
+- `src/components/ui/DrawingToolbar.tsx` — 드로잉 도구 팔레트
+- `src/stores/drawingStore.ts` — 드로잉 객체 + Undo/Redo 히스토리
+- `src/lib/canvas/DrawingRenderer.ts` — 드로잉 Canvas 오버레이
+- `src/types/drawing.ts` — Drawing 관련 타입
+- `src/hooks/useDrawingInteraction.ts` — 마우스 이벤트 처리 훅
+
+**기술 포인트:**
+
+- Canvas overlay 레이어 (차트 위에 투명 Canvas 겹침)
+- Hit testing (마우스 좌표 → 드로잉 객체 판정)
+- Command 패턴으로 Undo/Redo 구현
 
 ---
 

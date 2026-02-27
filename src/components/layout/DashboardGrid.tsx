@@ -41,6 +41,7 @@ import { WatchlistWidget } from '@/components/widgets/WatchlistWidget';
 import { KimchiPremiumWidget } from '@/components/widgets/KimchiPremiumWidget';
 import { DepthChartWidget } from '@/components/widgets/DepthChartWidget';
 import { PerformanceMonitorWidget } from '@/components/widgets/PerformanceMonitorWidget';
+import { PortfolioWidget } from '@/components/widgets/PortfolioWidget';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -73,6 +74,8 @@ export const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
     { i: 'depth', x: 5, y: 14, w: 2, h: 10 },
     { i: 'premium', x: 7, y: 14, w: 2, h: 10 },
     { i: 'perf', x: 9, y: 14, w: 3, h: 10 },
+    // Row 3: Portfolio
+    { i: 'portfolio', x: 0, y: 24, w: 4, h: 12 },
   ],
   md: [
     // Row 1: Chart full-width
@@ -85,6 +88,8 @@ export const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
     { i: 'trades', x: 2, y: 24, w: 3, h: 10 },
     { i: 'premium', x: 5, y: 24, w: 2, h: 10 },
     { i: 'perf', x: 7, y: 24, w: 3, h: 10 },
+    // Row 4: Portfolio
+    { i: 'portfolio', x: 0, y: 34, w: 5, h: 12 },
   ],
   sm: [
     // Single column stack — ordered by priority
@@ -95,6 +100,7 @@ export const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
     { i: 'depth', x: 0, y: 36, w: 6, h: 8 },
     { i: 'premium', x: 0, y: 44, w: 6, h: 8 },
     { i: 'perf', x: 0, y: 52, w: 6, h: 8 },
+    { i: 'portfolio', x: 0, y: 60, w: 6, h: 12 },
   ],
 };
 
@@ -148,6 +154,7 @@ export const DashboardGrid = memo(function DashboardGrid() {
       { key: 'premium', title: 'Kimchi Premium', component: <KimchiPremiumWidget /> },
       { key: 'depth', title: 'Depth Chart', component: <DepthChartWidget /> },
       { key: 'perf', title: 'Performance', component: <PerformanceMonitorWidget /> },
+      { key: 'portfolio', title: 'Portfolio', component: <PortfolioWidget /> },
     ],
     [],
   );
