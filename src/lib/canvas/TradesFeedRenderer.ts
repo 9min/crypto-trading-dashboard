@@ -36,6 +36,8 @@ interface TradesFeedColors {
   sellText: string;
   rowHover: string;
   border: string;
+  whaleBackground: string;
+  whaleBorder: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -58,6 +60,8 @@ const DARK_COLORS: TradesFeedColors = {
   sellText: '#f6465d',
   rowHover: 'rgba(255, 255, 255, 0.02)',
   border: '#252930',
+  whaleBackground: 'rgba(240, 185, 11, 0.06)',
+  whaleBorder: 'rgba(240, 185, 11, 0.4)',
 };
 
 const LIGHT_COLORS: TradesFeedColors = {
@@ -69,6 +73,8 @@ const LIGHT_COLORS: TradesFeedColors = {
   sellText: '#d9304a',
   rowHover: 'rgba(0, 0, 0, 0.02)',
   border: '#e0e3e8',
+  whaleBackground: 'rgba(240, 185, 11, 0.08)',
+  whaleBorder: 'rgba(240, 185, 11, 0.5)',
 };
 
 const DEFAULT_COLORS = DARK_COLORS;
@@ -88,6 +94,7 @@ export class TradesFeedRenderer implements CanvasRenderer {
   private colors: TradesFeedColors;
   private lastRenderedTradeId = -1;
   private readonly timezoneOffsetMs = new Date().getTimezoneOffset() * -60_000;
+  private lastWhaleThreshold = 0;
 
   constructor(ctx: CanvasRenderingContext2D, colors?: Partial<TradesFeedColors>) {
     this.ctx = ctx;
@@ -105,7 +112,13 @@ export class TradesFeedRenderer implements CanvasRenderer {
   }
 
   onFrame(): void {
-    const { lastTradeId, buffer } = useTradeStore.getState();
+    const { lastTradeId, buffer, whaleThreshold } = useTradeStore.getState();
+
+    // Force redraw when whale threshold changes
+    if (whaleThreshold !== this.lastWhaleThreshold) {
+      this.lastWhaleThreshold = whaleThreshold;
+      this.lastRenderedTradeId = -1;
+    }
 
     if (buffer.length === 0) {
       // No trades yet — clear stale data if previously drawn
@@ -140,7 +153,7 @@ export class TradesFeedRenderer implements CanvasRenderer {
   // -- Drawing ----------------------------------------------------------------
 
   private draw(): void {
-    const { buffer } = useTradeStore.getState();
+    const { buffer, whaleThreshold } = useTradeStore.getState();
     const { ctx, width, height, colors } = this;
 
     if (width === 0 || height === 0) return;
@@ -165,7 +178,9 @@ export class TradesFeedRenderer implements CanvasRenderer {
     const visibleRows = Math.floor((height - HEADER_HEIGHT) / ROW_HEIGHT);
     const count = Math.min(buffer.length, visibleRows);
 
-    ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
+    const normalFont = `${FONT_SIZE}px ${FONT_FAMILY}`;
+    const boldFont = `bold ${FONT_SIZE + 1}px ${FONT_FAMILY}`;
+    ctx.font = normalFont;
 
     for (let i = 0; i < count; i++) {
       const readIndex = buffer.length - 1 - i;
@@ -177,14 +192,30 @@ export class TradesFeedRenderer implements CanvasRenderer {
       if (price === null || quantity === null || time === null || isBuyerMaker === null) continue;
 
       const y = HEADER_HEIGHT + i * ROW_HEIGHT;
+      const notional = price * quantity;
+      const isWhale = notional >= whaleThreshold;
 
-      // Alternating row background for readability
-      if (i % 2 === 1) {
+      if (isWhale) {
+        // Whale row: highlight background
+        ctx.fillStyle = colors.whaleBackground;
+        ctx.fillRect(0, y, width, ROW_HEIGHT);
+        // Left accent bar (2px)
+        ctx.fillStyle = colors.whaleBorder;
+        ctx.fillRect(0, y, 2, ROW_HEIGHT);
+        // Bold font for whale rows
+        ctx.font = boldFont;
+      } else if (i % 2 === 1) {
+        // Alternating row background for readability
         ctx.fillStyle = colors.rowHover;
         ctx.fillRect(0, y, width, ROW_HEIGHT);
       }
 
       this.drawTradeRowFromFields(price, quantity, time, isBuyerMaker === 1, y, col1X, col2X);
+
+      // Restore normal font after whale row
+      if (isWhale) {
+        ctx.font = normalFont;
+      }
     }
 
     performance.mark('tradesfeed-draw-end');
