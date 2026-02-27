@@ -9,7 +9,9 @@
 // =============================================================================
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { getClientEnv } from '@/lib/env';
+import { getClientEnv, validateEnv } from '@/lib/env';
+
+validateEnv();
 
 const { NEXT_PUBLIC_SUPABASE_URL: supabaseUrl, NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey } =
   getClientEnv();

@@ -2,11 +2,13 @@
 // Environment Variable Validation
 // =============================================================================
 // Provides runtime validation and type-safe access to environment variables.
-// Missing variables emit console.warn — the app continues to function,
+// Missing variables emit console.error — the app continues to function,
 // but Supabase-dependent features (auth, preferences sync) are disabled.
+//
+// NOTE: getClientEnv() uses static process.env.NEXT_PUBLIC_* references
+// because Next.js inlines only static accesses at build time.
+// Dynamic process.env[key] would resolve to undefined in client bundles.
 // =============================================================================
-
-const CLIENT_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'] as const;
 
 interface ClientEnv {
   NEXT_PUBLIC_SUPABASE_URL: string;
@@ -17,24 +19,28 @@ let validated = false;
 
 /**
  * Validates that all required client environment variables are set.
- * Logs a warning for each missing variable.
+ * Logs a structured error for missing variables.
  * Safe to call multiple times — only validates once.
  */
 export function validateEnv(): string[] {
+  const env = getClientEnv();
   const missing: string[] = [];
 
-  for (const key of CLIENT_ENV_KEYS) {
-    const value = process.env[key];
-    if (!value || value.trim() === '') {
-      missing.push(key);
-    }
+  if (!env.NEXT_PUBLIC_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL.trim() === '') {
+    missing.push('NEXT_PUBLIC_SUPABASE_URL');
+  }
+  if (!env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY.trim() === '') {
+    missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
 
   if (missing.length > 0 && !validated) {
-    console.warn(
-      `[env] Missing environment variables: ${missing.join(', ')}. ` +
-        'Supabase features (auth, preferences sync) will be disabled.',
-    );
+    console.error('[env] Missing environment variables', {
+      component: 'env',
+      action: 'validateEnv',
+      timestamp: Date.now(),
+      missing,
+      message: 'Supabase features (auth, preferences sync) will be disabled.',
+    });
   }
 
   validated = true;
@@ -43,14 +49,10 @@ export function validateEnv(): string[] {
 
 /**
  * Returns a type-safe object of client environment variables.
- * Triggers validation on first call.
+ * Uses static process.env references for Next.js build-time inlining.
  * Values default to empty string when not set.
  */
 export function getClientEnv(): ClientEnv {
-  if (!validated) {
-    validateEnv();
-  }
-
   return {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',

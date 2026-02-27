@@ -50,40 +50,44 @@ describe('env', () => {
       expect(missing).toEqual(['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']);
     });
 
-    it('logs a warning when variables are missing', () => {
+    it('logs a structured error when variables are missing', () => {
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
       delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       validateEnv();
 
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('NEXT_PUBLIC_SUPABASE_URL'));
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[env] Missing environment variables',
+        expect.objectContaining({
+          component: 'env',
+          action: 'validateEnv',
+          missing: ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'],
+        }),
       );
     });
 
-    it('does not warn when all variables are present', () => {
+    it('does not log when all variables are present', () => {
       process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-key';
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       validateEnv();
 
-      expect(warnSpy).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
     });
 
-    it('only warns once across multiple calls', () => {
+    it('only logs once across multiple calls', () => {
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
       delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       validateEnv();
       validateEnv();
       validateEnv();
 
-      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -101,22 +105,12 @@ describe('env', () => {
     it('returns empty strings for unset variables', () => {
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
       delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const env = getClientEnv();
 
       expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe('');
       expect(env.NEXT_PUBLIC_SUPABASE_ANON_KEY).toBe('');
-    });
-
-    it('triggers validation on first call', () => {
-      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      getClientEnv();
-
-      expect(warnSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

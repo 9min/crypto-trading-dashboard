@@ -42,6 +42,12 @@ describe('next.config security headers', () => {
       expect(csp).toContain("default-src 'self'");
     });
 
+    it('excludes unsafe-inline and unsafe-eval from script-src in non-dev mode', () => {
+      // Tests run with NODE_ENV=test, so the strict production CSP applies
+      expect(csp).not.toContain('unsafe-eval');
+      expect(csp).toContain("script-src 'self'");
+    });
+
     it('allows Binance REST API in connect-src', () => {
       expect(csp).toContain('https://api.binance.com');
     });

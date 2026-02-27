@@ -4,12 +4,15 @@ import type { NextConfig } from 'next';
 // Content Security Policy
 // =============================================================================
 // Each directive is a separate array entry for readability.
-// `unsafe-inline` / `unsafe-eval` are required by Next.js and React Grid Layout.
+// Production: strict CSP without unsafe-inline/unsafe-eval.
+// Development: relaxed CSP for Next.js HMR and React Grid Layout.
 // =============================================================================
+
+const isDev = process.env.NODE_ENV === 'development';
 
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https://lh3.googleusercontent.com",
   "font-src 'self' https://fonts.gstatic.com",

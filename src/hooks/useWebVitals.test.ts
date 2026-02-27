@@ -16,6 +16,19 @@ vi.mock('next/web-vitals', () => ({
   },
 }));
 
+function invokeCallback(metric: {
+  name: string;
+  value: number;
+  rating: string;
+  delta: number;
+  id: string;
+}): void {
+  if (!capturedCallback) {
+    throw new Error('capturedCallback was not registered by useReportWebVitals');
+  }
+  capturedCallback(metric);
+}
+
 describe('useWebVitals', () => {
   beforeEach(() => {
     capturedCallback = null;
@@ -40,7 +53,7 @@ describe('useWebVitals', () => {
     const { useWebVitals } = await import('./useWebVitals');
 
     renderHook(() => useWebVitals());
-    capturedCallback!({
+    invokeCallback({
       name: 'LCP',
       value: 1234.5,
       rating: 'good',
@@ -61,7 +74,7 @@ describe('useWebVitals', () => {
     const { useWebVitals } = await import('./useWebVitals');
 
     renderHook(() => useWebVitals());
-    capturedCallback!({
+    invokeCallback({
       name: 'CLS',
       value: 0.05,
       rating: 'good',
@@ -83,7 +96,7 @@ describe('useWebVitals', () => {
     const { useWebVitals } = await import('./useWebVitals');
 
     renderHook(() => useWebVitals());
-    capturedCallback!({
+    invokeCallback({
       name: 'FCP',
       value: 800,
       rating: 'good',
@@ -100,9 +113,7 @@ describe('useWebVitals', () => {
     const { useWebVitals } = await import('./useWebVitals');
 
     renderHook(() => useWebVitals());
-
-    // Test needs-improvement rating
-    capturedCallback!({
+    invokeCallback({
       name: 'TTFB',
       value: 600,
       rating: 'needs-improvement',
