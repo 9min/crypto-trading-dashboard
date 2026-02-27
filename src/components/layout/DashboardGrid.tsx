@@ -65,42 +65,40 @@ const GRID_MARGIN: [number, number] = [8, 8];
 // Default layouts for each breakpoint (exported for reset functionality)
 export const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
   lg: [
-    // Row 1: Chart(9) + OrderBook(3) — primary data
-    { i: 'candlestick', x: 0, y: 0, w: 9, h: 14 },
-    { i: 'orderbook', x: 9, y: 0, w: 3, h: 14 },
-    // Row 2: Watchlist(3) Trades(2) Depth(2) Premium(2) Perf(3) = 12
+    // Row 1: Chart(7) + Trades(2) + Portfolio(3)
+    { i: 'candlestick', x: 0, y: 0, w: 7, h: 14 },
+    { i: 'trades', x: 7, y: 0, w: 2, h: 14 },
+    { i: 'portfolio', x: 9, y: 0, w: 3, h: 14 },
+    // Row 2: Watchlist(3) + OrderBook(2) + Depth(2) + Premium(2) + Perf(3)
     { i: 'watchlist', x: 0, y: 14, w: 3, h: 10 },
-    { i: 'trades', x: 3, y: 14, w: 2, h: 10 },
+    { i: 'orderbook', x: 3, y: 14, w: 2, h: 10 },
     { i: 'depth', x: 5, y: 14, w: 2, h: 10 },
     { i: 'premium', x: 7, y: 14, w: 2, h: 10 },
     { i: 'perf', x: 9, y: 14, w: 3, h: 10 },
-    // Row 3: Portfolio
-    { i: 'portfolio', x: 0, y: 24, w: 4, h: 12 },
   ],
   md: [
-    // Row 1: Chart full-width
-    { i: 'candlestick', x: 0, y: 0, w: 10, h: 12 },
-    // Row 2: OrderBook + Depth side by side
-    { i: 'orderbook', x: 0, y: 12, w: 5, h: 12 },
-    { i: 'depth', x: 5, y: 12, w: 5, h: 12 },
-    // Row 3: Watchlist + Trades + Premium + Perf
-    { i: 'watchlist', x: 0, y: 24, w: 2, h: 10 },
-    { i: 'trades', x: 2, y: 24, w: 3, h: 10 },
-    { i: 'premium', x: 5, y: 24, w: 2, h: 10 },
-    { i: 'perf', x: 7, y: 24, w: 3, h: 10 },
-    // Row 4: Portfolio
-    { i: 'portfolio', x: 0, y: 34, w: 5, h: 12 },
+    // Row 1: Chart(6) + Portfolio(4)
+    { i: 'candlestick', x: 0, y: 0, w: 6, h: 12 },
+    { i: 'portfolio', x: 6, y: 0, w: 4, h: 12 },
+    // Row 2: Trades(5) + OrderBook(5)
+    { i: 'trades', x: 0, y: 12, w: 5, h: 10 },
+    { i: 'orderbook', x: 5, y: 12, w: 5, h: 10 },
+    // Row 3: Watchlist(2) + Depth(3) + Premium(2) + Perf(3)
+    { i: 'watchlist', x: 0, y: 22, w: 2, h: 10 },
+    { i: 'depth', x: 2, y: 22, w: 3, h: 10 },
+    { i: 'premium', x: 5, y: 22, w: 2, h: 10 },
+    { i: 'perf', x: 7, y: 22, w: 3, h: 10 },
   ],
   sm: [
     // Single column stack — ordered by priority
     { i: 'candlestick', x: 0, y: 0, w: 6, h: 10 },
-    { i: 'orderbook', x: 0, y: 10, w: 6, h: 10 },
-    { i: 'watchlist', x: 0, y: 20, w: 6, h: 8 },
-    { i: 'trades', x: 0, y: 28, w: 6, h: 8 },
-    { i: 'depth', x: 0, y: 36, w: 6, h: 8 },
-    { i: 'premium', x: 0, y: 44, w: 6, h: 8 },
-    { i: 'perf', x: 0, y: 52, w: 6, h: 8 },
-    { i: 'portfolio', x: 0, y: 60, w: 6, h: 12 },
+    { i: 'portfolio', x: 0, y: 10, w: 6, h: 12 },
+    { i: 'trades', x: 0, y: 22, w: 6, h: 8 },
+    { i: 'orderbook', x: 0, y: 30, w: 6, h: 10 },
+    { i: 'watchlist', x: 0, y: 40, w: 6, h: 8 },
+    { i: 'depth', x: 0, y: 48, w: 6, h: 8 },
+    { i: 'premium', x: 0, y: 56, w: 6, h: 8 },
+    { i: 'perf', x: 0, y: 64, w: 6, h: 8 },
   ],
 };
 
