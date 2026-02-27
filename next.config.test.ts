@@ -3,8 +3,8 @@ import { securityHeaders } from './next.config';
 describe('next.config security headers', () => {
   const headerMap = new Map(securityHeaders.map((h) => [h.key, h.value]));
 
-  it('includes Content-Security-Policy', () => {
-    expect(headerMap.has('Content-Security-Policy')).toBe(true);
+  it('does not include Content-Security-Policy (handled by middleware)', () => {
+    expect(headerMap.has('Content-Security-Policy')).toBe(false);
   });
 
   it('includes X-Frame-Options set to DENY', () => {
@@ -33,48 +33,5 @@ describe('next.config security headers', () => {
     expect(pp).toContain('camera=()');
     expect(pp).toContain('microphone=()');
     expect(pp).toContain('geolocation=()');
-  });
-
-  describe('CSP directives', () => {
-    const csp = headerMap.get('Content-Security-Policy') ?? '';
-
-    it('allows self for default-src', () => {
-      expect(csp).toContain("default-src 'self'");
-    });
-
-    it('allows unsafe-inline but excludes unsafe-eval from script-src in non-dev mode', () => {
-      // Tests run with NODE_ENV=test, so the production CSP applies.
-      // Next.js App Router requires 'unsafe-inline' for RSC hydration scripts.
-      expect(csp).not.toContain('unsafe-eval');
-      expect(csp).toContain("script-src 'self' 'unsafe-inline'");
-    });
-
-    it('allows Binance REST API in connect-src', () => {
-      expect(csp).toContain('https://api.binance.com');
-    });
-
-    it('allows Binance WebSocket in connect-src', () => {
-      expect(csp).toContain('wss://stream.binance.com:9443');
-    });
-
-    it('allows Upbit WebSocket in connect-src', () => {
-      expect(csp).toContain('wss://api.upbit.com');
-    });
-
-    it('allows Supabase in connect-src', () => {
-      expect(csp).toContain('https://*.supabase.co');
-    });
-
-    it('allows Google user content images', () => {
-      expect(csp).toContain('https://lh3.googleusercontent.com');
-    });
-
-    it('allows Google Fonts', () => {
-      expect(csp).toContain('https://fonts.gstatic.com');
-    });
-
-    it('denies frame-ancestors', () => {
-      expect(csp).toContain("frame-ancestors 'none'");
-    });
   });
 });

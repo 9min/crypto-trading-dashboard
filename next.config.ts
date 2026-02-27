@@ -2,35 +2,13 @@ import type { NextConfig } from 'next';
 import bundleAnalyzer from '@next/bundle-analyzer';
 
 // =============================================================================
-// Content Security Policy
+// Security Headers (non-CSP)
 // =============================================================================
-// Each directive is a separate array entry for readability.
-//
-// Next.js App Router requires 'unsafe-inline' for script-src because RSC
-// payloads are delivered via inline <script> tags (self.__next_f.push).
-// Without it, browsers block hydration and the app fails to load.
-//
-// TODO: Migrate to nonce-based CSP via Next.js middleware for stricter
-// script-src without 'unsafe-inline'. See:
-// https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy
-//
-// Development additionally needs 'unsafe-eval' for HMR / React Fast Refresh.
+// Content-Security-Policy is handled by src/middleware.ts (nonce-based).
+// Only non-CSP security headers are defined here.
 // =============================================================================
-
-const isDev = process.env.NODE_ENV === 'development';
-
-const csp = [
-  "default-src 'self'",
-  isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://lh3.googleusercontent.com",
-  "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' https://api.binance.com wss://stream.binance.com:9443 wss://api.upbit.com https://*.supabase.co",
-  "frame-ancestors 'none'",
-].join('; ');
 
 export const securityHeaders = [
-  { key: 'Content-Security-Policy', value: csp },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   {
