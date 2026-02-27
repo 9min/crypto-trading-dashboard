@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { fetchUsdKrwRate } from '@/lib/exchange/exchangeRateService';
 import { usePremiumStore } from '@/stores/premiumStore';
 import { useUiStore } from '@/stores/uiStore';
+import { useKlineStore } from '@/stores/klineStore';
 import { toUpbitSymbol } from '@/utils/symbolMap';
 import type { BinanceTickerPriceResponse } from '@/types/binance';
 import type { UpbitTickerResponse } from '@/types/upbit';
@@ -50,14 +51,27 @@ export function usePremiumStream(): void {
           `/api/binance/ticker/price?symbol=${encodeURIComponent(binanceSymbol)}`,
           { signal: AbortSignal.timeout(10_000) },
         );
-        if (!response.ok) return;
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = (await response.json()) as BinanceTickerPriceResponse;
         if (isActive && data.price) {
           setBinancePrice(parseFloat(data.price));
         }
       } catch {
-        // Silently ignore — will retry on next interval
+        // REST API may be geo-restricted (e.g., 403 from South Korea).
+        // Fallback: use the latest kline close price when on Binance exchange
+        // (klineStore receives data via WebSocket which uses a different endpoint).
+        if (!isActive) return;
+        const exchange = useUiStore.getState().exchange;
+        if (exchange === 'binance') {
+          const candles = useKlineStore.getState().candles;
+          if (candles.length > 0) {
+            const lastClose = candles[candles.length - 1].close;
+            if (lastClose > 0) {
+              setBinancePrice(lastClose);
+            }
+          }
+        }
       }
     };
 
