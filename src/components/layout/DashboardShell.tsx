@@ -26,6 +26,7 @@ import { useSymbolFromUrl } from '@/hooks/useSymbolFromUrl';
 import { useUiStore } from '@/stores/uiStore';
 import { useTradeStore } from '@/stores/tradeStore';
 import { useWidgetStore } from '@/stores/widgetStore';
+import { usePortfolioStore } from '@/stores/portfolioStore';
 import { loadWhaleThreshold } from '@/utils/localPreferences';
 
 const DashboardGrid = dynamic(() => import('./DashboardGrid').then((m) => m.DashboardGrid), {
@@ -76,17 +77,19 @@ export const DashboardShell = memo(function DashboardShell() {
   const setSymbolSearchOpen = useUiStore((state) => state.setSymbolSearchOpen);
   const setShortcutsHelpOpen = useUiStore((state) => state.setShortcutsHelpOpen);
   const hydrateWidgets = useWidgetStore((state) => state.hydrateWidgets);
+  const hydratePortfolio = usePortfolioStore((state) => state.hydratePortfolio);
   const isMobile = useMobileBreakpoint();
 
   // Hydrate persisted exchange preference after mount to avoid SSR mismatch
   useEffect(() => {
     hydrateExchange();
     hydrateWidgets();
+    hydratePortfolio();
 
     // Hydrate whale threshold from localStorage
     const threshold = loadWhaleThreshold();
     useTradeStore.getState().setWhaleThreshold(threshold);
-  }, [hydrateExchange, hydrateWidgets]);
+  }, [hydrateExchange, hydrateWidgets, hydratePortfolio]);
 
   // Sync ?symbol= URL param ↔ uiStore.symbol after exchange hydration
   useSymbolFromUrl();
