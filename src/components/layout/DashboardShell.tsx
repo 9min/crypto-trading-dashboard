@@ -87,7 +87,7 @@ export const DashboardShell = memo(function DashboardShell() {
     return (
       <div className="bg-background flex h-[100dvh] flex-col">
         <MobileHeader />
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden pb-[calc(3.5rem+var(--safe-area-bottom))]">
           <MobileWidgetContainer />
         </main>
         <MobileTabBar />

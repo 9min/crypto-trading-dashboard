@@ -48,14 +48,14 @@ export const MobileHeaderMenu = memo(function MobileHeaderMenu({ onClose }: Mobi
     <>
       {/* Backdrop */}
       <div
-        className="animate-mobile-menu-backdrop fixed inset-0 z-20 bg-black/40"
+        className="animate-mobile-menu-backdrop fixed inset-0 z-50 bg-black/40"
         onClick={handleBackdropClick}
         aria-hidden="true"
       />
       {/* Menu panel */}
       <div
         data-testid="mobile-header-menu"
-        className="animate-mobile-menu-slide border-border bg-background-secondary absolute inset-x-0 top-11 z-20 border-b p-3"
+        className="animate-mobile-menu-slide border-border bg-background-secondary fixed inset-x-0 top-11 z-[60] border-b p-3"
         role="menu"
       >
         <div className="flex flex-col gap-3">
