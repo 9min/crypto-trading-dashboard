@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildCsp, middleware, config } from './middleware';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 // -----------------------------------------------------------------------------
 // buildCsp unit tests
@@ -106,7 +106,8 @@ describe('middleware', () => {
     // Base64 pattern embedded in nonce directive
     const nonceMatch = csp.match(/'nonce-([A-Za-z0-9+/=]+)'/);
     expect(nonceMatch).not.toBeNull();
-    expect(nonceMatch![1].length).toBeGreaterThan(0);
+    if (!nonceMatch) throw new Error('nonce not found in CSP');
+    expect(nonceMatch[1].length).toBeGreaterThan(0);
   });
 
   it('generates unique nonces for each request', () => {
@@ -121,12 +122,17 @@ describe('middleware', () => {
   });
 
   it('sets x-nonce request header for downstream use', () => {
+    const nextSpy = vi.spyOn(NextResponse, 'next');
+
     const response = middleware(createRequest());
-    // NextResponse.next with request.headers sets the x-nonce on forwarded headers
-    // The middleware explicitly sets this for use by server components
     const csp = response.headers.get('Content-Security-Policy') ?? '';
     const nonceFromCsp = csp.match(/'nonce-([A-Za-z0-9+/=]+)'/)?.[1];
     expect(nonceFromCsp).toBeDefined();
+
+    // Verify the forwarded request headers contain the same nonce
+    const init = nextSpy.mock.calls[0]?.[0] as { request?: { headers?: Headers } } | undefined;
+    const forwardedNonce = init?.request?.headers?.get('x-nonce');
+    expect(forwardedNonce).toBe(nonceFromCsp);
   });
 
   it('does not include unsafe-inline in script-src', () => {
