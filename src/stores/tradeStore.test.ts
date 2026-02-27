@@ -3,8 +3,19 @@
 // =============================================================================
 
 import { useTradeStore } from './tradeStore';
+import { useToastStore } from './toastStore';
 import type { TradeEntry } from '@/types/chart';
-import { MAX_TRADES } from '@/utils/constants';
+import { MAX_TRADES, DEFAULT_WHALE_THRESHOLD } from '@/utils/constants';
+
+vi.mock('@/utils/localPreferences', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/localPreferences')>();
+  return {
+    ...actual,
+    saveWhaleThreshold: vi.fn(),
+  };
+});
+
+import { saveWhaleThreshold } from '@/utils/localPreferences';
 
 // Helper to create a trade entry with sensible defaults
 function createTrade(overrides: Partial<TradeEntry> = {}): TradeEntry {
@@ -20,7 +31,9 @@ function createTrade(overrides: Partial<TradeEntry> = {}): TradeEntry {
 
 // Helper to reset store state between tests
 function resetStore(): void {
+  useTradeStore.setState({ whaleThreshold: DEFAULT_WHALE_THRESHOLD });
   useTradeStore.getState().reset();
+  useToastStore.setState({ toasts: [] });
 }
 
 describe('tradeStore', () => {
@@ -269,6 +282,76 @@ describe('tradeStore', () => {
       expect(state.lastPrice).toBe(0);
       expect(state.lastTradeId).toBe(-1);
       expect(state.lastPriceDirection).toBe('neutral');
+    });
+
+    it('preserves whale threshold through reset', () => {
+      useTradeStore.getState().setWhaleThreshold(100_000);
+      useTradeStore.getState().reset();
+      expect(useTradeStore.getState().whaleThreshold).toBe(100_000);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Whale Threshold
+  // ---------------------------------------------------------------------------
+
+  describe('whaleThreshold', () => {
+    it('has default whale threshold', () => {
+      expect(useTradeStore.getState().whaleThreshold).toBe(DEFAULT_WHALE_THRESHOLD);
+    });
+
+    it('setWhaleThreshold updates threshold and persists', () => {
+      useTradeStore.getState().setWhaleThreshold(100_000);
+
+      expect(useTradeStore.getState().whaleThreshold).toBe(100_000);
+      expect(saveWhaleThreshold).toHaveBeenCalledWith(100_000);
+    });
+
+    it('triggers toast for whale trade above threshold', () => {
+      useTradeStore.getState().setWhaleThreshold(10_000);
+
+      // Trade with notional = 50000 * 1 = 50000 >= 10000 → whale
+      useTradeStore.getState().addTrade(createTrade({ id: 1, price: 50000, quantity: 1 }));
+
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0].type).toBe('warning');
+      expect(toasts[0].message).toContain('Whale');
+    });
+
+    it('does not trigger toast for trades below threshold', () => {
+      useTradeStore.getState().setWhaleThreshold(100_000);
+
+      // Trade with notional = 50000 * 0.5 = 25000 < 100000
+      useTradeStore.getState().addTrade(createTrade({ id: 1, price: 50000, quantity: 0.5 }));
+
+      expect(useToastStore.getState().toasts).toHaveLength(0);
+    });
+
+    it('formats whale toast with K suffix', () => {
+      useTradeStore.getState().setWhaleThreshold(10_000);
+
+      // notional = 50000 * 1 = 50000 → "$50.0K"
+      useTradeStore
+        .getState()
+        .addTrade(createTrade({ id: 1, price: 50000, quantity: 1, isBuyerMaker: false }));
+
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts[0].message).toContain('BUY');
+      expect(toasts[0].message).toContain('$50.0K');
+    });
+
+    it('formats whale toast with M suffix for large trades', () => {
+      useTradeStore.getState().setWhaleThreshold(10_000);
+
+      // notional = 50000 * 30 = 1500000 → "$1.5M"
+      useTradeStore
+        .getState()
+        .addTrade(createTrade({ id: 1, price: 50000, quantity: 30, isBuyerMaker: true }));
+
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts[0].message).toContain('SELL');
+      expect(toasts[0].message).toContain('$1.5M');
     });
   });
 });

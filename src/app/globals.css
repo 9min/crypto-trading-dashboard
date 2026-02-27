@@ -303,6 +303,38 @@ body {
 }
 
 /* =============================================================================
+   Modal Animations
+   ============================================================================= */
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-backdrop {
+  animation: modal-fade-in 0.15s ease-out;
+}
+
+.animate-modal-content {
+  animation: modal-scale-in 0.15s ease-out;
+}
+
+/* =============================================================================
    Focus Visible — Keyboard Accessibility
    ============================================================================= */
 
@@ -322,6 +354,11 @@ body {
 
   .animate-mobile-menu-backdrop,
   .animate-mobile-menu-slide {
+    animation: none;
+  }
+
+  .animate-modal-backdrop,
+  .animate-modal-content {
     animation: none;
   }
 

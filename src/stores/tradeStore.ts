@@ -18,7 +18,11 @@ import {
   TRADE_FIELD_QUANTITY,
   TRADE_FIELD_TIME,
   TRADE_FIELD_IS_BUYER_MAKER,
+  DEFAULT_WHALE_THRESHOLD,
 } from '@/utils/constants';
+import { useToastStore } from '@/stores/toastStore';
+import { formatPrice } from '@/utils/formatPrice';
+import { saveWhaleThreshold } from '@/utils/localPreferences';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -36,6 +40,8 @@ interface TradeStoreState {
   lastPrice: number;
   /** Direction of last price movement */
   lastPriceDirection: PriceDirection;
+  /** Minimum notional value (price * quantity) to classify a trade as a whale trade */
+  whaleThreshold: number;
 }
 
 interface TradeStoreActions {
@@ -45,6 +51,8 @@ interface TradeStoreActions {
   setTrades: (trades: TradeEntry[]) => void;
   /** Materialize buffer contents as TradeEntry[] (newest-first) for React UI */
   toTradeEntries: () => TradeEntry[];
+  /** Update the whale trade detection threshold */
+  setWhaleThreshold: (threshold: number) => void;
   /** Reset store to initial state */
   reset: () => void;
 }
@@ -88,6 +96,7 @@ const INITIAL_STATE: TradeStoreState = {
   lastTradeId: -1,
   lastPrice: 0,
   lastPriceDirection: 'neutral',
+  whaleThreshold: DEFAULT_WHALE_THRESHOLD,
 };
 
 // -----------------------------------------------------------------------------
@@ -104,6 +113,21 @@ export const useTradeStore = create<TradeStore>()((set, get) => ({
     const direction = computePriceDirection(trade.price, state.lastPrice);
 
     state.buffer.push(packTrade(trade));
+
+    // Whale trade toast notification (ingestion-time check)
+    const notional = trade.price * trade.quantity;
+    if (notional >= state.whaleThreshold) {
+      const side = trade.isBuyerMaker ? 'SELL' : 'BUY';
+      const formatted =
+        notional >= 1_000_000
+          ? `$${(notional / 1_000_000).toFixed(1)}M`
+          : notional >= 1_000
+            ? `$${(notional / 1_000).toFixed(1)}K`
+            : `$${notional.toFixed(0)}`;
+      useToastStore
+        .getState()
+        .addToast(`Whale ${side}: ${formatted} @ ${formatPrice(trade.price)}`, 'warning', 6000);
+    }
 
     set({
       lastTradeId: trade.id,
@@ -171,12 +195,18 @@ export const useTradeStore = create<TradeStore>()((set, get) => ({
     return result;
   },
 
+  setWhaleThreshold: (threshold: number): void => {
+    saveWhaleThreshold(threshold);
+    set({ whaleThreshold: threshold });
+  },
+
   reset: (): void => {
     set({
       buffer: createTradeBuffer(),
       lastTradeId: -1,
       lastPrice: 0,
       lastPriceDirection: 'neutral',
+      whaleThreshold: get().whaleThreshold,
     });
   },
 }));

@@ -6,11 +6,14 @@ import {
   loadInterval,
   saveWatchlistSymbols,
   loadWatchlistSymbols,
+  saveWhaleThreshold,
+  loadWhaleThreshold,
   THEME_KEY,
   INTERVAL_KEY,
   WATCHLIST_KEY,
+  WHALE_THRESHOLD_KEY,
 } from './localPreferences';
-import { DEFAULT_WATCHLIST_SYMBOLS } from '@/utils/constants';
+import { DEFAULT_WATCHLIST_SYMBOLS, DEFAULT_WHALE_THRESHOLD } from '@/utils/constants';
 
 describe('localPreferences', () => {
   const mockStorage = new Map<string, string>();
@@ -162,6 +165,56 @@ describe('localPreferences', () => {
         throw new Error('SecurityError');
       });
       expect(loadWatchlistSymbols()).toEqual([...DEFAULT_WATCHLIST_SYMBOLS]);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Whale Threshold
+  // ---------------------------------------------------------------------------
+  describe('saveWhaleThreshold', () => {
+    it('stores the threshold string under the correct key', () => {
+      saveWhaleThreshold(100000);
+      expect(localStorage.setItem).toHaveBeenCalledWith(WHALE_THRESHOLD_KEY, '100000');
+    });
+
+    it('does not throw when localStorage.setItem throws', () => {
+      vi.mocked(localStorage.setItem).mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      });
+      expect(() => saveWhaleThreshold(50000)).not.toThrow();
+    });
+  });
+
+  describe('loadWhaleThreshold', () => {
+    it('returns the stored threshold when valid', () => {
+      mockStorage.set(WHALE_THRESHOLD_KEY, '100000');
+      expect(loadWhaleThreshold()).toBe(100000);
+    });
+
+    it('returns default threshold when no value is stored', () => {
+      expect(loadWhaleThreshold()).toBe(DEFAULT_WHALE_THRESHOLD);
+    });
+
+    it('returns default threshold for non-numeric value', () => {
+      mockStorage.set(WHALE_THRESHOLD_KEY, 'abc');
+      expect(loadWhaleThreshold()).toBe(DEFAULT_WHALE_THRESHOLD);
+    });
+
+    it('returns default threshold for zero', () => {
+      mockStorage.set(WHALE_THRESHOLD_KEY, '0');
+      expect(loadWhaleThreshold()).toBe(DEFAULT_WHALE_THRESHOLD);
+    });
+
+    it('returns default threshold for negative values', () => {
+      mockStorage.set(WHALE_THRESHOLD_KEY, '-100');
+      expect(loadWhaleThreshold()).toBe(DEFAULT_WHALE_THRESHOLD);
+    });
+
+    it('returns default threshold when localStorage.getItem throws', () => {
+      vi.mocked(localStorage.getItem).mockImplementation(() => {
+        throw new Error('SecurityError');
+      });
+      expect(loadWhaleThreshold()).toBe(DEFAULT_WHALE_THRESHOLD);
     });
   });
 });

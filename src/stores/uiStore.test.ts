@@ -22,6 +22,8 @@ describe('uiStore', () => {
       connectionState: { status: 'idle' },
       layout: [],
       activeMobileTab: 'chart',
+      isSymbolSearchOpen: false,
+      isShortcutsHelpOpen: false,
     });
     vi.clearAllMocks();
   });
@@ -35,6 +37,8 @@ describe('uiStore', () => {
     expect(state.connectionState).toEqual({ status: 'idle' });
     expect(state.layout).toEqual([]);
     expect(state.activeMobileTab).toBe('chart');
+    expect(state.isSymbolSearchOpen).toBe(false);
+    expect(state.isShortcutsHelpOpen).toBe(false);
   });
 
   describe('setTheme', () => {
@@ -150,6 +154,57 @@ describe('uiStore', () => {
       ];
       useUiStore.getState().setLayout(layout);
       expect(useUiStore.getState().layout).toEqual(layout);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Symbol Search & Shortcuts Help Overlays
+  // ---------------------------------------------------------------------------
+
+  describe('setSymbolSearchOpen', () => {
+    it('opens the symbol search modal', () => {
+      useUiStore.getState().setSymbolSearchOpen(true);
+      expect(useUiStore.getState().isSymbolSearchOpen).toBe(true);
+    });
+
+    it('closes the symbol search modal', () => {
+      useUiStore.getState().setSymbolSearchOpen(true);
+      useUiStore.getState().setSymbolSearchOpen(false);
+      expect(useUiStore.getState().isSymbolSearchOpen).toBe(false);
+    });
+  });
+
+  describe('setShortcutsHelpOpen', () => {
+    it('opens the shortcuts help modal', () => {
+      useUiStore.getState().setShortcutsHelpOpen(true);
+      expect(useUiStore.getState().isShortcutsHelpOpen).toBe(true);
+    });
+
+    it('closes the shortcuts help modal', () => {
+      useUiStore.getState().setShortcutsHelpOpen(true);
+      useUiStore.getState().setShortcutsHelpOpen(false);
+      expect(useUiStore.getState().isShortcutsHelpOpen).toBe(false);
+    });
+  });
+
+  describe('closeAllOverlays', () => {
+    it('closes both modals when both are open', () => {
+      useUiStore.getState().setSymbolSearchOpen(true);
+      useUiStore.getState().setShortcutsHelpOpen(true);
+
+      useUiStore.getState().closeAllOverlays();
+
+      const state = useUiStore.getState();
+      expect(state.isSymbolSearchOpen).toBe(false);
+      expect(state.isShortcutsHelpOpen).toBe(false);
+    });
+
+    it('is safe to call when no overlays are open', () => {
+      useUiStore.getState().closeAllOverlays();
+
+      const state = useUiStore.getState();
+      expect(state.isSymbolSearchOpen).toBe(false);
+      expect(state.isShortcutsHelpOpen).toBe(false);
     });
   });
 });

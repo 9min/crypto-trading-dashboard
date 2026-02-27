@@ -10,18 +10,23 @@
 // - Responsive widget grid with drag/resize capabilities
 // =============================================================================
 
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { DashboardHeader } from './DashboardHeader';
 import { MobileHeader } from './MobileHeader';
 import { MobileTabBar } from './MobileTabBar';
 import { MobileWidgetContainer } from './MobileWidgetContainer';
+import { SymbolSearchModal } from '@/components/ui/SymbolSearchModal';
+import { KeyboardShortcutsHelp } from '@/components/ui/KeyboardShortcutsHelp';
 import { useExchangeWebSocket } from '@/hooks/useExchangeWebSocket';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMobileBreakpoint } from '@/hooks/useMobileBreakpoint';
 import { usePriceAlertMonitor } from '@/hooks/usePriceAlertMonitor';
 import { useSymbolFromUrl } from '@/hooks/useSymbolFromUrl';
 import { useUiStore } from '@/stores/uiStore';
+import { useTradeStore } from '@/stores/tradeStore';
 import { useWidgetStore } from '@/stores/widgetStore';
+import { loadWhaleThreshold } from '@/utils/localPreferences';
 
 const DashboardGrid = dynamic(() => import('./DashboardGrid').then((m) => m.DashboardGrid), {
   ssr: false,
@@ -66,6 +71,10 @@ function DashboardGridSkeleton() {
 export const DashboardShell = memo(function DashboardShell() {
   const hydrateExchange = useUiStore((state) => state.hydrateExchange);
   const isExchangeHydrated = useUiStore((state) => state.isExchangeHydrated);
+  const isSymbolSearchOpen = useUiStore((state) => state.isSymbolSearchOpen);
+  const isShortcutsHelpOpen = useUiStore((state) => state.isShortcutsHelpOpen);
+  const setSymbolSearchOpen = useUiStore((state) => state.setSymbolSearchOpen);
+  const setShortcutsHelpOpen = useUiStore((state) => state.setShortcutsHelpOpen);
   const hydrateWidgets = useWidgetStore((state) => state.hydrateWidgets);
   const isMobile = useMobileBreakpoint();
 
@@ -73,6 +82,10 @@ export const DashboardShell = memo(function DashboardShell() {
   useEffect(() => {
     hydrateExchange();
     hydrateWidgets();
+
+    // Hydrate whale threshold from localStorage
+    const threshold = loadWhaleThreshold();
+    useTradeStore.getState().setWhaleThreshold(threshold);
   }, [hydrateExchange, hydrateWidgets]);
 
   // Sync ?symbol= URL param ↔ uiStore.symbol after exchange hydration
@@ -83,6 +96,17 @@ export const DashboardShell = memo(function DashboardShell() {
   // Monitor price alerts across all streams and send browser notifications
   usePriceAlertMonitor();
 
+  // Global keyboard shortcuts (disabled on mobile)
+  useKeyboardShortcuts({ enabled: !isMobile });
+
+  const handleCloseSymbolSearch = useCallback(() => {
+    setSymbolSearchOpen(false);
+  }, [setSymbolSearchOpen]);
+
+  const handleCloseShortcutsHelp = useCallback(() => {
+    setShortcutsHelpOpen(false);
+  }, [setShortcutsHelpOpen]);
+
   if (isMobile) {
     return (
       <div className="bg-background flex h-[100dvh] flex-col">
@@ -91,6 +115,8 @@ export const DashboardShell = memo(function DashboardShell() {
           <MobileWidgetContainer />
         </main>
         <MobileTabBar />
+        <SymbolSearchModal isOpen={isSymbolSearchOpen} onClose={handleCloseSymbolSearch} />
+        <KeyboardShortcutsHelp isOpen={isShortcutsHelpOpen} onClose={handleCloseShortcutsHelp} />
       </div>
     );
   }
@@ -101,6 +127,8 @@ export const DashboardShell = memo(function DashboardShell() {
       <main className="flex-1 overflow-auto p-1.5">
         <DashboardGrid />
       </main>
+      <SymbolSearchModal isOpen={isSymbolSearchOpen} onClose={handleCloseSymbolSearch} />
+      <KeyboardShortcutsHelp isOpen={isShortcutsHelpOpen} onClose={handleCloseShortcutsHelp} />
     </div>
   );
 });
