@@ -42,6 +42,10 @@ interface UiStoreState {
   layout: LayoutItem[];
   /** Active mobile tab (bottom tab bar selection) */
   activeMobileTab: MobileTab;
+  /** Whether the symbol search modal (command palette) is open */
+  isSymbolSearchOpen: boolean;
+  /** Whether the keyboard shortcuts help modal is open */
+  isShortcutsHelpOpen: boolean;
 }
 
 interface UiStoreActions {
@@ -61,6 +65,12 @@ interface UiStoreActions {
   setLayout: (layout: LayoutItem[]) => void;
   /** Set the active mobile tab */
   setActiveMobileTab: (tab: MobileTab) => void;
+  /** Open or close the symbol search modal */
+  setSymbolSearchOpen: (open: boolean) => void;
+  /** Open or close the keyboard shortcuts help modal */
+  setShortcutsHelpOpen: (open: boolean) => void;
+  /** Close all overlay modals */
+  closeAllOverlays: () => void;
 }
 
 type UiStore = UiStoreState & UiStoreActions;
@@ -110,6 +120,18 @@ export const useUiStore = create<UiStore>()((set) => {
     set({ activeMobileTab: tab });
   }
 
+  function setSymbolSearchOpen(open: boolean): void {
+    set({ isSymbolSearchOpen: open });
+  }
+
+  function setShortcutsHelpOpen(open: boolean): void {
+    set({ isShortcutsHelpOpen: open });
+  }
+
+  function closeAllOverlays(): void {
+    set({ isSymbolSearchOpen: false, isShortcutsHelpOpen: false });
+  }
+
   return {
     // -- State ----------------------------------------------------------------
     theme: 'dark',
@@ -119,6 +141,8 @@ export const useUiStore = create<UiStore>()((set) => {
     connectionState: { status: 'idle' },
     layout: [],
     activeMobileTab: 'chart',
+    isSymbolSearchOpen: false,
+    isShortcutsHelpOpen: false,
 
     // -- Actions --------------------------------------------------------------
     setTheme,
@@ -129,6 +153,9 @@ export const useUiStore = create<UiStore>()((set) => {
     setConnectionState,
     setLayout,
     setActiveMobileTab,
+    setSymbolSearchOpen,
+    setShortcutsHelpOpen,
+    closeAllOverlays,
   };
 });
 
