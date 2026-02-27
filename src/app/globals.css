@@ -37,6 +37,9 @@
   --shadow-widget: none;
   --shadow-header: none;
 
+  /* Safe area */
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+
   /* Spacing base unit */
   --spacing-unit: 4px;
 
@@ -268,6 +271,38 @@ body {
 }
 
 /* =============================================================================
+   Mobile Menu Animations
+   ============================================================================= */
+
+@keyframes mobile-menu-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mobile-menu-slide-down {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-mobile-menu-backdrop {
+  animation: mobile-menu-fade-in 0.15s ease-out;
+}
+
+.animate-mobile-menu-slide {
+  animation: mobile-menu-slide-down 0.2s ease-out;
+}
+
+/* =============================================================================
    Focus Visible — Keyboard Accessibility
    ============================================================================= */
 
@@ -282,6 +317,11 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-toast-slide-in {
+    animation: none;
+  }
+
+  .animate-mobile-menu-backdrop,
+  .animate-mobile-menu-slide {
     animation: none;
   }
 
