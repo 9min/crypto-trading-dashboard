@@ -109,12 +109,12 @@ describe('useSymbolFromUrl', () => {
 
   it('does not update when URL symbol matches current store symbol', () => {
     setUrlParam(DEFAULT_SYMBOL);
-    const setSymbolSpy = vi.spyOn(useUiStore.getState(), 'setSymbol');
 
+    const symbolBefore = useUiStore.getState().symbol;
     renderHook(() => useSymbolFromUrl());
 
-    // Symbol already matches, should not call setSymbol
-    expect(setSymbolSpy).not.toHaveBeenCalled();
-    setSymbolSpy.mockRestore();
+    // Symbol already matches, store value should remain unchanged
+    expect(useUiStore.getState().symbol).toBe(symbolBefore);
+    expect(useUiStore.getState().symbol).toBe(DEFAULT_SYMBOL);
   });
 });
