@@ -33,6 +33,7 @@ import { useSparklineData, sparklineCache } from './useSparklineData';
 
 // Mock global fetch for Binance path
 const mockFetch = vi.fn();
+let originalFetch: typeof globalThis.fetch;
 
 // -----------------------------------------------------------------------------
 // Tests
@@ -40,6 +41,7 @@ const mockFetch = vi.fn();
 
 describe('useSparklineData', () => {
   beforeEach(() => {
+    originalFetch = globalThis.fetch;
     vi.clearAllMocks();
     sparklineCache.clear();
 
@@ -58,6 +60,7 @@ describe('useSparklineData', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    globalThis.fetch = originalFetch;
   });
 
   // ---------------------------------------------------------------------------

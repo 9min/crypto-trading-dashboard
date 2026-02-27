@@ -34,6 +34,7 @@ import { usePremiumStream } from './usePremiumStream';
 
 // Mock global fetch
 const mockFetch = vi.fn();
+let originalFetch: typeof globalThis.fetch;
 
 // -----------------------------------------------------------------------------
 // Tests
@@ -41,6 +42,7 @@ const mockFetch = vi.fn();
 
 describe('usePremiumStream', () => {
   beforeEach(() => {
+    originalFetch = globalThis.fetch;
     vi.useFakeTimers();
     vi.clearAllMocks();
 
@@ -72,6 +74,7 @@ describe('usePremiumStream', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    globalThis.fetch = originalFetch;
   });
 
   // ---------------------------------------------------------------------------
