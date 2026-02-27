@@ -12,7 +12,7 @@ import { KLINE_INTERVALS } from '@/types/chart';
 import type { Theme } from '@/stores/uiStore';
 import type { ExchangeId } from '@/types/exchange';
 import { EXCHANGE_IDS } from '@/types/exchange';
-import { DEFAULT_WATCHLIST_SYMBOLS } from '@/utils/constants';
+import { DEFAULT_WATCHLIST_SYMBOLS, DEFAULT_WHALE_THRESHOLD } from '@/utils/constants';
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -23,6 +23,7 @@ const INTERVAL_KEY = 'dashboard-interval';
 const WATCHLIST_KEY = 'dashboard-watchlist';
 const EXCHANGE_KEY = 'dashboard-exchange';
 const MOBILE_TAB_KEY = 'dashboard-mobile-tab';
+const WHALE_THRESHOLD_KEY = 'dashboard-whale-threshold';
 
 /** Mobile tab identifiers for the bottom tab bar */
 export type MobileTab = 'chart' | 'book' | 'trades' | 'more';
@@ -191,7 +192,48 @@ export function loadMobileTab(): MobileTab {
 }
 
 // -----------------------------------------------------------------------------
+// Whale Threshold
+// -----------------------------------------------------------------------------
+
+/** Saves the whale trade threshold to localStorage. */
+export function saveWhaleThreshold(threshold: number): void {
+  try {
+    localStorage.setItem(WHALE_THRESHOLD_KEY, String(threshold));
+  } catch (error) {
+    console.error('[localPreferences] Failed to save whale threshold', {
+      timestamp: Date.now(),
+      error,
+    });
+  }
+}
+
+/** Loads the whale trade threshold from localStorage. Defaults to `DEFAULT_WHALE_THRESHOLD`. */
+export function loadWhaleThreshold(): number {
+  try {
+    if (typeof window === 'undefined') return DEFAULT_WHALE_THRESHOLD;
+    const raw = localStorage.getItem(WHALE_THRESHOLD_KEY);
+    if (raw !== null) {
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+  } catch (error) {
+    console.error('[localPreferences] Failed to load whale threshold', {
+      timestamp: Date.now(),
+      error,
+    });
+  }
+  return DEFAULT_WHALE_THRESHOLD;
+}
+
+// -----------------------------------------------------------------------------
 // Exports
 // -----------------------------------------------------------------------------
 
-export { THEME_KEY, INTERVAL_KEY, WATCHLIST_KEY, EXCHANGE_KEY, MOBILE_TAB_KEY };
+export {
+  THEME_KEY,
+  INTERVAL_KEY,
+  WATCHLIST_KEY,
+  EXCHANGE_KEY,
+  MOBILE_TAB_KEY,
+  WHALE_THRESHOLD_KEY,
+};

@@ -54,6 +54,9 @@ export const DEFAULT_UPBIT_WATCHLIST_SYMBOLS = [
 
 export const MAX_WATCHLIST_SYMBOLS = 20;
 
+export const DEFAULT_WHALE_THRESHOLD = 50_000;
+export const WHALE_THRESHOLD_OPTIONS = [10_000, 50_000, 100_000, 500_000] as const;
+
 export const COLORS = {
   BUY: '#00C087',
   SELL: '#F6465D',
