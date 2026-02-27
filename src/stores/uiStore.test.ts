@@ -95,9 +95,9 @@ describe('uiStore', () => {
 
   describe('setActiveMobileTab', () => {
     it('sets the active mobile tab and persists to localStorage', () => {
-      useUiStore.getState().setActiveMobileTab('book');
-      expect(useUiStore.getState().activeMobileTab).toBe('book');
-      expect(saveMobileTab).toHaveBeenCalledWith('book');
+      useUiStore.getState().setActiveMobileTab('portfolio');
+      expect(useUiStore.getState().activeMobileTab).toBe('portfolio');
+      expect(saveMobileTab).toHaveBeenCalledWith('portfolio');
     });
 
     it('sets the more tab', () => {

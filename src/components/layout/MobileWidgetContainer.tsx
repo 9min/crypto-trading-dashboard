@@ -12,8 +12,9 @@ import { memo } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { CandlestickWidget } from '@/components/widgets/CandlestickWidget';
-import { OrderBookWidget } from '@/components/widgets/OrderBookWidget';
 import { TradesFeedWidget } from '@/components/widgets/TradesFeedWidget';
+import { PortfolioWidget } from '@/components/widgets/PortfolioWidget';
+import { PerformanceMonitorWidget } from '@/components/widgets/PerformanceMonitorWidget';
 import { MobileMorePanel } from './MobileMorePanel';
 
 // -----------------------------------------------------------------------------
@@ -30,16 +31,22 @@ export const MobileWidgetContainer = memo(function MobileWidgetContainer() {
           <CandlestickWidget />
         </ErrorBoundary>
       );
-    case 'book':
+    case 'portfolio':
       return (
-        <ErrorBoundary widgetName="Order Book">
-          <OrderBookWidget />
+        <ErrorBoundary widgetName="Portfolio">
+          <PortfolioWidget />
         </ErrorBoundary>
       );
     case 'trades':
       return (
         <ErrorBoundary widgetName="Trades">
           <TradesFeedWidget />
+        </ErrorBoundary>
+      );
+    case 'perf':
+      return (
+        <ErrorBoundary widgetName="Performance">
+          <PerformanceMonitorWidget />
         </ErrorBoundary>
       );
     case 'more':
