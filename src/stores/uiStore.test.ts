@@ -4,10 +4,12 @@ import { DEFAULT_SYMBOL } from '@/utils/constants';
 vi.mock('@/utils/localPreferences', () => ({
   saveExchange: vi.fn(),
   loadExchange: vi.fn(() => 'upbit' as const),
+  saveMobileTab: vi.fn(),
+  loadMobileTab: vi.fn(() => 'chart' as const),
 }));
 
 // Import mocked functions for assertion
-import { saveExchange, loadExchange } from '@/utils/localPreferences';
+import { saveExchange, loadExchange, saveMobileTab, loadMobileTab } from '@/utils/localPreferences';
 
 describe('uiStore', () => {
   beforeEach(() => {
@@ -19,6 +21,7 @@ describe('uiStore', () => {
       isExchangeHydrated: false,
       connectionState: { status: 'idle' },
       layout: [],
+      activeMobileTab: 'chart',
     });
     vi.clearAllMocks();
   });
@@ -31,6 +34,7 @@ describe('uiStore', () => {
     expect(state.isExchangeHydrated).toBe(false);
     expect(state.connectionState).toEqual({ status: 'idle' });
     expect(state.layout).toEqual([]);
+    expect(state.activeMobileTab).toBe('chart');
   });
 
   describe('setTheme', () => {
@@ -78,8 +82,24 @@ describe('uiStore', () => {
     it('loads exchange from localStorage and sets isExchangeHydrated', () => {
       useUiStore.getState().hydrateExchange();
       expect(loadExchange).toHaveBeenCalled();
+      expect(loadMobileTab).toHaveBeenCalled();
       expect(useUiStore.getState().exchange).toBe('upbit');
       expect(useUiStore.getState().isExchangeHydrated).toBe(true);
+      expect(useUiStore.getState().activeMobileTab).toBe('chart');
+    });
+  });
+
+  describe('setActiveMobileTab', () => {
+    it('sets the active mobile tab and persists to localStorage', () => {
+      useUiStore.getState().setActiveMobileTab('book');
+      expect(useUiStore.getState().activeMobileTab).toBe('book');
+      expect(saveMobileTab).toHaveBeenCalledWith('book');
+    });
+
+    it('sets the more tab', () => {
+      useUiStore.getState().setActiveMobileTab('more');
+      expect(useUiStore.getState().activeMobileTab).toBe('more');
+      expect(saveMobileTab).toHaveBeenCalledWith('more');
     });
   });
 

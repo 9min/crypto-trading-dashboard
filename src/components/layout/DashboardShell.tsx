@@ -13,7 +13,11 @@
 import { memo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { DashboardHeader } from './DashboardHeader';
+import { MobileHeader } from './MobileHeader';
+import { MobileTabBar } from './MobileTabBar';
+import { MobileWidgetContainer } from './MobileWidgetContainer';
 import { useExchangeWebSocket } from '@/hooks/useExchangeWebSocket';
+import { useMobileBreakpoint } from '@/hooks/useMobileBreakpoint';
 import { usePriceAlertMonitor } from '@/hooks/usePriceAlertMonitor';
 import { useSymbolFromUrl } from '@/hooks/useSymbolFromUrl';
 import { useUiStore } from '@/stores/uiStore';
@@ -63,6 +67,7 @@ export const DashboardShell = memo(function DashboardShell() {
   const hydrateExchange = useUiStore((state) => state.hydrateExchange);
   const isExchangeHydrated = useUiStore((state) => state.isExchangeHydrated);
   const hydrateWidgets = useWidgetStore((state) => state.hydrateWidgets);
+  const isMobile = useMobileBreakpoint();
 
   // Hydrate persisted exchange preference after mount to avoid SSR mismatch
   useEffect(() => {
@@ -77,6 +82,18 @@ export const DashboardShell = memo(function DashboardShell() {
 
   // Monitor price alerts across all streams and send browser notifications
   usePriceAlertMonitor();
+
+  if (isMobile) {
+    return (
+      <div className="bg-background flex h-[100dvh] flex-col">
+        <MobileHeader />
+        <main className="flex-1 overflow-hidden pb-[calc(3.5rem+var(--safe-area-bottom))]">
+          <MobileWidgetContainer />
+        </main>
+        <MobileTabBar />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background flex h-screen flex-col">
