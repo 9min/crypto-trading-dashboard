@@ -242,7 +242,7 @@ export function applyBuyTrade(
  */
 export function applySellTrade(
   existing: PortfolioHolding,
-  price: number,
+  _price: number,
   quantity: number,
 ): PortfolioHolding | undefined {
   const remainingQuantity = existing.quantity - quantity;

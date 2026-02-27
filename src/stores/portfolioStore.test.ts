@@ -276,7 +276,7 @@ describe('hydratePortfolio', () => {
     expect(usePortfolioStore.getState().trades).toHaveLength(2);
   });
 
-  it('sets ishhdrated true even without saved data', () => {
+  it('sets isHydrated true even without saved data', () => {
     usePortfolioStore.getState().hydratePortfolio();
 
     expect(usePortfolioStore.getState().isHydrated).toBe(true);

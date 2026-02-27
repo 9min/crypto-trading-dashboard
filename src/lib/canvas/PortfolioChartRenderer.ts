@@ -121,18 +121,41 @@ export class PortfolioChartRenderer implements CanvasRenderer {
     const { ctx, width, height } = this;
     if (width === 0 || height === 0) return;
 
-    // Clear
-    ctx.fillStyle = this.colors.background;
-    ctx.fillRect(0, 0, width, height);
+    const startMark = 'PortfolioChartRenderer.draw:start';
+    const endMark = 'PortfolioChartRenderer.draw:end';
+    const measureName = 'PortfolioChartRenderer.draw';
+    performance.mark(startMark);
 
-    if (this.slices.length === 0 || this.totalValue === 0) {
-      this.drawEmptyState();
-      return;
+    try {
+      // Clear
+      ctx.fillStyle = this.colors.background;
+      ctx.fillRect(0, 0, width, height);
+
+      if (this.slices.length === 0 || this.totalValue === 0) {
+        this.drawEmptyState();
+        return;
+      }
+
+      this.drawDonut();
+      this.drawCenterText();
+      this.drawLegend();
+    } finally {
+      performance.mark(endMark);
+      const entry = performance.measure(measureName, startMark, endMark);
+      if (entry.duration > 4) {
+        console.error('[PortfolioChartRenderer] redraw exceeded 4ms budget', {
+          action: 'draw',
+          timestamp: Date.now(),
+          durationMs: entry.duration,
+          width,
+          height,
+          sliceCount: this.slices.length,
+        });
+      }
+      performance.clearMarks(startMark);
+      performance.clearMarks(endMark);
+      performance.clearMeasures(measureName);
     }
-
-    this.drawDonut();
-    this.drawCenterText();
-    this.drawLegend();
   }
 
   private drawEmptyState(): void {
