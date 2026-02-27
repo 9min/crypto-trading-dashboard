@@ -10,7 +10,13 @@ import type { ConnectionState } from '@/types/chart';
 import type { LayoutItem } from '@/types/widget';
 import type { ExchangeId } from '@/types/exchange';
 import { DEFAULT_SYMBOL } from '@/utils/constants';
-import { loadExchange, saveExchange } from '@/utils/localPreferences';
+import {
+  loadExchange,
+  saveExchange,
+  loadMobileTab,
+  saveMobileTab,
+  type MobileTab,
+} from '@/utils/localPreferences';
 
 /** Default exchange used for SSR and initial hydration */
 const DEFAULT_EXCHANGE: ExchangeId = 'binance';
@@ -34,6 +40,8 @@ interface UiStoreState {
   connectionState: ConnectionState;
   /** Current dashboard widget layout configuration */
   layout: LayoutItem[];
+  /** Active mobile tab (bottom tab bar selection) */
+  activeMobileTab: MobileTab;
 }
 
 interface UiStoreActions {
@@ -51,6 +59,8 @@ interface UiStoreActions {
   setConnectionState: (state: ConnectionState) => void;
   /** Replace the entire dashboard layout */
   setLayout: (layout: LayoutItem[]) => void;
+  /** Set the active mobile tab */
+  setActiveMobileTab: (tab: MobileTab) => void;
 }
 
 type UiStore = UiStoreState & UiStoreActions;
@@ -80,7 +90,11 @@ export const useUiStore = create<UiStore>()((set) => {
   }
 
   function hydrateExchange(): void {
-    set({ exchange: loadExchange(), isExchangeHydrated: true });
+    set({
+      exchange: loadExchange(),
+      isExchangeHydrated: true,
+      activeMobileTab: loadMobileTab(),
+    });
   }
 
   function setConnectionState(connectionState: ConnectionState): void {
@@ -91,6 +105,11 @@ export const useUiStore = create<UiStore>()((set) => {
     set({ layout });
   }
 
+  function setActiveMobileTab(tab: MobileTab): void {
+    saveMobileTab(tab);
+    set({ activeMobileTab: tab });
+  }
+
   return {
     // -- State ----------------------------------------------------------------
     theme: 'dark',
@@ -99,6 +118,7 @@ export const useUiStore = create<UiStore>()((set) => {
     isExchangeHydrated: false,
     connectionState: { status: 'idle' },
     layout: [],
+    activeMobileTab: 'chart',
 
     // -- Actions --------------------------------------------------------------
     setTheme,
@@ -108,6 +128,7 @@ export const useUiStore = create<UiStore>()((set) => {
     hydrateExchange,
     setConnectionState,
     setLayout,
+    setActiveMobileTab,
   };
 });
 
@@ -116,3 +137,4 @@ export const useUiStore = create<UiStore>()((set) => {
 // -----------------------------------------------------------------------------
 
 export type { Theme, UiStoreState, UiStoreActions, UiStore };
+export type { MobileTab } from '@/utils/localPreferences';

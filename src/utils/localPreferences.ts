@@ -22,10 +22,16 @@ const THEME_KEY = 'dashboard-theme';
 const INTERVAL_KEY = 'dashboard-interval';
 const WATCHLIST_KEY = 'dashboard-watchlist';
 const EXCHANGE_KEY = 'dashboard-exchange';
+const MOBILE_TAB_KEY = 'dashboard-mobile-tab';
+
+/** Mobile tab identifiers for the bottom tab bar */
+export type MobileTab = 'chart' | 'book' | 'trades' | 'more';
+const MOBILE_TABS: readonly MobileTab[] = ['chart', 'book', 'trades', 'more'] as const;
 
 const VALID_THEMES = new Set<string>(['dark', 'light']);
 const VALID_INTERVALS = new Set<string>(KLINE_INTERVALS);
 const VALID_EXCHANGES = new Set<string>(EXCHANGE_IDS);
+const VALID_MOBILE_TABS = new Set<string>(MOBILE_TABS);
 
 // -----------------------------------------------------------------------------
 // Theme
@@ -154,7 +160,38 @@ export function loadExchange(): ExchangeId {
 }
 
 // -----------------------------------------------------------------------------
+// Mobile Tab
+// -----------------------------------------------------------------------------
+
+/** Saves the active mobile tab to localStorage. */
+export function saveMobileTab(tab: MobileTab): void {
+  try {
+    localStorage.setItem(MOBILE_TAB_KEY, tab);
+  } catch (error) {
+    console.error('[localPreferences] Failed to save mobile tab', {
+      timestamp: Date.now(),
+      error,
+    });
+  }
+}
+
+/** Loads the active mobile tab from localStorage. Defaults to `'chart'`. */
+export function loadMobileTab(): MobileTab {
+  try {
+    if (typeof window === 'undefined') return 'chart';
+    const raw = localStorage.getItem(MOBILE_TAB_KEY);
+    if (raw && VALID_MOBILE_TABS.has(raw)) return raw as MobileTab;
+  } catch (error) {
+    console.error('[localPreferences] Failed to load mobile tab', {
+      timestamp: Date.now(),
+      error,
+    });
+  }
+  return 'chart';
+}
+
+// -----------------------------------------------------------------------------
 // Exports
 // -----------------------------------------------------------------------------
 
-export { THEME_KEY, INTERVAL_KEY, WATCHLIST_KEY, EXCHANGE_KEY };
+export { THEME_KEY, INTERVAL_KEY, WATCHLIST_KEY, EXCHANGE_KEY, MOBILE_TAB_KEY };
