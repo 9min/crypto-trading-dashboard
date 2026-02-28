@@ -7,7 +7,7 @@
 // No funding rate polling needed (spot trading has no funding).
 // =============================================================================
 
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useSpotStore } from '@/stores/spotStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -20,19 +20,17 @@ import type { SpotBuyParams, SpotSellParams } from '@/types/spot';
 // -----------------------------------------------------------------------------
 
 export const SpotTradePanelWidget = memo(function SpotTradePanelWidget() {
-  // Store selectors
+  // Store selectors — granular subscriptions to avoid rerenders on unrelated symbols
   const symbol = useUiStore((state) => state.symbol);
   const walletBalance = useSpotStore((state) => state.walletBalance);
-  const holdings = useSpotStore((state) => state.holdings);
+  const existingHolding = useSpotStore(
+    useCallback((state) => state.holdings.get(symbol) ?? null, [symbol]),
+  );
   const buyAsset = useSpotStore((state) => state.buyAsset);
   const sellAsset = useSpotStore((state) => state.sellAsset);
-  const tickers = useWatchlistStore((state) => state.tickers);
-
-  // Current symbol price — uses Upbit KRW price via tickers
-  const currentPrice = useMemo(() => tickers.get(symbol)?.price ?? 0, [tickers, symbol]);
-
-  // Existing holding on current symbol
-  const existingHolding = useMemo(() => holdings.get(symbol) ?? null, [holdings, symbol]);
+  const currentPrice = useWatchlistStore(
+    useCallback((state) => state.tickers.get(symbol)?.price ?? 0, [symbol]),
+  );
 
   // Callbacks
   const handleBuy = useCallback((params: SpotBuyParams) => buyAsset(params), [buyAsset]);

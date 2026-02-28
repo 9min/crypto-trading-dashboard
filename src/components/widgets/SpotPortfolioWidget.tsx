@@ -367,9 +367,17 @@ export const SpotPortfolioWidget = memo(function SpotPortfolioWidget() {
   }, []);
 
   const handleScreenshot = useCallback(async () => {
-    const colors = getThemeColors();
-    const blob = await renderSpotSnapshot({ summary, holdings: holdingsWithPnl }, colors);
-    setSnapshotBlob(blob);
+    try {
+      const colors = getThemeColors();
+      const blob = await renderSpotSnapshot({ summary, holdings: holdingsWithPnl }, colors);
+      setSnapshotBlob(blob);
+    } catch (error) {
+      console.error('[SpotPortfolioWidget] Failed to render snapshot', {
+        action: 'handleScreenshot',
+        timestamp: Date.now(),
+        error,
+      });
+    }
   }, [summary, holdingsWithPnl]);
 
   const handleCloseSnapshot = useCallback(() => {

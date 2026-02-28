@@ -481,9 +481,17 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
   }, []);
 
   const handleScreenshot = useCallback(async () => {
-    const colors = getThemeColors();
-    const blob = await renderFuturesSnapshot({ summary, positions: positionsWithPnl }, colors);
-    setSnapshotBlob(blob);
+    try {
+      const colors = getThemeColors();
+      const blob = await renderFuturesSnapshot({ summary, positions: positionsWithPnl }, colors);
+      setSnapshotBlob(blob);
+    } catch (error) {
+      console.error('[PortfolioWidget] Failed to render snapshot', {
+        action: 'handleScreenshot',
+        timestamp: Date.now(),
+        error,
+      });
+    }
   }, [summary, positionsWithPnl]);
 
   const handleCloseSnapshot = useCallback(() => {
