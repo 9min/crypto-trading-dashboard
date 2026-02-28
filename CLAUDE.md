@@ -47,7 +47,7 @@ src/
 │   │   ├── TradesFeedWidget.tsx
 │   │   ├── WatchlistWidget.tsx
 │   │   ├── WidgetWrapper.tsx
-│   │   ├── PortfolioWidget.tsx    # Phase 5: 모의 포트폴리오
+│   │   ├── PortfolioWidget.tsx    # Phase 5: 선물 모의투자
 │   │   ├── MultiChartWidget.tsx   # Phase 5: 다중 심볼 차트
 │   │   └── ChartPanel.tsx         # Phase 5: 개별 차트 패널
 │   ├── ui/               # 재사용 가능한 UI 프리미티브
@@ -65,7 +65,7 @@ src/
 │   │   ├── UserMenu.tsx
 │   │   ├── WatchlistManagePopover.tsx
 │   │   ├── WidgetSelector.tsx
-│   │   ├── TradePanel.tsx         # Phase 5: 매수/매도 주문 패널
+│   │   ├── TradePanel.tsx         # Phase 5: 롱/숏 주문 패널
 │   │   └── DrawingToolbar.tsx     # Phase 5: 드로잉 도구 팔레트
 │   └── layout/           # 레이아웃 컴포넌트
 │       ├── ConnectionStatus.tsx
@@ -105,7 +105,7 @@ src/
 │   ├── uiStore.ts
 │   ├── watchlistStore.ts
 │   ├── widgetStore.ts
-│   ├── portfolioStore.ts          # Phase 5: 모의 포트폴리오
+│   ├── portfolioStore.ts          # Phase 5: 선물 모의투자
 │   ├── multiChartStore.ts         # Phase 5: 멀티차트 상태
 │   └── drawingStore.ts            # Phase 5: 드로잉 상태
 ├── lib/                  # 핵심 라이브러리
@@ -118,7 +118,7 @@ src/
 │   │   ├── OrderBookRenderer.ts
 │   │   ├── PerformanceMonitorRenderer.ts
 │   │   ├── TradesFeedRenderer.ts
-│   │   ├── PortfolioChartRenderer.ts  # Phase 5: 자산 비중 차트
+│   │   ├── PortfolioChartRenderer.ts  # Phase 5: 포지션 차트
 │   │   └── DrawingRenderer.ts         # Phase 5: 드로잉 오버레이
 │   ├── binance/          # Binance API 클라이언트
 │   │   ├── restApi.ts
@@ -140,7 +140,7 @@ src/
 │   ├── supabase.ts       # Supabase 데이터베이스 타입
 │   ├── upbit.ts          # Upbit API 응답 타입
 │   ├── widget.ts         # 위젯 관련 타입
-│   ├── portfolio.ts      # Phase 5: Portfolio 관련 타입
+│   ├── portfolio.ts      # Phase 5: 선물 모의투자 타입
 │   └── drawing.ts        # Phase 5: Drawing 관련 타입
 └── utils/                # 유틸리티 함수
     ├── constants.ts
@@ -156,7 +156,7 @@ src/
     ├── symbolMap.ts
     ├── symbolSearch.ts
     ├── widgetStorage.ts
-    └── portfolioCalc.ts   # Phase 5: PnL 계산 유틸
+    └── portfolioCalc.ts   # Phase 5: 선물 PnL/청산가 계산
 ```
 
 ---
@@ -508,7 +508,7 @@ useEffect(() => {
 | `toastStore`      | 토스트 알림 메시지 큐 및 표시 상태         |
 | `watchlistStore`  | 관심 종목 목록, 실시간 가격 업데이트       |
 | `widgetStore`     | 위젯 표시 설정, 활성/비활성 상태           |
-| `portfolioStore`  | 모의 포트폴리오 잔고, 보유자산, 거래내역   |
+| `portfolioStore`  | 선물 모의투자 포지션, 마진, 거래내역, PnL  |
 | `multiChartStore` | 멀티차트 심볼 배열, 레이아웃 모드, 동기화  |
 | `drawingStore`    | 차트 드로잉 객체, Undo/Redo 히스토리       |
 
@@ -724,47 +724,69 @@ describe('depthStore', () => {
 
 ## 12. Phase 5 개발 로드맵
 
-> Phase 4(번들 최적화, CSP, 훅 테스트)까지 완료. Phase 5에서는 신규 기능 3개를 순차적으로 구현한다.
+> Phase 4(번들 최적화, CSP, 훅 테스트)까지 완료. Phase 5에서는 신규 기능을 순차적으로 구현한다.
 
 ### 12.1 구현 순서 및 진행 상태
 
-| #   | 기능              | 상태      | 브랜치 | PR  |
-| --- | ----------------- | --------- | ------ | --- |
-| 1   | Portfolio Tracker | ✅ 완료   | main   | —   |
-| 2   | Multi-Chart Sync  | ⬜ 미시작 | —      | —   |
-| 3   | Drawing Tools     | ⬜ 미시작 | —      | —   |
+| #   | 기능                     | 상태      | 브랜치 | PR  |
+| --- | ------------------------ | --------- | ------ | --- |
+| 1   | Portfolio Tracker (현물) | ✅ 완료   | main   | #45 |
+| 2   | Futures Paper Trading    | ⬜ 미시작 | —      | —   |
+| 3   | Multi-Chart Sync         | ⬜ 미시작 | —      | —   |
+| 4   | Drawing Tools            | ⬜ 미시작 | —      | —   |
 
-### 12.2 Portfolio Tracker (모의 포트폴리오)
+### 12.2 Futures Paper Trading (코인 선물 모의투자)
 
-가상 잔고($100,000 USDT)로 매수/매도 시뮬레이션(Paper Trading). 포트폴리오 PnL 실시간 계산.
+기존 현물 모의투자(Portfolio Tracker)를 코인 선물 모의투자로 대체. 롱/숏 포지션, 1x~100x 레버리지, 청산가 계산 등 실제 선물 거래 시뮬레이션.
 
 **핵심 기능:**
 
-- 가상 잔고 + 시장가 기반 매수/매도 주문 UI
-- 보유 자산 목록 + 실시간 PnL 계산 (watchlistStore 가격 활용)
-- 자산 비중 시각화 (Canvas — `PortfolioChartRenderer`)
-- 거래 내역 테이블 + CSV 내보내기
+- 롱(Long) / 숏(Short) 포지션 개설 (시장가 기반)
+- 레버리지 설정 (1x ~ 100x, Cross / Isolated 마진 모드)
+- 실시간 미실현 PnL (Unrealized PnL) + ROE% 계산
+- 청산가 (Liquidation Price) 자동 계산 및 표시
+- 포지션 부분 청산 / 전체 청산 (Close Position)
+- 강제 청산 시뮬레이션 (현재가가 청산가 도달 시 자동 청산)
+- 거래 내역 + 실현 PnL (Realized PnL) 기록
 - Supabase 영속화 (로그인) / localStorage 폴백 (비로그인)
 
-**신규 파일:**
+**수정 파일 (기존 Portfolio 코드 리팩터):**
 
-- `src/stores/portfolioStore.ts` — 잔고, 보유자산, 거래내역 상태
-- `src/components/widgets/PortfolioWidget.tsx` — 포트폴리오 위젯
-- `src/components/ui/TradePanel.tsx` — 매수/매도 주문 패널
-- `src/types/portfolio.ts` — Portfolio 관련 타입
-- `src/lib/canvas/PortfolioChartRenderer.ts` — 자산 비중 차트
-- `src/utils/portfolioCalc.ts` — PnL 계산 유틸
+- `src/stores/portfolioStore.ts` → 선물 포지션, 마진, 레버리지 상태 추가
+- `src/components/widgets/PortfolioWidget.tsx` → 포지션 목록, 미실현 PnL 표시
+- `src/components/ui/TradePanel.tsx` → 롱/숏 탭, 레버리지 슬라이더
+- `src/types/portfolio.ts` → 선물 관련 타입 (Position, MarginType, Side 등)
+- `src/lib/canvas/PortfolioChartRenderer.ts` → 포지션 비중 차트
+- `src/utils/portfolioCalc.ts` → 청산가, 마진, ROE 계산 로직 추가
 
-**수정 파일:**
+**핵심 타입:**
 
-- `src/stores/widgetStore.ts` — portfolio 위젯 ID 추가
-- `src/types/widget.ts` — WidgetId에 `'portfolio'` 추가
-- `src/components/layout/DashboardGrid.tsx` — 기본 레이아웃 배치
+```typescript
+type PositionSide = 'long' | 'short';
+type MarginType = 'cross' | 'isolated';
+
+interface FuturesPosition {
+  id: string;
+  symbol: string;
+  side: PositionSide;
+  entryPrice: number;
+  quantity: number;
+  leverage: number;
+  marginType: MarginType;
+  margin: number; // 투입 증거금
+  liquidationPrice: number; // 청산가
+  openedAt: number; // 포지션 오픈 시각
+}
+```
 
 **기술 포인트:**
 
-- Supabase 테이블: `portfolio_trades`, `portfolio_holdings`
-- Canvas로 자산 비중 차트 렌더링 (DOM 최소화 원칙 준수)
+- 격리 마진 청산가: `entryPrice × (1 ∓ 1/leverage)` (롱: −, 숏: +)
+- ROE 계산: `(currentPrice − entryPrice) / entryPrice × leverage × 100` (숏은 부호 반전)
+- Unrealized PnL: `(currentPrice − entryPrice) × quantity × direction` (long: +1, short: −1)
+- 실시간 가격 × 포지션으로 PnL 계산 (watchlistStore 가격 활용)
+- 강제 청산: 현재가 ≤ 청산가(롱) 또는 현재가 ≥ 청산가(숏) 시 자동 포지션 종료
+- Supabase 테이블: `futures_positions`, `futures_trades`
 
 ### 12.3 Multi-Chart Sync (다중 심볼 차트 비교)
 
