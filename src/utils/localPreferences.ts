@@ -26,7 +26,7 @@ const MOBILE_TAB_KEY = 'dashboard-mobile-tab';
 const WHALE_THRESHOLD_KEY = 'dashboard-whale-threshold';
 
 /** Mobile tab identifiers for the bottom tab bar — derived from runtime array */
-const MOBILE_TABS = ['market', 'chart', 'trade', 'portfolio', 'more'] as const;
+const MOBILE_TABS = ['chart', 'orderbook', 'trade', 'portfolio', 'more'] as const;
 export type MobileTab = (typeof MOBILE_TABS)[number];
 
 const VALID_THEMES = new Set<string>(['dark', 'light']);
