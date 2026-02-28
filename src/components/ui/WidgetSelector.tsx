@@ -19,6 +19,7 @@ import { WIDGET_TYPES, type WidgetType } from '@/types/widget';
 export const WidgetSelector = memo(function WidgetSelector() {
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const visibleWidgets = useWidgetStore((state) => state.visibleWidgets);
   const hideWidget = useWidgetStore((state) => state.hideWidget);
@@ -38,6 +39,25 @@ export const WidgetSelector = memo(function WidgetSelector() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, [isOpen]);
+
+  // Adjust popover horizontal position to prevent viewport overflow
+  useEffect(() => {
+    if (!isOpen) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    requestAnimationFrame(() => {
+      const rect = panel.getBoundingClientRect();
+      const margin = 8;
+      if (rect.left < margin) {
+        panel.style.transform = `translateX(${margin - rect.left}px)`;
+      } else if (rect.right > window.innerWidth - margin) {
+        panel.style.transform = `translateX(-${rect.right - (window.innerWidth - margin)}px)`;
+      } else {
+        panel.style.transform = '';
+      }
+    });
   }, [isOpen]);
 
   const handleToggle = useCallback(() => {
@@ -60,7 +80,7 @@ export const WidgetSelector = memo(function WidgetSelector() {
       <button
         type="button"
         onClick={handleToggle}
-        className="text-foreground-secondary hover:bg-background-tertiary hover:text-foreground relative flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors"
+        className="text-foreground-secondary hover:bg-background-tertiary hover:text-foreground relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-md transition-colors"
         aria-label="Toggle widgets"
       >
         {/* Grid icon */}
@@ -85,7 +105,10 @@ export const WidgetSelector = memo(function WidgetSelector() {
       </button>
 
       {isOpen && (
-        <div className="border-border bg-background-secondary absolute top-full right-0 z-50 mt-2 w-52 overflow-hidden rounded-lg border shadow-xl">
+        <div
+          ref={panelRef}
+          className="border-border bg-background-secondary absolute top-full right-0 z-50 mt-2 w-52 overflow-hidden rounded-lg border shadow-xl"
+        >
           {/* Header */}
           <div className="border-border flex items-center justify-between border-b px-3 py-2">
             <span className="text-foreground text-xs font-semibold">Widgets</span>

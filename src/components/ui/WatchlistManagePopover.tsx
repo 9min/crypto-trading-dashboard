@@ -84,7 +84,7 @@ export const WatchlistManagePopover = memo(function WatchlistManagePopover() {
       <button
         type="button"
         onClick={handleToggle}
-        className="text-foreground-secondary hover:bg-background hover:text-foreground flex h-5 w-5 cursor-pointer items-center justify-center rounded transition-colors"
+        className="text-foreground-secondary hover:bg-background hover:text-foreground flex h-7 w-7 cursor-pointer items-center justify-center rounded transition-colors"
         aria-label="Add symbol"
       >
         <svg

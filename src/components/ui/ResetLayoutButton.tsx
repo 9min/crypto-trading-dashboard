@@ -36,7 +36,7 @@ export const ResetLayoutButton = memo(function ResetLayoutButton() {
     <button
       type="button"
       onClick={handleReset}
-      className="text-foreground-secondary hover:bg-background-tertiary hover:text-foreground flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors"
+      className="text-foreground-secondary hover:bg-background-tertiary hover:text-foreground flex h-8 w-8 cursor-pointer items-center justify-center rounded-md transition-colors"
       aria-label="Reset layout"
       title="Reset layout"
     >
