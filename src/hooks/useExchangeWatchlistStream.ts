@@ -13,6 +13,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useWatchlistStream } from '@/hooks/useWatchlistStream';
 import { useUpbitWatchlistStream } from '@/hooks/useUpbitWatchlistStream';
+import { useFuturesBinanceStream } from '@/hooks/useFuturesBinanceStream';
 import { toUpbitSymbol } from '@/utils/symbolMap';
 
 // -----------------------------------------------------------------------------
@@ -39,4 +40,8 @@ export function useExchangeWatchlistStream(): void {
 
   // Upbit watchlist: active when exchange === 'upbit'
   useUpbitWatchlistStream({ symbols: upbitSymbols });
+
+  // Futures Binance stream: maintains Binance USDT prices for futures PnL
+  // when the active exchange is not Binance
+  useFuturesBinanceStream({ enabled: exchange === 'upbit' });
 }

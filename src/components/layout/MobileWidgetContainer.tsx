@@ -20,6 +20,8 @@ import { DepthChartWidget } from '@/components/widgets/DepthChartWidget';
 import { TradesFeedWidget } from '@/components/widgets/TradesFeedWidget';
 import { PortfolioWidget } from '@/components/widgets/PortfolioWidget';
 import { TradePanelWidget } from '@/components/widgets/TradePanelWidget';
+import { SpotPortfolioWidget } from '@/components/widgets/SpotPortfolioWidget';
+import { SpotTradePanelWidget } from '@/components/widgets/SpotTradePanelWidget';
 import { PerformanceMonitorWidget } from '@/components/widgets/PerformanceMonitorWidget';
 
 // -----------------------------------------------------------------------------
@@ -38,6 +40,7 @@ const MORE_ITEM_STYLE = { height: 260, minHeight: 260 } as const;
 
 export const MobileWidgetContainer = memo(function MobileWidgetContainer() {
   const activeMobileTab = useUiStore((state) => state.activeMobileTab);
+  const exchange = useUiStore((state) => state.exchange);
 
   switch (activeMobileTab) {
     case 'chart':
@@ -73,13 +76,13 @@ export const MobileWidgetContainer = memo(function MobileWidgetContainer() {
     case 'trade':
       return (
         <ErrorBoundary widgetName="Trade Panel">
-          <TradePanelWidget />
+          {exchange === 'upbit' ? <SpotTradePanelWidget /> : <TradePanelWidget />}
         </ErrorBoundary>
       );
     case 'portfolio':
       return (
-        <ErrorBoundary widgetName="Futures">
-          <PortfolioWidget />
+        <ErrorBoundary widgetName={exchange === 'upbit' ? 'Spot' : 'Futures'}>
+          {exchange === 'upbit' ? <SpotPortfolioWidget /> : <PortfolioWidget />}
         </ErrorBoundary>
       );
     case 'more':

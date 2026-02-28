@@ -115,6 +115,21 @@ describe('useWatchlistStream', () => {
       });
     });
 
+    it('also calls setBinanceTickers with REST responses', async () => {
+      const setBinanceTickersSpy = vi.spyOn(useWatchlistStore.getState(), 'setBinanceTickers');
+
+      renderHook(() => useWatchlistStream(true));
+
+      await vi.waitFor(() => {
+        expect(setBinanceTickersSpy).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({ symbol: 'BTCUSDT', price: 50000 }),
+            expect.objectContaining({ symbol: 'ETHUSDT', price: 3000 }),
+          ]),
+        );
+      });
+    });
+
     it('connects WatchlistStreamManager with symbols', () => {
       renderHook(() => useWatchlistStream(true));
 
@@ -148,6 +163,29 @@ describe('useWatchlistStream', () => {
       });
 
       expect(updateTickerSpy).toHaveBeenCalledWith(
+        'BTCUSDT',
+        expect.objectContaining({
+          price: 51000,
+          volume: 1100000,
+        }),
+      );
+    });
+
+    it('also routes miniTicker events to updateBinanceTicker', async () => {
+      let tickerHandler: ((event: BinanceMiniTickerEvent) => void) | null = null;
+      mockSubscribe.mockImplementation((handler: (event: BinanceMiniTickerEvent) => void) => {
+        tickerHandler = handler;
+        return vi.fn();
+      });
+
+      const updateBinanceTickerSpy = vi.spyOn(useWatchlistStore.getState(), 'updateBinanceTicker');
+      renderHook(() => useWatchlistStream(true));
+
+      act(() => {
+        tickerHandler?.(createMiniTickerEvent('BTCUSDT', '51000', '50000', '1100000'));
+      });
+
+      expect(updateBinanceTickerSpy).toHaveBeenCalledWith(
         'BTCUSDT',
         expect.objectContaining({
           price: 51000,

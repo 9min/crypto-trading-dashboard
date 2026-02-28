@@ -8,7 +8,7 @@
 // Respects safe-area-inset-bottom for devices with home indicators.
 // =============================================================================
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import type { MobileTab } from '@/stores/uiStore';
 
@@ -140,7 +140,7 @@ interface TabConfig {
 // Constants
 // -----------------------------------------------------------------------------
 
-const TABS: readonly TabConfig[] = [
+const BASE_TABS: readonly TabConfig[] = [
   { id: 'chart', label: 'Chart', icon: ChartIcon },
   { id: 'orderbook', label: 'Book', icon: OrderBookIcon },
   { id: 'trade', label: 'Trade', icon: TradeIcon },
@@ -155,6 +155,15 @@ const TABS: readonly TabConfig[] = [
 export const MobileTabBar = memo(function MobileTabBar() {
   const activeMobileTab = useUiStore((state) => state.activeMobileTab);
   const setActiveMobileTab = useUiStore((state) => state.setActiveMobileTab);
+  const exchange = useUiStore((state) => state.exchange);
+
+  const tabs = useMemo(
+    () =>
+      BASE_TABS.map((tab) =>
+        tab.id === 'portfolio' ? { ...tab, label: exchange === 'upbit' ? 'Spot' : 'Futures' } : tab,
+      ),
+    [exchange],
+  );
 
   const handleTabClick = useCallback(
     (tab: MobileTab) => {
@@ -170,7 +179,7 @@ export const MobileTabBar = memo(function MobileTabBar() {
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="flex h-14">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = activeMobileTab === tab.id;
           const Icon = tab.icon;
           return (
