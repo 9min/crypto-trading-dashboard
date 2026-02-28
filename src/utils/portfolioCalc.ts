@@ -283,7 +283,8 @@ export function calculateFuturesSummary(
   const availableBalance = walletBalance - totalMarginUsed;
   const totalUnrealizedPnlPercent =
     totalMarginUsed > 0 ? (totalUnrealizedPnl / totalMarginUsed) * 100 : 0;
-  const marginRatio = totalEquity > 0 ? (totalMarginUsed / totalEquity) * 100 : 0;
+  const marginRatio =
+    totalEquity > 0 ? (totalMarginUsed / totalEquity) * 100 : totalMarginUsed > 0 ? 100 : 0;
   const marginRatioPercent = Math.max(0, Math.min(100, marginRatio));
 
   return {

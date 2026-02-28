@@ -113,15 +113,18 @@ export const TradePanel = memo(function TradePanel({
     };
   }, []);
 
+  const isCloseMode = existingPosition !== null && existingPosition.side === activeSide;
+
   // Parse quantity to base asset amount
+  // In close mode, quantity is always in base asset — skip USDT conversion
   const parsedQuantity = useMemo(() => {
     const val = parseFloat(quantity);
     if (isNaN(val) || val <= 0) return 0;
-    if (inputMode === 'usdt' && currentPrice > 0) {
+    if (!isCloseMode && inputMode === 'usdt' && currentPrice > 0) {
       return val / currentPrice;
     }
     return val;
-  }, [quantity, inputMode, currentPrice]);
+  }, [quantity, inputMode, currentPrice, isCloseMode]);
 
   const baseAsset = useMemo(() => formatSymbol(symbol).replace(/\/.*$/, ''), [symbol]);
 
@@ -136,7 +139,6 @@ export const TradePanel = memo(function TradePanel({
     [availableBalance, currentPrice, leverage],
   );
 
-  const isCloseMode = existingPosition !== null && existingPosition.side === activeSide;
   const hasOppositePosition = existingPosition !== null && existingPosition.side !== activeSide;
 
   // Parse TP/SL

@@ -33,6 +33,7 @@ import {
 } from '@/utils/portfolioCalc';
 import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol } from '@/utils/formatSymbol';
+import { fetchFundingRate } from '@/lib/binance/restApi';
 import { TradePanel } from '@/components/ui/TradePanel';
 import { WidgetWrapper } from './WidgetWrapper';
 import type { FuturesTrade, PositionWithPnl, CloseReason } from '@/types/portfolio';
@@ -471,7 +472,6 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
 
     const fetchRate = async () => {
       try {
-        const { fetchFundingRate } = await import('@/lib/binance/restApi');
         const data = await fetchFundingRate(symbol);
         if (!cancelled) {
           setFundingRate(parseFloat(data.lastFundingRate));
