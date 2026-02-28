@@ -8,10 +8,13 @@ import {
   loadWatchlistSymbols,
   saveWhaleThreshold,
   loadWhaleThreshold,
+  saveWhaleAlertEnabled,
+  loadWhaleAlertEnabled,
   THEME_KEY,
   INTERVAL_KEY,
   WATCHLIST_KEY,
   WHALE_THRESHOLD_KEY,
+  WHALE_ALERT_ENABLED_KEY,
 } from './localPreferences';
 import { DEFAULT_WATCHLIST_SYMBOLS, DEFAULT_WHALE_THRESHOLD } from '@/utils/constants';
 
@@ -215,6 +218,56 @@ describe('localPreferences', () => {
         throw new Error('SecurityError');
       });
       expect(loadWhaleThreshold()).toBe(DEFAULT_WHALE_THRESHOLD);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Whale Alert Enabled
+  // ---------------------------------------------------------------------------
+  describe('saveWhaleAlertEnabled', () => {
+    it('stores the boolean string under the correct key', () => {
+      saveWhaleAlertEnabled(false);
+      expect(localStorage.setItem).toHaveBeenCalledWith(WHALE_ALERT_ENABLED_KEY, 'false');
+    });
+
+    it('stores true under the correct key', () => {
+      saveWhaleAlertEnabled(true);
+      expect(localStorage.setItem).toHaveBeenCalledWith(WHALE_ALERT_ENABLED_KEY, 'true');
+    });
+
+    it('does not throw when localStorage.setItem throws', () => {
+      vi.mocked(localStorage.setItem).mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      });
+      expect(() => saveWhaleAlertEnabled(true)).not.toThrow();
+    });
+  });
+
+  describe('loadWhaleAlertEnabled', () => {
+    it('returns true when stored value is "true"', () => {
+      mockStorage.set(WHALE_ALERT_ENABLED_KEY, 'true');
+      expect(loadWhaleAlertEnabled()).toBe(true);
+    });
+
+    it('returns false when stored value is "false"', () => {
+      mockStorage.set(WHALE_ALERT_ENABLED_KEY, 'false');
+      expect(loadWhaleAlertEnabled()).toBe(false);
+    });
+
+    it('returns false when no value is stored', () => {
+      expect(loadWhaleAlertEnabled()).toBe(false);
+    });
+
+    it('returns false for an invalid string', () => {
+      mockStorage.set(WHALE_ALERT_ENABLED_KEY, 'maybe');
+      expect(loadWhaleAlertEnabled()).toBe(false);
+    });
+
+    it('returns false when localStorage.getItem throws', () => {
+      vi.mocked(localStorage.getItem).mockImplementation(() => {
+        throw new Error('SecurityError');
+      });
+      expect(loadWhaleAlertEnabled()).toBe(false);
     });
   });
 });

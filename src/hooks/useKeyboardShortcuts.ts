@@ -98,6 +98,12 @@ export function useKeyboardShortcuts({ enabled }: UseKeyboardShortcutsOptions): 
         return;
       }
 
+      // S → Open settings
+      if (key === 's' || key === 'S') {
+        useUiStore.getState().setSettingsOpen(true);
+        return;
+      }
+
       // Escape → Close all overlays
       if (key === 'Escape') {
         useUiStore.getState().closeAllOverlays();

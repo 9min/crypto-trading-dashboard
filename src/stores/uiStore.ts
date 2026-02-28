@@ -46,6 +46,8 @@ interface UiStoreState {
   isSymbolSearchOpen: boolean;
   /** Whether the keyboard shortcuts help modal is open */
   isShortcutsHelpOpen: boolean;
+  /** Whether the settings panel is open */
+  isSettingsOpen: boolean;
 }
 
 interface UiStoreActions {
@@ -69,6 +71,8 @@ interface UiStoreActions {
   setSymbolSearchOpen: (open: boolean) => void;
   /** Open or close the keyboard shortcuts help modal */
   setShortcutsHelpOpen: (open: boolean) => void;
+  /** Open or close the settings panel */
+  setSettingsOpen: (open: boolean) => void;
   /** Close all overlay modals */
   closeAllOverlays: () => void;
 }
@@ -128,8 +132,12 @@ export const useUiStore = create<UiStore>()((set) => {
     set({ isShortcutsHelpOpen: open });
   }
 
+  function setSettingsOpen(open: boolean): void {
+    set({ isSettingsOpen: open });
+  }
+
   function closeAllOverlays(): void {
-    set({ isSymbolSearchOpen: false, isShortcutsHelpOpen: false });
+    set({ isSymbolSearchOpen: false, isShortcutsHelpOpen: false, isSettingsOpen: false });
   }
 
   return {
@@ -143,6 +151,7 @@ export const useUiStore = create<UiStore>()((set) => {
     activeMobileTab: 'chart',
     isSymbolSearchOpen: false,
     isShortcutsHelpOpen: false,
+    isSettingsOpen: false,
 
     // -- Actions --------------------------------------------------------------
     setTheme,
@@ -155,6 +164,7 @@ export const useUiStore = create<UiStore>()((set) => {
     setActiveMobileTab,
     setSymbolSearchOpen,
     setShortcutsHelpOpen,
+    setSettingsOpen,
     closeAllOverlays,
   };
 });

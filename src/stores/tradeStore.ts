@@ -22,7 +22,7 @@ import {
 } from '@/utils/constants';
 import { useToastStore } from '@/stores/toastStore';
 import { formatPrice } from '@/utils/formatPrice';
-import { saveWhaleThreshold } from '@/utils/localPreferences';
+import { saveWhaleThreshold, saveWhaleAlertEnabled } from '@/utils/localPreferences';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -42,6 +42,8 @@ interface TradeStoreState {
   lastPriceDirection: PriceDirection;
   /** Minimum notional value (price * quantity) to classify a trade as a whale trade */
   whaleThreshold: number;
+  /** Whether whale alert toast notifications are enabled */
+  isWhaleAlertEnabled: boolean;
 }
 
 interface TradeStoreActions {
@@ -53,6 +55,8 @@ interface TradeStoreActions {
   toTradeEntries: () => TradeEntry[];
   /** Update the whale trade detection threshold */
   setWhaleThreshold: (threshold: number) => void;
+  /** Enable or disable whale alert toast notifications */
+  setWhaleAlertEnabled: (enabled: boolean) => void;
   /** Reset store to initial state */
   reset: () => void;
 }
@@ -97,6 +101,7 @@ const INITIAL_STATE: TradeStoreState = {
   lastPrice: 0,
   lastPriceDirection: 'neutral',
   whaleThreshold: DEFAULT_WHALE_THRESHOLD,
+  isWhaleAlertEnabled: false,
 };
 
 // -----------------------------------------------------------------------------
@@ -116,7 +121,7 @@ export const useTradeStore = create<TradeStore>()((set, get) => ({
 
     // Whale trade toast notification (ingestion-time check)
     const notional = trade.price * trade.quantity;
-    if (notional >= state.whaleThreshold) {
+    if (state.isWhaleAlertEnabled && notional >= state.whaleThreshold) {
       const side = trade.isBuyerMaker ? 'SELL' : 'BUY';
       const formatted =
         notional >= 1_000_000
@@ -200,6 +205,11 @@ export const useTradeStore = create<TradeStore>()((set, get) => ({
     set({ whaleThreshold: threshold });
   },
 
+  setWhaleAlertEnabled: (enabled: boolean): void => {
+    saveWhaleAlertEnabled(enabled);
+    set({ isWhaleAlertEnabled: enabled });
+  },
+
   reset: (): void => {
     set({
       buffer: createTradeBuffer(),
@@ -207,6 +217,7 @@ export const useTradeStore = create<TradeStore>()((set, get) => ({
       lastPrice: 0,
       lastPriceDirection: 'neutral',
       whaleThreshold: get().whaleThreshold,
+      isWhaleAlertEnabled: get().isWhaleAlertEnabled,
     });
   },
 }));

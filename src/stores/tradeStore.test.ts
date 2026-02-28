@@ -12,10 +12,11 @@ vi.mock('@/utils/localPreferences', async (importOriginal) => {
   return {
     ...actual,
     saveWhaleThreshold: vi.fn(),
+    saveWhaleAlertEnabled: vi.fn(),
   };
 });
 
-import { saveWhaleThreshold } from '@/utils/localPreferences';
+import { saveWhaleThreshold, saveWhaleAlertEnabled } from '@/utils/localPreferences';
 
 // Helper to create a trade entry with sensible defaults
 function createTrade(overrides: Partial<TradeEntry> = {}): TradeEntry {
@@ -31,7 +32,7 @@ function createTrade(overrides: Partial<TradeEntry> = {}): TradeEntry {
 
 // Helper to reset store state between tests
 function resetStore(): void {
-  useTradeStore.setState({ whaleThreshold: DEFAULT_WHALE_THRESHOLD });
+  useTradeStore.setState({ whaleThreshold: DEFAULT_WHALE_THRESHOLD, isWhaleAlertEnabled: false });
   useTradeStore.getState().reset();
   useToastStore.setState({ toasts: [] });
 }
@@ -308,6 +309,7 @@ describe('tradeStore', () => {
     });
 
     it('triggers toast for whale trade above threshold', () => {
+      useTradeStore.getState().setWhaleAlertEnabled(true);
       useTradeStore.getState().setWhaleThreshold(10_000);
 
       // Trade with notional = 50000 * 1 = 50000 >= 10000 → whale
@@ -320,6 +322,7 @@ describe('tradeStore', () => {
     });
 
     it('does not trigger toast for trades below threshold', () => {
+      useTradeStore.getState().setWhaleAlertEnabled(true);
       useTradeStore.getState().setWhaleThreshold(100_000);
 
       // Trade with notional = 50000 * 0.5 = 25000 < 100000
@@ -329,6 +332,7 @@ describe('tradeStore', () => {
     });
 
     it('formats whale toast with K suffix', () => {
+      useTradeStore.getState().setWhaleAlertEnabled(true);
       useTradeStore.getState().setWhaleThreshold(10_000);
 
       // notional = 50000 * 1 = 50000 → "$50.0K"
@@ -342,6 +346,7 @@ describe('tradeStore', () => {
     });
 
     it('formats whale toast with M suffix for large trades', () => {
+      useTradeStore.getState().setWhaleAlertEnabled(true);
       useTradeStore.getState().setWhaleThreshold(10_000);
 
       // notional = 50000 * 30 = 1500000 → "$1.5M"
@@ -352,6 +357,50 @@ describe('tradeStore', () => {
       const toasts = useToastStore.getState().toasts;
       expect(toasts[0].message).toContain('SELL');
       expect(toasts[0].message).toContain('$1.5M');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Whale Alert Enabled
+  // ---------------------------------------------------------------------------
+
+  describe('isWhaleAlertEnabled', () => {
+    it('defaults to false', () => {
+      expect(useTradeStore.getState().isWhaleAlertEnabled).toBe(false);
+    });
+
+    it('setWhaleAlertEnabled updates state and persists', () => {
+      useTradeStore.getState().setWhaleAlertEnabled(false);
+
+      expect(useTradeStore.getState().isWhaleAlertEnabled).toBe(false);
+      expect(saveWhaleAlertEnabled).toHaveBeenCalledWith(false);
+    });
+
+    it('suppresses whale toast when disabled', () => {
+      useTradeStore.getState().setWhaleThreshold(10_000);
+      useTradeStore.getState().setWhaleAlertEnabled(false);
+
+      // Trade with notional = 50000 * 1 = 50000 >= 10000 → would be whale, but alerts disabled
+      useTradeStore.getState().addTrade(createTrade({ id: 1, price: 50000, quantity: 1 }));
+
+      expect(useToastStore.getState().toasts).toHaveLength(0);
+    });
+
+    it('shows whale toast when re-enabled', () => {
+      useTradeStore.getState().setWhaleThreshold(10_000);
+      useTradeStore.getState().setWhaleAlertEnabled(false);
+      useTradeStore.getState().setWhaleAlertEnabled(true);
+
+      useTradeStore.getState().addTrade(createTrade({ id: 1, price: 50000, quantity: 1 }));
+
+      expect(useToastStore.getState().toasts).toHaveLength(1);
+      expect(useToastStore.getState().toasts[0].message).toContain('Whale');
+    });
+
+    it('preserves isWhaleAlertEnabled through reset', () => {
+      useTradeStore.getState().setWhaleAlertEnabled(true);
+      useTradeStore.getState().reset();
+      expect(useTradeStore.getState().isWhaleAlertEnabled).toBe(true);
     });
   });
 });

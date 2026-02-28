@@ -18,6 +18,7 @@ import { MobileTabBar } from './MobileTabBar';
 import { MobileWidgetContainer } from './MobileWidgetContainer';
 import { SymbolSearchModal } from '@/components/ui/SymbolSearchModal';
 import { KeyboardShortcutsHelp } from '@/components/ui/KeyboardShortcutsHelp';
+import { SettingsPanel } from '@/components/ui/SettingsPanel';
 import { useExchangeWebSocket } from '@/hooks/useExchangeWebSocket';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMobileBreakpoint } from '@/hooks/useMobileBreakpoint';
@@ -27,7 +28,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useTradeStore } from '@/stores/tradeStore';
 import { useWidgetStore } from '@/stores/widgetStore';
 import { usePortfolioStore } from '@/stores/portfolioStore';
-import { loadWhaleThreshold } from '@/utils/localPreferences';
+import { loadWhaleThreshold, loadWhaleAlertEnabled } from '@/utils/localPreferences';
 
 const DashboardGrid = dynamic(() => import('./DashboardGrid').then((m) => m.DashboardGrid), {
   ssr: false,
@@ -74,8 +75,10 @@ export const DashboardShell = memo(function DashboardShell() {
   const isExchangeHydrated = useUiStore((state) => state.isExchangeHydrated);
   const isSymbolSearchOpen = useUiStore((state) => state.isSymbolSearchOpen);
   const isShortcutsHelpOpen = useUiStore((state) => state.isShortcutsHelpOpen);
+  const isSettingsOpen = useUiStore((state) => state.isSettingsOpen);
   const setSymbolSearchOpen = useUiStore((state) => state.setSymbolSearchOpen);
   const setShortcutsHelpOpen = useUiStore((state) => state.setShortcutsHelpOpen);
+  const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const hydrateWidgets = useWidgetStore((state) => state.hydrateWidgets);
   const hydratePortfolio = usePortfolioStore((state) => state.hydratePortfolio);
   const isMobile = useMobileBreakpoint();
@@ -86,9 +89,11 @@ export const DashboardShell = memo(function DashboardShell() {
     hydrateWidgets();
     hydratePortfolio();
 
-    // Hydrate whale threshold from localStorage
+    // Hydrate whale threshold and alert enabled from localStorage
     const threshold = loadWhaleThreshold();
     useTradeStore.getState().setWhaleThreshold(threshold);
+    const whaleAlertEnabled = loadWhaleAlertEnabled();
+    useTradeStore.getState().setWhaleAlertEnabled(whaleAlertEnabled);
   }, [hydrateExchange, hydrateWidgets, hydratePortfolio]);
 
   // Sync ?symbol= URL param ↔ uiStore.symbol after exchange hydration
@@ -110,6 +115,10 @@ export const DashboardShell = memo(function DashboardShell() {
     setShortcutsHelpOpen(false);
   }, [setShortcutsHelpOpen]);
 
+  const handleCloseSettings = useCallback(() => {
+    setSettingsOpen(false);
+  }, [setSettingsOpen]);
+
   if (isMobile) {
     return (
       <div className="bg-background flex h-[100dvh] flex-col">
@@ -120,6 +129,7 @@ export const DashboardShell = memo(function DashboardShell() {
         <MobileTabBar />
         <SymbolSearchModal isOpen={isSymbolSearchOpen} onClose={handleCloseSymbolSearch} />
         <KeyboardShortcutsHelp isOpen={isShortcutsHelpOpen} onClose={handleCloseShortcutsHelp} />
+        <SettingsPanel isOpen={isSettingsOpen} onClose={handleCloseSettings} />
       </div>
     );
   }
@@ -132,6 +142,7 @@ export const DashboardShell = memo(function DashboardShell() {
       </main>
       <SymbolSearchModal isOpen={isSymbolSearchOpen} onClose={handleCloseSymbolSearch} />
       <KeyboardShortcutsHelp isOpen={isShortcutsHelpOpen} onClose={handleCloseShortcutsHelp} />
+      <SettingsPanel isOpen={isSettingsOpen} onClose={handleCloseSettings} />
     </div>
   );
 });
