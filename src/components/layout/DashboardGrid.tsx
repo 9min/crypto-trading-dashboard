@@ -43,6 +43,9 @@ import { DepthChartWidget } from '@/components/widgets/DepthChartWidget';
 import { PerformanceMonitorWidget } from '@/components/widgets/PerformanceMonitorWidget';
 import { PortfolioWidget } from '@/components/widgets/PortfolioWidget';
 import { TradePanelWidget } from '@/components/widgets/TradePanelWidget';
+import { SpotPortfolioWidget } from '@/components/widgets/SpotPortfolioWidget';
+import { SpotTradePanelWidget } from '@/components/widgets/SpotTradePanelWidget';
+import { useUiStore } from '@/stores/uiStore';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -146,6 +149,7 @@ export const DashboardGrid = memo(function DashboardGrid() {
   );
 
   const visibleWidgets = useWidgetStore((state) => state.visibleWidgets);
+  const exchange = useUiStore((state) => state.exchange);
 
   const allWidgets: GridWidget[] = useMemo(
     () => [
@@ -156,10 +160,18 @@ export const DashboardGrid = memo(function DashboardGrid() {
       { key: 'premium', title: 'Kimchi Premium', component: <KimchiPremiumWidget /> },
       { key: 'depth', title: 'Depth Chart', component: <DepthChartWidget /> },
       { key: 'perf', title: 'Performance', component: <PerformanceMonitorWidget /> },
-      { key: 'portfolio', title: 'Futures', component: <PortfolioWidget /> },
-      { key: 'tradepanel', title: 'Trade Panel', component: <TradePanelWidget /> },
+      {
+        key: 'portfolio',
+        title: exchange === 'upbit' ? 'Spot' : 'Futures',
+        component: exchange === 'upbit' ? <SpotPortfolioWidget /> : <PortfolioWidget />,
+      },
+      {
+        key: 'tradepanel',
+        title: 'Trade Panel',
+        component: exchange === 'upbit' ? <SpotTradePanelWidget /> : <TradePanelWidget />,
+      },
     ],
-    [],
+    [exchange],
   );
 
   // Filter widgets by visibility

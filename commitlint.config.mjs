@@ -26,6 +26,7 @@ const config = {
         'alert',
         'portfolio',
         'futures',
+        'spot',
       ],
     ],
     'scope-empty': [2, 'never'],

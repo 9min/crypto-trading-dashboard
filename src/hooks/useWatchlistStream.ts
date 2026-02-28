@@ -25,6 +25,8 @@ export function useWatchlistStream(enabled = true): void {
   const symbols = useWatchlistStore((state) => state.symbols);
   const setTickers = useWatchlistStore((state) => state.setTickers);
   const updateTicker = useWatchlistStore((state) => state.updateTicker);
+  const setBinanceTickers = useWatchlistStore((state) => state.setBinanceTickers);
+  const updateBinanceTicker = useWatchlistStore((state) => state.updateBinanceTicker);
   const setLoading = useWatchlistStore((state) => state.setLoading);
 
   useEffect(() => {
@@ -52,6 +54,7 @@ export function useWatchlistStream(enabled = true): void {
         }));
 
         setTickers(tickers);
+        setBinanceTickers(tickers);
       })
       .catch((error: unknown) => {
         if (!isActive) return;
@@ -73,12 +76,15 @@ export function useWatchlistStream(enabled = true): void {
       const open = parseFloat(event.o);
       const priceChangePercent = open !== 0 ? ((close - open) / open) * 100 : 0;
 
-      updateTicker(event.s, {
+      const tickerUpdate = {
         price: close,
         priceChangePercent,
         volume: parseFloat(event.q),
         lastUpdateTime: event.E,
-      });
+      };
+
+      updateTicker(event.s, tickerUpdate);
+      updateBinanceTicker(event.s, tickerUpdate);
     };
 
     const unsubscribe = manager.subscribe(handleMiniTicker);
@@ -90,5 +96,13 @@ export function useWatchlistStream(enabled = true): void {
       manager.disconnect();
       setLoading(false);
     };
-  }, [enabled, symbols, setTickers, updateTicker, setLoading]);
+  }, [
+    enabled,
+    symbols,
+    setTickers,
+    updateTicker,
+    setBinanceTickers,
+    updateBinanceTicker,
+    setLoading,
+  ]);
 }

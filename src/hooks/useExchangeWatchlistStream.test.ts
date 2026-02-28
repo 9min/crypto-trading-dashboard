@@ -14,6 +14,7 @@ import { renderHook } from '@testing-library/react';
 
 const mockUseWatchlistStream = vi.fn();
 const mockUseUpbitWatchlistStream = vi.fn();
+const mockUseFuturesBinanceStream = vi.fn();
 
 vi.mock('@/hooks/useWatchlistStream', () => ({
   useWatchlistStream: (...args: unknown[]) => mockUseWatchlistStream(...args),
@@ -21,6 +22,10 @@ vi.mock('@/hooks/useWatchlistStream', () => ({
 
 vi.mock('@/hooks/useUpbitWatchlistStream', () => ({
   useUpbitWatchlistStream: (...args: unknown[]) => mockUseUpbitWatchlistStream(...args),
+}));
+
+vi.mock('@/hooks/useFuturesBinanceStream', () => ({
+  useFuturesBinanceStream: (...args: unknown[]) => mockUseFuturesBinanceStream(...args),
 }));
 
 vi.mock('@/utils/symbolMap', () => ({
@@ -154,5 +159,38 @@ describe('useExchangeWatchlistStream', () => {
 
     // useMemo should return the same reference if dependencies haven't changed
     expect(firstCall).toBe(secondCall);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Futures Binance stream
+  // ---------------------------------------------------------------------------
+
+  it('enables futures binance stream when exchange is upbit', () => {
+    useUiStore.getState().setExchange('upbit');
+
+    renderHook(() => useExchangeWatchlistStream());
+
+    expect(mockUseFuturesBinanceStream).toHaveBeenCalledWith({ enabled: true });
+  });
+
+  it('disables futures binance stream when exchange is binance', () => {
+    useUiStore.getState().setExchange('binance');
+
+    renderHook(() => useExchangeWatchlistStream());
+
+    expect(mockUseFuturesBinanceStream).toHaveBeenCalledWith({ enabled: false });
+  });
+
+  it('toggles futures binance stream when exchange changes', () => {
+    useUiStore.getState().setExchange('binance');
+
+    const { rerender } = renderHook(() => useExchangeWatchlistStream());
+
+    expect(mockUseFuturesBinanceStream).toHaveBeenLastCalledWith({ enabled: false });
+
+    useUiStore.getState().setExchange('upbit');
+    rerender();
+
+    expect(mockUseFuturesBinanceStream).toHaveBeenLastCalledWith({ enabled: true });
   });
 });

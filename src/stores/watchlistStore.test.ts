@@ -230,6 +230,108 @@ describe('watchlistStore', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // updateBinanceTicker
+  // ---------------------------------------------------------------------------
+
+  describe('updateBinanceTicker', () => {
+    it('creates a new binance ticker entry when none exists', () => {
+      useWatchlistStore.getState().updateBinanceTicker('BTCUSDT', {
+        price: 50000,
+        priceChangePercent: 1.5,
+        volume: 500_000_000,
+        lastUpdateTime: 1000,
+      });
+
+      const ticker = useWatchlistStore.getState().binancePrices.get('BTCUSDT');
+      expect(ticker).toBeDefined();
+      expect(ticker?.price).toBe(50000);
+      expect(ticker?.priceChangePercent).toBe(1.5);
+      expect(ticker?.volume).toBe(500_000_000);
+      expect(ticker?.symbol).toBe('BTCUSDT');
+    });
+
+    it('merges partial updates with existing binance ticker data', () => {
+      useWatchlistStore.getState().updateBinanceTicker('ETHUSDT', {
+        price: 3000,
+        priceChangePercent: -2.0,
+        volume: 100_000_000,
+        lastUpdateTime: 1000,
+      });
+
+      useWatchlistStore.getState().updateBinanceTicker('ETHUSDT', {
+        price: 3100,
+        lastUpdateTime: 2000,
+      });
+
+      const ticker = useWatchlistStore.getState().binancePrices.get('ETHUSDT');
+      expect(ticker?.price).toBe(3100);
+      expect(ticker?.priceChangePercent).toBe(-2.0);
+      expect(ticker?.volume).toBe(100_000_000);
+    });
+
+    it('creates a new Map reference on each update', () => {
+      const mapBefore = useWatchlistStore.getState().binancePrices;
+
+      useWatchlistStore.getState().updateBinanceTicker('BTCUSDT', { price: 50000 });
+
+      const mapAfter = useWatchlistStore.getState().binancePrices;
+      expect(mapAfter).not.toBe(mapBefore);
+    });
+
+    it('does not affect tickers map', () => {
+      useWatchlistStore.getState().updateBinanceTicker('BTCUSDT', { price: 50000 });
+
+      expect(useWatchlistStore.getState().tickers.size).toBe(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // setBinanceTickers
+  // ---------------------------------------------------------------------------
+
+  describe('setBinanceTickers', () => {
+    it('bulk-sets binance tickers from an array', () => {
+      const tickers = [
+        createTicker({ symbol: 'BTCUSDT', price: 50000 }),
+        createTicker({ symbol: 'ETHUSDT', price: 3000 }),
+      ];
+
+      useWatchlistStore.getState().setBinanceTickers(tickers);
+
+      const state = useWatchlistStore.getState();
+      expect(state.binancePrices.size).toBe(2);
+      expect(state.binancePrices.get('BTCUSDT')?.price).toBe(50000);
+      expect(state.binancePrices.get('ETHUSDT')?.price).toBe(3000);
+    });
+
+    it('replaces existing binance tickers completely', () => {
+      useWatchlistStore
+        .getState()
+        .setBinanceTickers([
+          createTicker({ symbol: 'BTCUSDT' }),
+          createTicker({ symbol: 'ETHUSDT' }),
+        ]);
+
+      useWatchlistStore.getState().setBinanceTickers([createTicker({ symbol: 'SOLUSDT' })]);
+
+      const state = useWatchlistStore.getState();
+      expect(state.binancePrices.size).toBe(1);
+      expect(state.binancePrices.has('SOLUSDT')).toBe(true);
+      expect(state.binancePrices.has('BTCUSDT')).toBe(false);
+    });
+
+    it('does not affect tickers map', () => {
+      useWatchlistStore.getState().setTickers([createTicker({ symbol: 'BTCUSDT', price: 40000 })]);
+      useWatchlistStore
+        .getState()
+        .setBinanceTickers([createTicker({ symbol: 'BTCUSDT', price: 50000 })]);
+
+      expect(useWatchlistStore.getState().tickers.get('BTCUSDT')?.price).toBe(40000);
+      expect(useWatchlistStore.getState().binancePrices.get('BTCUSDT')?.price).toBe(50000);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // reset
   // ---------------------------------------------------------------------------
 
@@ -238,6 +340,7 @@ describe('watchlistStore', () => {
       // Modify store
       useWatchlistStore.getState().addSymbol('DOTUSDT');
       useWatchlistStore.getState().setTickers([createTicker({ symbol: 'BTCUSDT' })]);
+      useWatchlistStore.getState().setBinanceTickers([createTicker({ symbol: 'BTCUSDT' })]);
       useWatchlistStore.getState().setLoading(true);
 
       // Reset
@@ -246,7 +349,19 @@ describe('watchlistStore', () => {
       const state = useWatchlistStore.getState();
       expect(state.symbols).toEqual([...DEFAULT_WATCHLIST_SYMBOLS]);
       expect(state.tickers.size).toBe(0);
+      expect(state.binancePrices.size).toBe(0);
       expect(state.isLoading).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Initial state — binancePrices
+  // ---------------------------------------------------------------------------
+
+  describe('initial state - binancePrices', () => {
+    it('starts with an empty binancePrices map', () => {
+      const state = useWatchlistStore.getState();
+      expect(state.binancePrices.size).toBe(0);
     });
   });
 });

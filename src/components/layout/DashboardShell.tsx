@@ -28,6 +28,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useTradeStore } from '@/stores/tradeStore';
 import { useWidgetStore } from '@/stores/widgetStore';
 import { usePortfolioStore } from '@/stores/portfolioStore';
+import { useSpotStore } from '@/stores/spotStore';
 import { loadWhaleThreshold, loadWhaleAlertEnabled } from '@/utils/localPreferences';
 
 const DashboardGrid = dynamic(() => import('./DashboardGrid').then((m) => m.DashboardGrid), {
@@ -81,6 +82,7 @@ export const DashboardShell = memo(function DashboardShell() {
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const hydrateWidgets = useWidgetStore((state) => state.hydrateWidgets);
   const hydratePortfolio = usePortfolioStore((state) => state.hydratePortfolio);
+  const hydrateSpot = useSpotStore((state) => state.hydrateSpot);
   const isMobile = useMobileBreakpoint();
 
   // Hydrate persisted exchange preference after mount to avoid SSR mismatch
@@ -88,13 +90,14 @@ export const DashboardShell = memo(function DashboardShell() {
     hydrateExchange();
     hydrateWidgets();
     hydratePortfolio();
+    hydrateSpot();
 
     // Hydrate whale threshold and alert enabled from localStorage
     const threshold = loadWhaleThreshold();
     useTradeStore.getState().setWhaleThreshold(threshold);
     const whaleAlertEnabled = loadWhaleAlertEnabled();
     useTradeStore.getState().setWhaleAlertEnabled(whaleAlertEnabled);
-  }, [hydrateExchange, hydrateWidgets, hydratePortfolio]);
+  }, [hydrateExchange, hydrateWidgets, hydratePortfolio, hydrateSpot]);
 
   // Sync ?symbol= URL param ↔ uiStore.symbol after exchange hydration
   useSymbolFromUrl();

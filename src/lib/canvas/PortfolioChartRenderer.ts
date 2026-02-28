@@ -67,6 +67,8 @@ export class PortfolioChartRenderer implements CanvasRenderer {
   private slices: AllocationSlice[] = [];
   private isDirty = false;
   private totalValue = 0;
+  private currencyPrefix = '$';
+  private currencyDecimals = 2;
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
@@ -112,6 +114,17 @@ export class PortfolioChartRenderer implements CanvasRenderer {
    */
   setColors(colors: Partial<PortfolioChartColors>): void {
     this.colors = { ...this.colors, ...colors };
+    this.isDirty = true;
+  }
+
+  /**
+   * Set currency prefix and decimal places for value formatting.
+   * KRW: setCurrencyPrefix('\u20A9', 0)
+   * USDT: setCurrencyPrefix('$', 2) (default)
+   */
+  setCurrencyPrefix(prefix: string, decimals = 2): void {
+    this.currencyPrefix = prefix;
+    this.currencyDecimals = decimals;
     this.isDirty = true;
   }
 
@@ -257,8 +270,11 @@ export class PortfolioChartRenderer implements CanvasRenderer {
   // -- Helpers ----------------------------------------------------------------
 
   private formatValue(value: number): string {
-    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
-    if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
-    return `$${value.toFixed(2)}`;
+    const p = this.currencyPrefix;
+    const d = this.currencyDecimals;
+    if (value >= 1_000_000_000) return `${p}${(value / 1_000_000_000).toFixed(d > 0 ? 1 : 0)}B`;
+    if (value >= 1_000_000) return `${p}${(value / 1_000_000).toFixed(d > 0 ? 2 : 0)}M`;
+    if (value >= 1_000) return `${p}${(value / 1_000).toFixed(d > 0 ? 1 : 0)}K`;
+    return `${p}${value.toFixed(d)}`;
   }
 }

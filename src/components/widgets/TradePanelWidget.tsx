@@ -34,10 +34,13 @@ export const TradePanelWidget = memo(function TradePanelWidget() {
   const defaultMarginType = usePortfolioStore((state) => state.defaultMarginType);
   const openPosition = usePortfolioStore((state) => state.openPosition);
   const closePosition = usePortfolioStore((state) => state.closePosition);
-  const tickers = useWatchlistStore((state) => state.tickers);
+  const binancePrices = useWatchlistStore((state) => state.binancePrices);
 
-  // Current symbol price
-  const currentPrice = useMemo(() => tickers.get(symbol)?.price ?? 0, [tickers, symbol]);
+  // Current symbol price — always uses Binance USDT price for futures trading
+  const currentPrice = useMemo(
+    () => binancePrices.get(symbol)?.price ?? 0,
+    [binancePrices, symbol],
+  );
 
   // Existing positions on current symbol (hedge mode: independent long/short)
   const longPosition = useMemo(
@@ -49,10 +52,10 @@ export const TradePanelWidget = memo(function TradePanelWidget() {
     [positions, symbol],
   );
 
-  // Available balance from summary
+  // Available balance from summary — uses Binance USDT prices for correct margin calc
   const availableBalance = useMemo(
-    () => calculateFuturesSummary(positions, tickers, walletBalance).availableBalance,
-    [positions, tickers, walletBalance],
+    () => calculateFuturesSummary(positions, binancePrices, walletBalance).availableBalance,
+    [positions, binancePrices, walletBalance],
   );
 
   // Funding rate polling (60s interval)
