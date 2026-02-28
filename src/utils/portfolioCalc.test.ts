@@ -65,7 +65,7 @@ function makeTickers(entries: Array<[string, number]>): Map<string, { price: num
 }
 
 function makePositionsMap(positions: FuturesPosition[]): Map<string, FuturesPosition> {
-  return new Map(positions.map((p) => [p.symbol, p]));
+  return new Map(positions.map((p) => [`${p.symbol}_${p.side}`, p]));
 }
 
 // =============================================================================

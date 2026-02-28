@@ -96,7 +96,7 @@ function createDefaultIndicators(): Record<string, IndicatorConfig> {
       id: 'volume',
       maPeriod: 20,
       maColor: INDICATOR_COLORS.VOLUME_MA,
-      visible: false,
+      visible: true,
     },
   };
 }

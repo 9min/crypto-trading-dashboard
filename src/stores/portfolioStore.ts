@@ -13,6 +13,7 @@ import type {
   FuturesTrade,
   PortfolioTab,
   MarginType,
+  PositionSide,
   OpenPositionParams,
   AutoCloseResult,
 } from '@/types/portfolio';
@@ -21,8 +22,10 @@ import {
   MAX_TRADE_HISTORY,
   PORTFOLIO_STORAGE_KEY,
   MAX_OPEN_POSITIONS,
+  MAX_LEVERAGE,
   DEFAULT_LEVERAGE,
   DEFAULT_MARGIN_TYPE,
+  positionKey,
 } from '@/types/portfolio';
 import {
   calculateLiquidationPrice,
@@ -41,7 +44,7 @@ import {
 interface PortfolioStoreState {
   /** Wallet balance in USDT (cash not locked in margin) */
   walletBalance: number;
-  /** Map of symbol → open futures position (1 symbol = 1 position) */
+  /** Map of positionKey (symbol_side) → open futures position (hedge mode: 1 per symbol+side) */
   positions: Map<string, FuturesPosition>;
   /** Trade history (newest first), capped at MAX_TRADE_HISTORY */
   trades: FuturesTrade[];
@@ -58,15 +61,16 @@ interface PortfolioStoreState {
 interface PortfolioStoreActions {
   /**
    * Open a new futures position or add to existing same-direction position.
-   * Returns true if opened/averaged, false if rejected (insufficient balance,
-   * opposite direction exists, or max positions reached).
+   * Hedge mode: long and short on the same symbol are independent positions.
+   * Returns true if opened/averaged, false if rejected (insufficient balance
+   * or max positions reached).
    */
   openPosition: (params: OpenPositionParams) => boolean;
   /**
    * Close a position partially or fully.
    * Returns true if closed, false if no position or insufficient quantity.
    */
-  closePosition: (symbol: string, price: number, quantity: number) => boolean;
+  closePosition: (symbol: string, side: PositionSide, price: number, quantity: number) => boolean;
   /**
    * Check all positions for auto-close (liquidation, TP, SL).
    * Returns array of auto-close results with symbol and reason.
@@ -76,7 +80,12 @@ interface PortfolioStoreActions {
    * Update TP/SL prices for an existing position.
    * Returns true if updated, false if no position found.
    */
-  updatePositionTpSl: (symbol: string, tp: number | null, sl: number | null) => boolean;
+  updatePositionTpSl: (
+    symbol: string,
+    side: PositionSide,
+    tp: number | null,
+    sl: number | null,
+  ) => boolean;
   /** Set default leverage for new positions */
   setDefaultLeverage: (leverage: number) => void;
   /** Set default margin type for new positions */
@@ -174,7 +183,7 @@ function loadPersistedPortfolio(): Partial<PortfolioStoreState> | null {
         takeProfitPrice: typeof p.takeProfitPrice === 'number' ? p.takeProfitPrice : null,
         stopLossPrice: typeof p.stopLossPrice === 'number' ? p.stopLossPrice : null,
       };
-      positionsMap.set(symbol, restoredPos);
+      positionsMap.set(positionKey(restoredPos.symbol, restoredPos.side), restoredPos);
     }
 
     // Validate trades
@@ -270,12 +279,10 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     const stopLossPrice = params.stopLossPrice ?? null;
 
     // Validation
-    if (price <= 0 || quantity <= 0 || leverage < 1) return false;
+    if (price <= 0 || quantity <= 0 || leverage < 1 || leverage > MAX_LEVERAGE) return false;
 
-    const existing = state.positions.get(symbol);
-
-    // If position exists on same symbol but opposite direction, reject
-    if (existing && existing.side !== side) return false;
+    const key = positionKey(symbol, side);
+    const existing = state.positions.get(key);
 
     if (!existing && state.positions.size >= MAX_OPEN_POSITIONS) return false;
 
@@ -331,7 +338,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
       };
 
       const newPositions = new Map(state.positions);
-      newPositions.set(symbol, updatedPosition);
+      newPositions.set(key, updatedPosition);
       const newTrades = [trade, ...state.trades].slice(0, MAX_TRADE_HISTORY);
 
       const newState = {
@@ -383,7 +390,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     };
 
     const newPositions = new Map(state.positions);
-    newPositions.set(symbol, position);
+    newPositions.set(key, position);
     const newTrades = [trade, ...state.trades].slice(0, MAX_TRADE_HISTORY);
 
     const newState = {
@@ -398,9 +405,10 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     return true;
   },
 
-  closePosition: (symbol: string, price: number, quantity: number): boolean => {
+  closePosition: (symbol: string, side: PositionSide, price: number, quantity: number): boolean => {
     const state = get();
-    const position = state.positions.get(symbol);
+    const key = positionKey(symbol, side);
+    const position = state.positions.get(key);
 
     if (!position) return false;
     if (price <= 0 || quantity <= 0) return false;
@@ -421,10 +429,10 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     // Update or remove position
     const newPositions = new Map(state.positions);
     if (isFullClose) {
-      newPositions.delete(symbol);
+      newPositions.delete(key);
     } else {
       const remainingRatio = (position.quantity - quantity) / position.quantity;
-      newPositions.set(symbol, {
+      newPositions.set(key, {
         ...position,
         quantity: position.quantity - quantity,
         margin: position.margin * remainingRatio,
@@ -467,8 +475,8 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     const newTrades = [...state.trades];
     let newWalletBalance = state.walletBalance;
 
-    for (const [symbol, position] of state.positions) {
-      const currentPrice = prices.get(symbol);
+    for (const [key, position] of state.positions) {
+      const currentPrice = prices.get(position.symbol);
       if (currentPrice === undefined) continue;
 
       // 1. Liquidation check (highest priority)
@@ -479,11 +487,11 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
 
         if (isLiq) {
           newWalletBalance = Math.max(0, newWalletBalance - position.margin);
-          newPositions.delete(symbol);
+          newPositions.delete(key);
 
           newTrades.unshift({
             id: generateTradeId(),
-            symbol,
+            symbol: position.symbol,
             side: position.side,
             action: 'close',
             price: currentPrice,
@@ -495,7 +503,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
             timestamp: Date.now(),
           });
 
-          results.push({ symbol, reason: 'liquidated' });
+          results.push({ symbol: position.symbol, side: position.side, reason: 'liquidated' });
           continue;
         }
       }
@@ -515,11 +523,11 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
         const realizedPnl = rawPnl - fee;
 
         newWalletBalance = Math.max(0, newWalletBalance + realizedPnl);
-        newPositions.delete(symbol);
+        newPositions.delete(key);
 
         newTrades.unshift({
           id: generateTradeId(),
-          symbol,
+          symbol: position.symbol,
           side: position.side,
           action: 'close',
           price: currentPrice,
@@ -531,7 +539,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
           timestamp: Date.now(),
         });
 
-        results.push({ symbol, reason: 'take-profit' });
+        results.push({ symbol: position.symbol, side: position.side, reason: 'take-profit' });
         continue;
       }
 
@@ -550,11 +558,11 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
         const realizedPnl = rawPnl - fee;
 
         newWalletBalance = Math.max(0, newWalletBalance + realizedPnl);
-        newPositions.delete(symbol);
+        newPositions.delete(key);
 
         newTrades.unshift({
           id: generateTradeId(),
-          symbol,
+          symbol: position.symbol,
           side: position.side,
           action: 'close',
           price: currentPrice,
@@ -566,7 +574,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
           timestamp: Date.now(),
         });
 
-        results.push({ symbol, reason: 'stop-loss' });
+        results.push({ symbol: position.symbol, side: position.side, reason: 'stop-loss' });
         continue;
       }
     }
@@ -586,13 +594,19 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     return results;
   },
 
-  updatePositionTpSl: (symbol: string, tp: number | null, sl: number | null): boolean => {
+  updatePositionTpSl: (
+    symbol: string,
+    side: PositionSide,
+    tp: number | null,
+    sl: number | null,
+  ): boolean => {
     const state = get();
-    const position = state.positions.get(symbol);
+    const key = positionKey(symbol, side);
+    const position = state.positions.get(key);
     if (!position) return false;
 
     const newPositions = new Map(state.positions);
-    newPositions.set(symbol, {
+    newPositions.set(key, {
       ...position,
       takeProfitPrice: tp,
       stopLossPrice: sl,
@@ -605,7 +619,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
   },
 
   setDefaultLeverage: (leverage: number): void => {
-    if (leverage < 1) return;
+    if (leverage < 1 || leverage > MAX_LEVERAGE) return;
     set({ defaultLeverage: leverage });
     persistPortfolio(get());
   },

@@ -9,12 +9,12 @@
 //   Top-left     → FPS counter + 60-second mini sparkline
 //   Top-right    → JS Heap usage / 200 MB target
 //   Bottom-left  → Canvas draw times per renderer
-//   Bottom-right → DOM node count / 500 target
+//   Bottom-right → DOM node count / 700 target
 //
 // Color thresholds follow CLAUDE.md performance targets:
-//   Good (green)    → FPS >= 55, Heap < 150MB, Draw < 3ms, DOM < 400
-//   Warning (yellow) → FPS 45-54, Heap 150-199MB, Draw 3-4ms, DOM 400-499
-//   Critical (red)   → FPS < 45, Heap >= 200MB, Draw > 4ms, DOM >= 500
+//   Good (green)    → FPS >= 55, Heap < 150MB, Draw < 3ms, DOM < 500
+//   Warning (yellow) → FPS 45-54, Heap 150-199MB, Draw 3-4ms, DOM 500-699
+//   Critical (red)   → FPS < 45, Heap >= 200MB, Draw > 4ms, DOM >= 700
 //
 // Performance: all buffers pre-allocated, zero per-frame heap allocations.
 // =============================================================================
@@ -267,8 +267,8 @@ export class PerformanceMonitorRenderer implements CanvasRenderer {
 
   /** Returns status color based on DOM node count */
   getStatusColorForDom(count: number): string {
-    if (count < 400) return this.colors.good;
-    if (count < 500) return this.colors.warning;
+    if (count < 500) return this.colors.good;
+    if (count < 700) return this.colors.warning;
     return this.colors.critical;
   }
 
@@ -595,13 +595,13 @@ export class PerformanceMonitorRenderer implements CanvasRenderer {
     // Target
     ctx.font = `${LABEL_FONT_SIZE}px ${FONT_FAMILY}`;
     ctx.fillStyle = colors.foregroundSecondary;
-    ctx.fillText('/ 500 target', innerX, innerY + TITLE_FONT_SIZE + VALUE_FONT_SIZE + 10);
+    ctx.fillText('/ 700 target', innerX, innerY + TITLE_FONT_SIZE + VALUE_FONT_SIZE + 10);
 
     // Progress bar
     const barY = innerY + TITLE_FONT_SIZE + VALUE_FONT_SIZE + LABEL_FONT_SIZE + 18;
     const barW = w - CARD_PADDING * 2;
     const barH = 6;
-    const fillRatio = Math.min(this.domNodeCount / 500, 1);
+    const fillRatio = Math.min(this.domNodeCount / 700, 1);
 
     ctx.fillStyle = colors.border;
     this.drawRoundedRect(innerX, barY, barW, barH, 3);
