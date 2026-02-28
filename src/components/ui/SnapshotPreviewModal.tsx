@@ -44,6 +44,12 @@ function useBlobDataUrl(blob: Blob | null): string | null {
         setDataUrl(reader.result as string);
       }
     };
+    reader.onerror = () => {
+      if (!aborted) {
+        console.error('[useBlobDataUrl] FileReader failed to read blob');
+        setDataUrl(null);
+      }
+    };
     reader.readAsDataURL(blob);
     return () => {
       aborted = true;
@@ -63,7 +69,7 @@ export const SnapshotPreviewModal = memo(function SnapshotPreviewModal({
   blob,
   filename,
 }: SnapshotPreviewModalProps) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewDataUrl = useBlobDataUrl(blob);
 
@@ -91,7 +97,7 @@ export const SnapshotPreviewModal = memo(function SnapshotPreviewModal({
   }, [isOpen, onClose]);
 
   const handleClose = useCallback(() => {
-    setCopied(false);
+    setCopyState('idle');
     if (copiedTimerRef.current) {
       clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = null;
@@ -112,17 +118,21 @@ export const SnapshotPreviewModal = memo(function SnapshotPreviewModal({
     if (!blob) return;
     try {
       await copyBlobToClipboard(blob);
-      setCopied(true);
-      if (copiedTimerRef.current) {
-        clearTimeout(copiedTimerRef.current);
-      }
-      copiedTimerRef.current = setTimeout(() => {
-        setCopied(false);
-        copiedTimerRef.current = null;
-      }, 1500);
-    } catch {
-      console.error('[SnapshotPreviewModal] Failed to copy to clipboard');
+      setCopyState('copied');
+    } catch (error) {
+      console.error('[SnapshotPreviewModal] Failed to copy to clipboard', {
+        timestamp: Date.now(),
+        error,
+      });
+      setCopyState('failed');
     }
+    if (copiedTimerRef.current) {
+      clearTimeout(copiedTimerRef.current);
+    }
+    copiedTimerRef.current = setTimeout(() => {
+      setCopyState('idle');
+      copiedTimerRef.current = null;
+    }, 1500);
   }, [blob]);
 
   const handleSave = useCallback(() => {
@@ -184,12 +194,14 @@ export const SnapshotPreviewModal = memo(function SnapshotPreviewModal({
             type="button"
             onClick={handleCopy}
             className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-              copied
+              copyState === 'copied'
                 ? 'bg-buy/10 text-buy'
-                : 'bg-background-tertiary text-foreground hover:bg-background-tertiary/80'
+                : copyState === 'failed'
+                  ? 'bg-sell/10 text-sell'
+                  : 'bg-background-tertiary text-foreground hover:bg-background-tertiary/80'
             }`}
           >
-            {copied ? (
+            {copyState === 'copied' ? (
               <>
                 <svg
                   width="14"
@@ -204,6 +216,23 @@ export const SnapshotPreviewModal = memo(function SnapshotPreviewModal({
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
                 Copied!
+              </>
+            ) : copyState === 'failed' ? (
+              <>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+                Failed
               </>
             ) : (
               <>
