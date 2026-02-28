@@ -27,6 +27,8 @@ import {
   spotTradesToCsv,
 } from '@/utils/spotCalc';
 import { downloadCsv } from '@/utils/portfolioCalc';
+import { renderSpotSnapshot, getThemeColors } from '@/utils/portfolioSnapshot';
+import { SnapshotPreviewModal } from '@/components/ui/SnapshotPreviewModal';
 import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol } from '@/utils/formatSymbol';
 import { WidgetWrapper } from './WidgetWrapper';
@@ -280,6 +282,7 @@ export const SpotPortfolioWidget = memo(function SpotPortfolioWidget() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isResetConfirming, setIsResetConfirming] = useState(false);
+  const [snapshotBlob, setSnapshotBlob] = useState<Blob | null>(null);
 
   // Store selectors
   const theme = useUiStore((state) => state.theme);
@@ -363,6 +366,16 @@ export const SpotPortfolioWidget = memo(function SpotPortfolioWidget() {
     setIsResetConfirming(false);
   }, []);
 
+  const handleScreenshot = useCallback(async () => {
+    const colors = getThemeColors();
+    const blob = await renderSpotSnapshot({ summary, holdings: holdingsWithPnl }, colors);
+    setSnapshotBlob(blob);
+  }, [summary, holdingsWithPnl]);
+
+  const handleCloseSnapshot = useCallback(() => {
+    setSnapshotBlob(null);
+  }, []);
+
   const handleTabHoldings = useCallback(() => setActiveTab('holdings'), [setActiveTab]);
   const handleTabHistory = useCallback(() => setActiveTab('history'), [setActiveTab]);
 
@@ -370,6 +383,27 @@ export const SpotPortfolioWidget = memo(function SpotPortfolioWidget() {
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={handleScreenshot}
+          className="text-foreground-tertiary hover:text-foreground cursor-pointer rounded px-1 transition-colors"
+          aria-label="Take portfolio screenshot"
+          title="Screenshot"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
+        </button>
         {trades.length > 0 && (
           <button
             type="button"
@@ -413,6 +447,7 @@ export const SpotPortfolioWidget = memo(function SpotPortfolioWidget() {
       </div>
     ),
     [
+      handleScreenshot,
       trades.length,
       handleExportCsv,
       isResetConfirming,
@@ -422,62 +457,72 @@ export const SpotPortfolioWidget = memo(function SpotPortfolioWidget() {
     ],
   );
 
+  const snapshotFilename = `spot-portfolio-${new Date().toISOString().slice(0, 10)}.png`;
+
   return (
-    <WidgetWrapper title="Spot" headerActions={headerActions}>
-      <div className="flex h-full flex-col">
-        {/* Summary bar */}
-        <SpotSummaryBar
-          totalValue={summary.totalValue}
-          walletBalance={summary.walletBalance}
-          totalPnl={summary.totalUnrealizedPnl}
-          totalPnlPercent={summary.totalUnrealizedPnlPercent}
-          holdingCount={summary.holdingCount}
-        />
+    <>
+      <WidgetWrapper title="Spot" headerActions={headerActions}>
+        <div className="flex h-full flex-col">
+          {/* Summary bar */}
+          <SpotSummaryBar
+            totalValue={summary.totalValue}
+            walletBalance={summary.walletBalance}
+            totalPnl={summary.totalUnrealizedPnl}
+            totalPnlPercent={summary.totalUnrealizedPnlPercent}
+            holdingCount={summary.holdingCount}
+          />
 
-        {/* Donut chart */}
-        <div ref={containerRef} className="h-32 w-full shrink-0">
-          <canvas ref={canvasRef} className="block h-full w-full" />
-        </div>
+          {/* Donut chart */}
+          <div ref={containerRef} className="h-32 w-full shrink-0">
+            <canvas ref={canvasRef} className="block h-full w-full" />
+          </div>
 
-        {/* Tab buttons */}
-        <div className="border-border bg-background-secondary flex shrink-0 border-b">
-          <button
-            type="button"
-            onClick={handleTabHoldings}
-            className={`flex-1 cursor-pointer py-2 text-xs transition-all ${
-              activeTab === 'holdings'
-                ? 'border-accent text-accent border-b-2 font-semibold'
-                : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'
-            }`}
-          >
-            Holdings{summary.holdingCount > 0 ? ` (${summary.holdingCount})` : ''}
-          </button>
-          <button
-            type="button"
-            onClick={handleTabHistory}
-            className={`flex-1 cursor-pointer py-2 text-xs transition-all ${
-              activeTab === 'history'
-                ? 'border-accent text-accent border-b-2 font-semibold'
-                : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'
-            }`}
-          >
-            History{trades.length > 0 ? ` (${trades.length})` : ''}
-          </button>
-        </div>
+          {/* Tab buttons */}
+          <div className="border-border bg-background-secondary flex shrink-0 border-b">
+            <button
+              type="button"
+              onClick={handleTabHoldings}
+              className={`flex-1 cursor-pointer py-2 text-xs transition-all ${
+                activeTab === 'holdings'
+                  ? 'border-accent text-accent border-b-2 font-semibold'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'
+              }`}
+            >
+              Holdings{summary.holdingCount > 0 ? ` (${summary.holdingCount})` : ''}
+            </button>
+            <button
+              type="button"
+              onClick={handleTabHistory}
+              className={`flex-1 cursor-pointer py-2 text-xs transition-all ${
+                activeTab === 'history'
+                  ? 'border-accent text-accent border-b-2 font-semibold'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'
+              }`}
+            >
+              History{trades.length > 0 ? ` (${trades.length})` : ''}
+            </button>
+          </div>
 
-        {/* Tab content */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {activeTab === 'holdings' ? (
-            <SpotHoldingsTab
-              holdings={holdingsWithPnl}
-              onSell={handleSellHolding}
-              onSelectSymbol={setSymbol}
-            />
-          ) : (
-            <SpotHistoryTab trades={trades} />
-          )}
+          {/* Tab content */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {activeTab === 'holdings' ? (
+              <SpotHoldingsTab
+                holdings={holdingsWithPnl}
+                onSell={handleSellHolding}
+                onSelectSymbol={setSymbol}
+              />
+            ) : (
+              <SpotHistoryTab trades={trades} />
+            )}
+          </div>
         </div>
-      </div>
-    </WidgetWrapper>
+      </WidgetWrapper>
+      <SnapshotPreviewModal
+        isOpen={snapshotBlob !== null}
+        onClose={handleCloseSnapshot}
+        blob={snapshotBlob}
+        filename={snapshotFilename}
+      />
+    </>
   );
 });
