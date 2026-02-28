@@ -63,11 +63,11 @@ test.describe('Responsive layout', () => {
     await expect(page.getByTestId('mobile-header')).toBeVisible();
     await expect(page.getByTestId('mobile-tab-bar')).toBeVisible();
 
-    // Default tab is "chart" — shows Chart + Order Book in split view
+    // Default tab is "chart" — shows Chart + Watchlist in split view
     const widgetTitles = page.getByTestId('widget-title');
     await expect(widgetTitles).toHaveCount(2);
     await expect(widgetTitles.first()).toHaveText('Chart');
-    await expect(widgetTitles.nth(1)).toHaveText('Order Book');
+    await expect(widgetTitles.nth(1)).toHaveText('Watchlist');
   });
 
   test('header remains visible across all viewports', async ({ page }) => {

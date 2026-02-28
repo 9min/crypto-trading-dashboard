@@ -4,7 +4,7 @@
 // MobileTabBar Component
 // =============================================================================
 // Fixed bottom tab bar for mobile viewports. Provides quick navigation between
-// five main mobile views: Market, Chart, Trade, Positions, and More.
+// five main mobile views: Chart, Order Book, Trade, Futures, and More.
 // Respects safe-area-inset-bottom for devices with home indicators.
 // =============================================================================
 
@@ -15,28 +15,6 @@ import type { MobileTab } from '@/stores/uiStore';
 // -----------------------------------------------------------------------------
 // Icons (inline SVG, 20x20)
 // -----------------------------------------------------------------------------
-
-function MarketIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {/* List icon — three horizontal bars */}
-      <line x1="4" y1="6" x2="20" y2="6" />
-      <line x1="4" y1="12" x2="20" y2="12" />
-      <line x1="4" y1="18" x2="20" y2="18" />
-    </svg>
-  );
-}
 
 function ChartIcon() {
   return (
@@ -59,6 +37,28 @@ function ChartIcon() {
       <rect x="16" y="10" width="4" height="6" rx="0.5" fill="currentColor" stroke="none" />
       <line x1="12" y1="6" x2="12" y2="18" />
       <rect x="10" y="9" width="4" height="4" rx="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function OrderBookIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* Stacked rows — order book levels */}
+      <rect x="3" y="3" width="18" height="4" rx="1" />
+      <rect x="3" y="10" width="18" height="4" rx="1" />
+      <rect x="3" y="17" width="18" height="4" rx="1" />
     </svg>
   );
 }
@@ -141,10 +141,10 @@ interface TabConfig {
 // -----------------------------------------------------------------------------
 
 const TABS: readonly TabConfig[] = [
-  { id: 'market', label: 'Market', icon: MarketIcon },
   { id: 'chart', label: 'Chart', icon: ChartIcon },
+  { id: 'orderbook', label: 'Book', icon: OrderBookIcon },
   { id: 'trade', label: 'Trade', icon: TradeIcon },
-  { id: 'portfolio', label: 'Positions', icon: PortfolioIcon },
+  { id: 'portfolio', label: 'Futures', icon: PortfolioIcon },
   { id: 'more', label: 'More', icon: MoreIcon },
 ] as const;
 
