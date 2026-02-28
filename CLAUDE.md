@@ -731,7 +731,7 @@ describe('depthStore', () => {
 | #   | 기능                     | 상태      | 브랜치 | PR  |
 | --- | ------------------------ | --------- | ------ | --- |
 | 1   | Portfolio Tracker (현물) | ✅ 완료   | main   | #45 |
-| 2   | Futures Paper Trading    | ⬜ 미시작 | —      | —   |
+| 2   | Futures Paper Trading    | ✅ 완료   | main   | #48 |
 | 3   | Multi-Chart Sync         | ⬜ 미시작 | —      | —   |
 | 4   | Drawing Tools            | ⬜ 미시작 | —      | —   |
 

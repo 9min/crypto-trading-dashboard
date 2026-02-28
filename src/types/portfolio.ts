@@ -16,7 +16,7 @@ type PositionSide = 'long' | 'short';
 type MarginType = 'cross' | 'isolated';
 
 /** Reason a position was closed */
-type CloseReason = 'manual' | 'liquidated';
+type CloseReason = 'manual' | 'liquidated' | 'take-profit' | 'stop-loss';
 
 /** A single open futures position */
 interface FuturesPosition {
@@ -40,6 +40,10 @@ interface FuturesPosition {
   liquidationPrice: number;
   /** Unix timestamp (ms) when the position was opened */
   openedAt: number;
+  /** Take-profit price (null if not set) */
+  takeProfitPrice: number | null;
+  /** Stop-loss price (null if not set) */
+  stopLossPrice: number | null;
 }
 
 /** A single futures trade record (open or close) */
@@ -62,6 +66,8 @@ interface FuturesTrade {
   realizedPnl: number;
   /** Reason for close (null for opens) */
   closeReason: CloseReason | null;
+  /** Trading fee (0.04% taker) */
+  fee: number;
   /** Unix timestamp (ms) */
   timestamp: number;
 }
@@ -82,6 +88,10 @@ interface PositionWithPnl extends FuturesPosition {
   pnlPercent: number;
   /** Margin allocation percentage of total equity */
   allocationPercent: number;
+  /** Notional value: currentPrice * quantity */
+  notionalValue: number;
+  /** Position margin ratio: margin / (margin + unrealizedPnl) * 100 */
+  positionMarginRatio: number;
 }
 
 // -----------------------------------------------------------------------------
@@ -104,6 +114,10 @@ interface FuturesSummary {
   totalUnrealizedPnlPercent: number;
   /** Number of open positions */
   positionCount: number;
+  /** Margin ratio: totalMarginUsed / totalEquity * 100 */
+  marginRatio: number;
+  /** Margin ratio clamped to 0~100 for progress bar */
+  marginRatioPercent: number;
 }
 
 // -----------------------------------------------------------------------------
@@ -123,6 +137,18 @@ interface AllocationSlice {
 }
 
 // -----------------------------------------------------------------------------
+// Auto-Close Result
+// -----------------------------------------------------------------------------
+
+/** Result of an auto-close event (liquidation, TP, or SL) */
+interface AutoCloseResult {
+  /** Symbol that was auto-closed */
+  symbol: string;
+  /** Reason for auto-close */
+  reason: CloseReason;
+}
+
+// -----------------------------------------------------------------------------
 // Store Types
 // -----------------------------------------------------------------------------
 
@@ -137,6 +163,8 @@ interface OpenPositionParams {
   quantity: number;
   leverage: number;
   marginType: MarginType;
+  takeProfitPrice?: number | null;
+  stopLossPrice?: number | null;
 }
 
 // -----------------------------------------------------------------------------
@@ -164,6 +192,9 @@ const DEFAULT_MARGIN_TYPE: MarginType = 'isolated';
 /** Maximum number of simultaneously open positions */
 const MAX_OPEN_POSITIONS = 20;
 
+/** Taker fee rate (0.04%) */
+const TAKER_FEE_RATE = 0.0004;
+
 // -----------------------------------------------------------------------------
 // Exports
 // -----------------------------------------------------------------------------
@@ -176,6 +207,7 @@ export {
   DEFAULT_LEVERAGE,
   DEFAULT_MARGIN_TYPE,
   MAX_OPEN_POSITIONS,
+  TAKER_FEE_RATE,
 };
 export type {
   PositionSide,
@@ -188,4 +220,5 @@ export type {
   AllocationSlice,
   PortfolioTab,
   OpenPositionParams,
+  AutoCloseResult,
 };

@@ -31,7 +31,7 @@ export function buildCsp(isDev: boolean): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https://lh3.googleusercontent.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' https://data-api.binance.vision wss://stream.binance.com:9443 wss://api.upbit.com https://*.supabase.co",
+    "connect-src 'self' https://data-api.binance.vision https://fapi.binance.com wss://stream.binance.com:9443 wss://api.upbit.com https://*.supabase.co",
     "frame-ancestors 'none'",
   ];
 

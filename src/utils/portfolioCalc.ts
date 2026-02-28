@@ -15,6 +15,7 @@ import type {
   PositionSide,
   MarginType,
 } from '@/types/portfolio';
+import { TAKER_FEE_RATE } from '@/types/portfolio';
 
 // -----------------------------------------------------------------------------
 // Allocation Palette
@@ -106,6 +107,61 @@ export function calculateMargin(entryPrice: number, quantity: number, leverage: 
 }
 
 /**
+ * Calculates the taker fee for a trade.
+ * fee = price * quantity * TAKER_FEE_RATE (0.04%)
+ */
+export function calculateFee(price: number, quantity: number): number {
+  return price * quantity * TAKER_FEE_RATE;
+}
+
+/**
+ * Calculates the weighted average entry price when adding to a position.
+ * avgEntry = (oldEntry * oldQty + newEntry * newQty) / (oldQty + newQty)
+ */
+export function calculateAverageEntry(
+  oldEntry: number,
+  oldQty: number,
+  newEntry: number,
+  newQty: number,
+): number {
+  const totalQty = oldQty + newQty;
+  if (totalQty === 0) return 0;
+  return (oldEntry * oldQty + newEntry * newQty) / totalQty;
+}
+
+/**
+ * Calculates the notional value of a position.
+ * notional = price * quantity
+ */
+export function calculateNotionalValue(price: number, quantity: number): number {
+  return price * quantity;
+}
+
+/**
+ * Checks if the take-profit price has been hit.
+ * Long: currentPrice >= tpPrice
+ * Short: currentPrice <= tpPrice
+ */
+export function isTakeProfitHit(
+  currentPrice: number,
+  tpPrice: number,
+  side: PositionSide,
+): boolean {
+  if (side === 'long') return currentPrice >= tpPrice;
+  return currentPrice <= tpPrice;
+}
+
+/**
+ * Checks if the stop-loss price has been hit.
+ * Long: currentPrice <= slPrice
+ * Short: currentPrice >= slPrice
+ */
+export function isStopLossHit(currentPrice: number, slPrice: number, side: PositionSide): boolean {
+  if (side === 'long') return currentPrice <= slPrice;
+  return currentPrice >= slPrice;
+}
+
+/**
  * Checks if a position should be liquidated at the given price.
  * Long:  currentPrice <= liquidationPrice
  * Short: currentPrice >= liquidationPrice
@@ -143,6 +199,9 @@ export function calculatePositionPnl(
   const roe = calculateRoe(position.entryPrice, currentPrice, position.leverage, position.side);
   const pnlPercent = position.margin > 0 ? (unrealizedPnl / position.margin) * 100 : 0;
   const allocationPercent = totalEquity > 0 ? (position.margin / totalEquity) * 100 : 0;
+  const notionalValue = calculateNotionalValue(currentPrice, position.quantity);
+  const marginPlusPnl = position.margin + unrealizedPnl;
+  const positionMarginRatio = marginPlusPnl > 0 ? (position.margin / marginPlusPnl) * 100 : 100;
 
   return {
     ...position,
@@ -151,6 +210,8 @@ export function calculatePositionPnl(
     roe,
     pnlPercent,
     allocationPercent,
+    notionalValue,
+    positionMarginRatio,
   };
 }
 
@@ -222,6 +283,8 @@ export function calculateFuturesSummary(
   const availableBalance = walletBalance - totalMarginUsed;
   const totalUnrealizedPnlPercent =
     totalMarginUsed > 0 ? (totalUnrealizedPnl / totalMarginUsed) * 100 : 0;
+  const marginRatio = totalEquity > 0 ? (totalMarginUsed / totalEquity) * 100 : 0;
+  const marginRatioPercent = Math.max(0, Math.min(100, marginRatio));
 
   return {
     totalEquity,
@@ -231,6 +294,8 @@ export function calculateFuturesSummary(
     totalUnrealizedPnl,
     totalUnrealizedPnlPercent,
     positionCount: positions.size,
+    marginRatio,
+    marginRatioPercent,
   };
 }
 
@@ -301,10 +366,11 @@ export function calculateAllocationSlices(
  * Converts an array of futures trades to CSV string.
  */
 export function tradesToCsv(trades: FuturesTrade[]): string {
-  const header = 'id,symbol,side,action,price,quantity,leverage,realizedPnl,closeReason,timestamp';
+  const header =
+    'id,symbol,side,action,price,quantity,leverage,realizedPnl,fee,closeReason,timestamp';
   const rows = trades.map(
     (t) =>
-      `${t.id},${t.symbol},${t.side},${t.action},${t.price},${t.quantity},${t.leverage},${t.realizedPnl},${t.closeReason ?? ''},${new Date(t.timestamp).toISOString()}`,
+      `${t.id},${t.symbol},${t.side},${t.action},${t.price},${t.quantity},${t.leverage},${t.realizedPnl},${t.fee},${t.closeReason ?? ''},${new Date(t.timestamp).toISOString()}`,
   );
   return [header, ...rows].join('\n');
 }

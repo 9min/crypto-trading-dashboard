@@ -14,6 +14,7 @@ import type {
   PortfolioTab,
   MarginType,
   OpenPositionParams,
+  AutoCloseResult,
 } from '@/types/portfolio';
 import {
   INITIAL_CASH_BALANCE,
@@ -27,6 +28,10 @@ import {
   calculateLiquidationPrice,
   calculateMargin,
   calculateUnrealizedPnl,
+  calculateFee,
+  calculateAverageEntry,
+  isTakeProfitHit,
+  isStopLossHit,
 } from '@/utils/portfolioCalc';
 
 // -----------------------------------------------------------------------------
@@ -52,9 +57,9 @@ interface PortfolioStoreState {
 
 interface PortfolioStoreActions {
   /**
-   * Open a new futures position.
-   * Returns true if opened, false if rejected (insufficient balance,
-   * existing position on same symbol, or max positions reached).
+   * Open a new futures position or add to existing same-direction position.
+   * Returns true if opened/averaged, false if rejected (insufficient balance,
+   * opposite direction exists, or max positions reached).
    */
   openPosition: (params: OpenPositionParams) => boolean;
   /**
@@ -63,10 +68,15 @@ interface PortfolioStoreActions {
    */
   closePosition: (symbol: string, price: number, quantity: number) => boolean;
   /**
-   * Check all positions for liquidation at given prices.
-   * Returns array of liquidated symbols.
+   * Check all positions for auto-close (liquidation, TP, SL).
+   * Returns array of auto-close results with symbol and reason.
    */
-  checkLiquidations: (prices: Map<string, number>) => string[];
+  checkAutoClose: (prices: Map<string, number>) => AutoCloseResult[];
+  /**
+   * Update TP/SL prices for an existing position.
+   * Returns true if updated, false if no position found.
+   */
+  updatePositionTpSl: (symbol: string, tp: number | null, sl: number | null) => boolean;
   /** Set default leverage for new positions */
   setDefaultLeverage: (leverage: number) => void;
   /** Set default margin type for new positions */
@@ -158,7 +168,13 @@ function loadPersistedPortfolio(): Partial<PortfolioStoreState> | null {
       ) {
         continue;
       }
-      positionsMap.set(symbol, p as unknown as FuturesPosition);
+      // Backward compat: add TP/SL defaults for old data
+      const restoredPos: FuturesPosition = {
+        ...(p as unknown as FuturesPosition),
+        takeProfitPrice: typeof p.takeProfitPrice === 'number' ? p.takeProfitPrice : null,
+        stopLossPrice: typeof p.stopLossPrice === 'number' ? p.stopLossPrice : null,
+      };
+      positionsMap.set(symbol, restoredPos);
     }
 
     // Validate trades
@@ -175,10 +191,19 @@ function loadPersistedPortfolio(): Partial<PortfolioStoreState> | null {
         typeof t.quantity === 'number' &&
         typeof t.leverage === 'number' &&
         typeof t.realizedPnl === 'number' &&
-        (t.closeReason === null || t.closeReason === 'manual' || t.closeReason === 'liquidated') &&
+        (t.closeReason === null ||
+          t.closeReason === 'manual' ||
+          t.closeReason === 'liquidated' ||
+          t.closeReason === 'take-profit' ||
+          t.closeReason === 'stop-loss') &&
         typeof t.timestamp === 'number'
       ) {
-        trades.push(t as unknown as FuturesTrade);
+        // Backward compat: add fee default for old data
+        const restoredTrade: FuturesTrade = {
+          ...(t as unknown as FuturesTrade),
+          fee: typeof t.fee === 'number' ? t.fee : 0,
+        };
+        trades.push(restoredTrade);
       }
     }
 
@@ -241,17 +266,90 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
   openPosition: (params: OpenPositionParams): boolean => {
     const state = get();
     const { symbol, side, price, quantity, leverage, marginType } = params;
+    const takeProfitPrice = params.takeProfitPrice ?? null;
+    const stopLossPrice = params.stopLossPrice ?? null;
 
     // Validation
     if (price <= 0 || quantity <= 0 || leverage < 1) return false;
-    if (state.positions.has(symbol)) return false;
-    if (state.positions.size >= MAX_OPEN_POSITIONS) return false;
 
-    const margin = calculateMargin(price, quantity, leverage);
+    const existing = state.positions.get(symbol);
+
+    // If position exists on same symbol but opposite direction, reject
+    if (existing && existing.side !== side) return false;
+
+    if (!existing && state.positions.size >= MAX_OPEN_POSITIONS) return false;
+
+    const fee = calculateFee(price, quantity);
+
     const totalMarginUsed = [...state.positions.values()].reduce((sum, p) => sum + p.margin, 0);
     const availableBalance = state.walletBalance - totalMarginUsed;
 
+    if (existing) {
+      // Position averaging: same symbol, same direction
+      const avgEntry = calculateAverageEntry(
+        existing.entryPrice,
+        existing.quantity,
+        price,
+        quantity,
+      );
+      const newQty = existing.quantity + quantity;
+      const newMargin = calculateMargin(avgEntry, newQty, existing.leverage);
+      const additionalMargin = newMargin - existing.margin;
+
+      if (additionalMargin > availableBalance) return false;
+      if (fee > state.walletBalance - totalMarginUsed) return false;
+
+      const newLiqPrice = calculateLiquidationPrice(
+        avgEntry,
+        existing.leverage,
+        existing.side,
+        existing.marginType,
+      );
+
+      const updatedPosition: FuturesPosition = {
+        ...existing,
+        entryPrice: avgEntry,
+        quantity: newQty,
+        margin: newMargin,
+        liquidationPrice: newLiqPrice,
+        takeProfitPrice: takeProfitPrice ?? existing.takeProfitPrice,
+        stopLossPrice: stopLossPrice ?? existing.stopLossPrice,
+      };
+
+      const trade: FuturesTrade = {
+        id: generateTradeId(),
+        symbol,
+        side,
+        action: 'open',
+        price,
+        quantity,
+        leverage: existing.leverage,
+        realizedPnl: 0,
+        fee,
+        closeReason: null,
+        timestamp: Date.now(),
+      };
+
+      const newPositions = new Map(state.positions);
+      newPositions.set(symbol, updatedPosition);
+      const newTrades = [trade, ...state.trades].slice(0, MAX_TRADE_HISTORY);
+
+      const newState = {
+        walletBalance: state.walletBalance - fee,
+        positions: newPositions,
+        trades: newTrades,
+      };
+
+      set(newState);
+      persistPortfolio({ ...state, ...newState });
+      return true;
+    }
+
+    // New position
+    const margin = calculateMargin(price, quantity, leverage);
+
     if (margin > availableBalance) return false;
+    if (fee > state.walletBalance - totalMarginUsed) return false;
 
     const liquidationPrice = calculateLiquidationPrice(price, leverage, side, marginType);
 
@@ -266,6 +364,8 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
       margin,
       liquidationPrice,
       openedAt: Date.now(),
+      takeProfitPrice,
+      stopLossPrice,
     };
 
     const trade: FuturesTrade = {
@@ -277,6 +377,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
       quantity,
       leverage,
       realizedPnl: 0,
+      fee,
       closeReason: null,
       timestamp: Date.now(),
     };
@@ -286,6 +387,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     const newTrades = [trade, ...state.trades].slice(0, MAX_TRADE_HISTORY);
 
     const newState = {
+      walletBalance: state.walletBalance - fee,
       positions: newPositions,
       trades: newTrades,
     };
@@ -306,13 +408,15 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
 
     const isFullClose = Math.abs(quantity - position.quantity) < 1e-10;
 
-    // Calculate realized PnL for the closed quantity
-    const realizedPnl = calculateUnrealizedPnl(position.entryPrice, price, quantity, position.side);
+    // Calculate realized PnL for the closed quantity, minus fee
+    const rawPnl = calculateUnrealizedPnl(position.entryPrice, price, quantity, position.side);
+    const fee = calculateFee(price, quantity);
+    const realizedPnl = rawPnl - fee;
 
-    // Wallet balance change: only add realized PnL.
+    // Wallet balance change: only add realized PnL (fee already deducted).
     // Margin was never deducted from wallet on open (it's "reserved"),
     // so we must NOT add it back on close — only the PnL delta matters.
-    const newWalletBalance = state.walletBalance + realizedPnl;
+    const newWalletBalance = Math.max(0, state.walletBalance + realizedPnl);
 
     // Update or remove position
     const newPositions = new Map(state.positions);
@@ -336,6 +440,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
       quantity,
       leverage: position.leverage,
       realizedPnl,
+      fee,
       closeReason: 'manual',
       timestamp: Date.now(),
     };
@@ -354,61 +459,119 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     return true;
   },
 
-  checkLiquidations: (prices: Map<string, number>): string[] => {
+  checkAutoClose: (prices: Map<string, number>): AutoCloseResult[] => {
     const state = get();
-    const liquidated: string[] = [];
+    const results: AutoCloseResult[] = [];
+
+    const newPositions = new Map(state.positions);
+    const newTrades = [...state.trades];
+    let newWalletBalance = state.walletBalance;
 
     for (const [symbol, position] of state.positions) {
       const currentPrice = prices.get(symbol);
       if (currentPrice === undefined) continue;
 
-      let shouldLiquidate = false;
+      // 1. Liquidation check (highest priority)
       if (position.marginType === 'isolated') {
-        if (position.side === 'long' && currentPrice <= position.liquidationPrice) {
-          shouldLiquidate = true;
-        } else if (position.side === 'short' && currentPrice >= position.liquidationPrice) {
-          shouldLiquidate = true;
+        const isLiq =
+          (position.side === 'long' && currentPrice <= position.liquidationPrice) ||
+          (position.side === 'short' && currentPrice >= position.liquidationPrice);
+
+        if (isLiq) {
+          newWalletBalance = Math.max(0, newWalletBalance - position.margin);
+          newPositions.delete(symbol);
+
+          newTrades.unshift({
+            id: generateTradeId(),
+            symbol,
+            side: position.side,
+            action: 'close',
+            price: currentPrice,
+            quantity: position.quantity,
+            leverage: position.leverage,
+            realizedPnl: -position.margin,
+            fee: 0,
+            closeReason: 'liquidated',
+            timestamp: Date.now(),
+          });
+
+          results.push({ symbol, reason: 'liquidated' });
+          continue;
         }
       }
 
-      if (shouldLiquidate) {
-        liquidated.push(symbol);
+      // 2. Take-profit check
+      if (
+        position.takeProfitPrice !== null &&
+        isTakeProfitHit(currentPrice, position.takeProfitPrice, position.side)
+      ) {
+        const rawPnl = calculateUnrealizedPnl(
+          position.entryPrice,
+          currentPrice,
+          position.quantity,
+          position.side,
+        );
+        const fee = calculateFee(currentPrice, position.quantity);
+        const realizedPnl = rawPnl - fee;
+
+        newWalletBalance = Math.max(0, newWalletBalance + realizedPnl);
+        newPositions.delete(symbol);
+
+        newTrades.unshift({
+          id: generateTradeId(),
+          symbol,
+          side: position.side,
+          action: 'close',
+          price: currentPrice,
+          quantity: position.quantity,
+          leverage: position.leverage,
+          realizedPnl,
+          fee,
+          closeReason: 'take-profit',
+          timestamp: Date.now(),
+        });
+
+        results.push({ symbol, reason: 'take-profit' });
+        continue;
+      }
+
+      // 3. Stop-loss check
+      if (
+        position.stopLossPrice !== null &&
+        isStopLossHit(currentPrice, position.stopLossPrice, position.side)
+      ) {
+        const rawPnl = calculateUnrealizedPnl(
+          position.entryPrice,
+          currentPrice,
+          position.quantity,
+          position.side,
+        );
+        const fee = calculateFee(currentPrice, position.quantity);
+        const realizedPnl = rawPnl - fee;
+
+        newWalletBalance = Math.max(0, newWalletBalance + realizedPnl);
+        newPositions.delete(symbol);
+
+        newTrades.unshift({
+          id: generateTradeId(),
+          symbol,
+          side: position.side,
+          action: 'close',
+          price: currentPrice,
+          quantity: position.quantity,
+          leverage: position.leverage,
+          realizedPnl,
+          fee,
+          closeReason: 'stop-loss',
+          timestamp: Date.now(),
+        });
+
+        results.push({ symbol, reason: 'stop-loss' });
+        continue;
       }
     }
 
-    if (liquidated.length === 0) return liquidated;
-
-    // Process liquidations
-    const newPositions = new Map(state.positions);
-    const newTrades = [...state.trades];
-    let newWalletBalance = state.walletBalance;
-
-    for (const symbol of liquidated) {
-      const position = state.positions.get(symbol);
-      if (!position) continue;
-
-      const currentPrice = prices.get(symbol);
-      if (currentPrice === undefined) continue;
-
-      // Liquidation: lose the entire margin
-      newWalletBalance -= position.margin;
-      newPositions.delete(symbol);
-
-      const trade: FuturesTrade = {
-        id: generateTradeId(),
-        symbol,
-        side: position.side,
-        action: 'close',
-        price: currentPrice,
-        quantity: position.quantity,
-        leverage: position.leverage,
-        realizedPnl: -position.margin,
-        closeReason: 'liquidated',
-        timestamp: Date.now(),
-      };
-
-      newTrades.unshift(trade);
-    }
+    if (results.length === 0) return results;
 
     const cappedTrades = newTrades.slice(0, MAX_TRADE_HISTORY);
     const newState = {
@@ -420,7 +583,25 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     set(newState);
     persistPortfolio({ ...state, ...newState });
 
-    return liquidated;
+    return results;
+  },
+
+  updatePositionTpSl: (symbol: string, tp: number | null, sl: number | null): boolean => {
+    const state = get();
+    const position = state.positions.get(symbol);
+    if (!position) return false;
+
+    const newPositions = new Map(state.positions);
+    newPositions.set(symbol, {
+      ...position,
+      takeProfitPrice: tp,
+      stopLossPrice: sl,
+    });
+
+    const newState = { positions: newPositions };
+    set(newState);
+    persistPortfolio({ ...state, ...newState });
+    return true;
   },
 
   setDefaultLeverage: (leverage: number): void => {

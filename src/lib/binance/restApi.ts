@@ -129,10 +129,6 @@ export async function fetchExchangeInfo(): Promise<BinanceExchangeInfo> {
   return fetchWithRetry<BinanceExchangeInfo>(url);
 }
 
-// -----------------------------------------------------------------------------
-// 24hr Ticker
-// -----------------------------------------------------------------------------
-
 /**
  * Fetches 24-hour price change statistics for the given symbols.
  * Uses the Binance REST API `GET /api/v3/ticker/24hr` endpoint with
@@ -141,6 +137,40 @@ export async function fetchExchangeInfo(): Promise<BinanceExchangeInfo> {
  * @param symbols - Array of trading pair symbols (e.g., ["BTCUSDT", "ETHUSDT"])
  * @returns Array of 24hr ticker responses
  */
+// -----------------------------------------------------------------------------
+// Funding Rate (Futures)
+// -----------------------------------------------------------------------------
+
+/**
+ * Binance Futures premium index response.
+ * Public API — no authentication required.
+ */
+interface BinancePremiumIndex {
+  symbol: string;
+  markPrice: string;
+  indexPrice: string;
+  lastFundingRate: string;
+  nextFundingTime: number;
+}
+
+const BINANCE_FAPI_BASE_URL = 'https://fapi.binance.com/fapi/v1';
+
+/**
+ * Fetches the current funding rate and mark price for a futures symbol.
+ * Uses the Binance Futures Premium Index endpoint (public, no auth).
+ *
+ * @param symbol - Futures trading pair (e.g., "BTCUSDT")
+ * @returns Premium index data including funding rate
+ */
+export async function fetchFundingRate(symbol: string): Promise<BinancePremiumIndex> {
+  const url = `${BINANCE_FAPI_BASE_URL}/premiumIndex?symbol=${encodeURIComponent(symbol)}`;
+  return fetchWithRetry<BinancePremiumIndex>(url);
+}
+
+// -----------------------------------------------------------------------------
+// 24hr Ticker
+// -----------------------------------------------------------------------------
+
 export async function fetch24hrTickers(symbols: string[]): Promise<Binance24hrTickerResponse[]> {
   if (symbols.length === 0) return [];
 
