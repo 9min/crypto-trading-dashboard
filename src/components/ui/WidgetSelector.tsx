@@ -47,7 +47,7 @@ export const WidgetSelector = memo(function WidgetSelector() {
     const panel = panelRef.current;
     if (!panel) return;
 
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       const rect = panel.getBoundingClientRect();
       const margin = 8;
       if (rect.left < margin) {
@@ -58,6 +58,9 @@ export const WidgetSelector = memo(function WidgetSelector() {
         panel.style.transform = '';
       }
     });
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
   }, [isOpen]);
 
   const handleToggle = useCallback(() => {

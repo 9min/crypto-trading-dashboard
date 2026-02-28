@@ -104,7 +104,7 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
     const panel = panelRef.current;
     if (!panel) return;
 
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       const rect = panel.getBoundingClientRect();
       const margin = 8; // 0.5rem
       if (rect.left < margin) {
@@ -118,6 +118,9 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
         panel.style.transform = '';
       }
     });
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
   }, [isOpen]);
 
   const activeAlertCount = useMemo(() => alerts.filter((a) => a.isActive).length, [alerts]);
