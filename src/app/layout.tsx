@@ -21,19 +21,33 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+const SITE_URL = 'https://crypto-trading-dashboard-nine.vercel.app';
+
 export const metadata: Metadata = {
   title: 'Crypto Trading Dashboard',
   description: 'Real-time cryptocurrency trading dashboard with live WebSocket data',
+  metadataBase: new URL(SITE_URL),
   openGraph: {
     title: 'Crypto Trading Dashboard',
     description: 'Real-time cryptocurrency trading dashboard with live WebSocket data',
     type: 'website',
     locale: 'en_US',
+    url: SITE_URL,
+    siteName: 'CryptoDash',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1400,
+        height: 750,
+        alt: 'Crypto Trading Dashboard — real-time chart, orderbook, futures trading',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Crypto Trading Dashboard',
     description: 'Real-time cryptocurrency trading dashboard with live WebSocket data',
+    images: ['/og-image.png'],
   },
   other: {
     'color-scheme': 'dark light',
