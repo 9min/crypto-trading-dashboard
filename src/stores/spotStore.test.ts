@@ -2,7 +2,7 @@
 // Spot Portfolio Store Tests
 // =============================================================================
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { useSpotStore } from './spotStore';
 import {
   SPOT_INITIAL_BALANCE,
@@ -23,6 +23,10 @@ beforeEach(() => {
   useSpotStore.getState().reset();
   mockStorage.clear();
   vi.clearAllMocks();
+});
+
+afterAll(() => {
+  vi.unstubAllGlobals();
 });
 
 // -----------------------------------------------------------------------------
