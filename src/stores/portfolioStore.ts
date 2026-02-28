@@ -309,11 +309,10 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     // Calculate realized PnL for the closed quantity
     const realizedPnl = calculateUnrealizedPnl(position.entryPrice, price, quantity, position.side);
 
-    // Wallet balance change: return margin proportionally + realized PnL
-    const marginReturned = isFullClose
-      ? position.margin
-      : position.margin * (quantity / position.quantity);
-    const newWalletBalance = state.walletBalance + marginReturned + realizedPnl;
+    // Wallet balance change: only add realized PnL.
+    // Margin was never deducted from wallet on open (it's "reserved"),
+    // so we must NOT add it back on close — only the PnL delta matters.
+    const newWalletBalance = state.walletBalance + realizedPnl;
 
     // Update or remove position
     const newPositions = new Map(state.positions);
@@ -427,10 +426,12 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
   setDefaultLeverage: (leverage: number): void => {
     if (leverage < 1) return;
     set({ defaultLeverage: leverage });
+    persistPortfolio(get());
   },
 
   setDefaultMarginType: (marginType: MarginType): void => {
     set({ defaultMarginType: marginType });
+    persistPortfolio(get());
   },
 
   setActiveTab: (tab: PortfolioTab): void => {

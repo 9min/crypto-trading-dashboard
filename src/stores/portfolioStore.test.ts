@@ -293,27 +293,25 @@ describe('closePosition', () => {
     });
   });
 
-  it('closes fully with profit and returns margin + pnl', () => {
+  it('closes fully with profit and adds only realized pnl', () => {
     const initialBalance = usePortfolioStore.getState().walletBalance;
     const success = usePortfolioStore.getState().closePosition('BTCUSDT', 55000, 2);
 
     expect(success).toBe(true);
     expect(usePortfolioStore.getState().positions.has('BTCUSDT')).toBe(false);
 
-    // margin = (50000 * 2) / 10 = 10000
     // pnl = (55000 - 50000) * 2 = 10000
-    // wallet should increase by margin + pnl = 20000
-    expect(usePortfolioStore.getState().walletBalance).toBe(initialBalance + 10000 + 10000);
+    // Margin was never deducted from wallet, so only pnl is added
+    expect(usePortfolioStore.getState().walletBalance).toBe(initialBalance + 10000);
   });
 
   it('closes fully with loss', () => {
     const initialBalance = usePortfolioStore.getState().walletBalance;
     usePortfolioStore.getState().closePosition('BTCUSDT', 48000, 2);
 
-    // margin = 10000
     // pnl = (48000 - 50000) * 2 = -4000
-    // wallet += margin + pnl = 10000 - 4000 = 6000
-    expect(usePortfolioStore.getState().walletBalance).toBe(initialBalance + 10000 + -4000);
+    // Margin was never deducted, so only pnl is added (negative = loss)
+    expect(usePortfolioStore.getState().walletBalance).toBe(initialBalance + -4000);
   });
 
   it('closes partially and reduces position proportionally', () => {
@@ -379,9 +377,8 @@ describe('closePosition', () => {
     usePortfolioStore.getState().closePosition('BTCUSDT', 45000, 1);
 
     // Short PnL = (50000 - 45000) * 1 = 5000 (profit)
-    // margin = 5000
-    // wallet += margin + pnl = 5000 + 5000 = 10000
-    expect(usePortfolioStore.getState().walletBalance).toBe(initialBalance + 5000 + 5000);
+    // Margin was never deducted, so only pnl is added
+    expect(usePortfolioStore.getState().walletBalance).toBe(initialBalance + 5000);
   });
 });
 
@@ -707,10 +704,11 @@ describe('hydratePortfolio', () => {
   });
 
   it('restores default leverage and margin type', () => {
+    // setDefaultLeverage/setDefaultMarginType now persist independently
     usePortfolioStore.getState().setDefaultLeverage(50);
     usePortfolioStore.getState().setDefaultMarginType('cross');
 
-    // Persist by opening a position (triggers persist)
+    // Also open a position so there's richer persisted data
     usePortfolioStore.getState().openPosition({
       symbol: 'BTCUSDT',
       side: 'long',
@@ -719,12 +717,6 @@ describe('hydratePortfolio', () => {
       leverage: 10,
       marginType: 'isolated',
     });
-
-    // Manually persist the current state including defaults
-    const stored = JSON.parse(localStorage.getItem(PORTFOLIO_STORAGE_KEY) as string);
-    stored.defaultLeverage = 50;
-    stored.defaultMarginType = 'cross';
-    localStorage.setItem(PORTFOLIO_STORAGE_KEY, JSON.stringify(stored));
 
     usePortfolioStore.getState().reset();
     usePortfolioStore.getState().hydratePortfolio();
