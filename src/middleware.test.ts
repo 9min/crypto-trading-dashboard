@@ -54,6 +54,11 @@ describe('buildCsp', () => {
     expect(csp).toContain('https://data-api.binance.vision');
   });
 
+  it('allows Binance Futures API in connect-src', () => {
+    const csp = buildCsp(false);
+    expect(csp).toContain('https://fapi.binance.com');
+  });
+
   it('allows Binance WebSocket in connect-src', () => {
     const csp = buildCsp(false);
     expect(csp).toContain('wss://stream.binance.com:9443');
@@ -105,6 +110,7 @@ describe('middleware', () => {
     const response = middleware(createRequest());
     const csp = response.headers.get('Content-Security-Policy') ?? '';
     expect(csp).toContain('https://data-api.binance.vision');
+    expect(csp).toContain('https://fapi.binance.com');
     expect(csp).toContain('wss://stream.binance.com:9443');
     expect(csp).toContain('wss://api.upbit.com');
     expect(csp).toContain('https://*.supabase.co');

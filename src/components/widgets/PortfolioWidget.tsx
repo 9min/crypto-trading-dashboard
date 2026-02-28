@@ -4,14 +4,14 @@
 // PortfolioWidget Component — Futures Paper Trading
 // =============================================================================
 // Futures paper trading portfolio widget. Shows:
-// - Summary bar: Total Equity + Available Balance / Unrealized PnL
+// - Summary bar: Total Equity + Available Balance / Unrealized PnL + Margin Ratio
 // - Canvas donut chart for margin allocation (left) + positions/history tabs
+// - Position rows with PnL color coding, TP/SL display, notional value
+// - History rows with fee display and close reason badges
 // - Inline reset confirmation dialog
-// - TradePanel with Long/Short tabs for market orders
-// - Auto-liquidation check via useEffect on price changes
-//
-// Data flow: watchlistStore.tickers + portfolioStore.positions → useMemo →
-// renderer.updateSlices()
+// - TradePanel with Long/Short tabs, leverage slider, TP/SL, cost preview
+// - Auto-close check (liquidation + TP/SL) via useEffect on price changes
+// - Funding rate polling from Binance Futures API
 // =============================================================================
 
 import { memo, useRef, useState, useCallback, useEffect, useMemo } from 'react';
@@ -33,9 +33,39 @@ import {
 } from '@/utils/portfolioCalc';
 import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol } from '@/utils/formatSymbol';
+import { fetchFundingRate } from '@/lib/binance/restApi';
 import { TradePanel } from '@/components/ui/TradePanel';
 import { WidgetWrapper } from './WidgetWrapper';
-import type { FuturesTrade, PositionWithPnl } from '@/types/portfolio';
+import type { FuturesTrade, PositionWithPnl, CloseReason } from '@/types/portfolio';
+
+// -----------------------------------------------------------------------------
+// Margin Ratio Bar
+// -----------------------------------------------------------------------------
+
+interface MarginRatioBarProps {
+  ratio: number;
+  percent: number;
+}
+
+const MarginRatioBar = memo(function MarginRatioBar({ ratio, percent }: MarginRatioBarProps) {
+  const barColor = ratio < 50 ? 'bg-buy' : ratio < 80 ? 'bg-[#F0B90B]' : 'bg-sell';
+  const textColor = ratio < 50 ? 'text-buy' : ratio < 80 ? 'text-[#F0B90B]' : 'text-sell';
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-foreground-secondary text-[10px]">Margin Ratio</span>
+      <div className="bg-background h-2 flex-1 overflow-hidden rounded-full">
+        <div
+          className={`h-full rounded-full transition-all duration-300 ${barColor}`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <span className={`font-mono-num text-[10px] font-semibold ${textColor}`}>
+        {ratio.toFixed(1)}%
+      </span>
+    </div>
+  );
+});
 
 // -----------------------------------------------------------------------------
 // Sub-Components
@@ -46,6 +76,9 @@ interface SummaryBarProps {
   availableBalance: number;
   totalPnl: number;
   totalPnlPercent: number;
+  marginRatio: number;
+  marginRatioPercent: number;
+  positionCount: number;
 }
 
 const SummaryBar = memo(function SummaryBar({
@@ -53,37 +86,69 @@ const SummaryBar = memo(function SummaryBar({
   availableBalance,
   totalPnl,
   totalPnlPercent,
+  marginRatio,
+  marginRatioPercent,
+  positionCount,
 }: SummaryBarProps) {
   const pnlColor =
     totalPnl > 0 ? 'text-buy' : totalPnl < 0 ? 'text-sell' : 'text-foreground-secondary';
   const pnlSign = totalPnl > 0 ? '+' : '';
+  const pnlBg = totalPnl > 0 ? 'bg-buy/5' : totalPnl < 0 ? 'bg-sell/5' : '';
 
   return (
-    <div className="border-border grid grid-cols-2 gap-x-3 gap-y-0.5 border-b px-3 py-2">
-      {/* Row 1 left: Total Equity */}
-      <div className="flex flex-col">
-        <span className="text-foreground-secondary text-[10px]">Total Equity</span>
-        <span className="font-mono-num text-foreground text-sm font-semibold">
-          ${formatPrice(totalEquity)}
-        </span>
+    <div className="border-border flex flex-col gap-1.5 border-b px-3 py-2.5">
+      {/* Row 1: Total Equity + Available */}
+      <div className="flex items-start justify-between">
+        <div className="flex flex-col">
+          <span className="text-foreground-secondary text-[10px]">Total Equity</span>
+          <span className="font-mono-num text-foreground text-sm font-semibold">
+            ${formatPrice(totalEquity)}
+          </span>
+        </div>
+        <div className="flex flex-col items-end">
+          <span className="text-foreground-secondary text-[10px]">Available</span>
+          <span className="font-mono-num text-foreground text-xs">
+            ${formatPrice(availableBalance)}
+          </span>
+        </div>
       </div>
-      {/* Row 1 right: Available Balance */}
-      <div className="flex flex-col items-end">
-        <span className="text-foreground-secondary text-[10px]">Available</span>
-        <span className="font-mono-num text-foreground text-xs">
-          ${formatPrice(availableBalance)}
-        </span>
-      </div>
-      {/* Row 2: Unrealized PnL spanning full width */}
-      <div className="col-span-2">
-        <span className={`font-mono-num text-xs font-medium ${pnlColor}`}>
+      {/* Row 2: Unrealized PnL + Position count */}
+      <div className="flex items-center justify-between">
+        <span
+          className={`font-mono-num rounded px-1.5 py-0.5 text-xs font-medium ${pnlColor} ${pnlBg}`}
+        >
           {pnlSign}${formatPrice(Math.abs(totalPnl))} ({pnlSign}
           {totalPnlPercent.toFixed(2)}%)
         </span>
+        <span className="text-foreground-secondary text-[10px]">
+          {positionCount} {positionCount === 1 ? 'position' : 'positions'}
+        </span>
       </div>
+      {/* Row 3: Margin Ratio Bar */}
+      {positionCount > 0 && <MarginRatioBar ratio={marginRatio} percent={marginRatioPercent} />}
     </div>
   );
 });
+
+// -----------------------------------------------------------------------------
+// Close Reason Badge
+// -----------------------------------------------------------------------------
+
+function getCloseReasonBadge(reason: CloseReason | null): {
+  label: string;
+  className: string;
+} | null {
+  switch (reason) {
+    case 'liquidated':
+      return { label: 'LIQ', className: 'bg-sell/15 text-sell font-bold' };
+    case 'take-profit':
+      return { label: 'TP', className: 'bg-buy/15 text-buy font-bold' };
+    case 'stop-loss':
+      return { label: 'SL', className: 'bg-[#F0B90B]/15 text-[#F0B90B] font-bold' };
+    default:
+      return null;
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Positions Tab
@@ -92,19 +157,28 @@ const SummaryBar = memo(function SummaryBar({
 interface PositionsTabProps {
   positions: PositionWithPnl[];
   onClose: (symbol: string, price: number, quantity: number) => boolean;
+  onSelectSymbol: (symbol: string) => void;
 }
 
-const PositionsTab = memo(function PositionsTab({ positions, onClose }: PositionsTabProps) {
+const PositionsTab = memo(function PositionsTab({
+  positions,
+  onClose,
+  onSelectSymbol,
+}: PositionsTabProps) {
   if (positions.length === 0) {
     return (
-      <div className="text-foreground-secondary flex h-full items-center justify-center text-xs">
-        No open positions
+      <div className="flex flex-col items-center justify-center gap-1 py-6">
+        <span className="text-foreground-tertiary text-lg">&#9746;</span>
+        <span className="text-foreground-secondary text-xs">No open positions</span>
+        <span className="text-foreground-tertiary text-[10px]">
+          Open a position using the panel below
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col overflow-y-auto">
+    <div className="flex flex-col">
       {positions.map((pos) => {
         const pnlColor =
           pos.unrealizedPnl > 0
@@ -113,41 +187,66 @@ const PositionsTab = memo(function PositionsTab({ positions, onClose }: Position
               ? 'text-sell'
               : 'text-foreground-secondary';
         const sign = pos.unrealizedPnl > 0 ? '+' : '';
-        const sideLabel = pos.side === 'long' ? 'LONG' : 'SHORT';
-        const sideColor = pos.side === 'long' ? 'text-buy' : 'text-sell';
+        const sideColor = pos.side === 'long' ? 'bg-buy' : 'bg-sell';
+        const bgColor =
+          pos.unrealizedPnl > 0 ? 'bg-buy/5' : pos.unrealizedPnl < 0 ? 'bg-sell/5' : '';
 
         return (
-          <div key={pos.id} className="border-border/30 flex flex-col gap-0.5 border-b px-3 py-1.5">
-            {/* Row 1: Symbol + Side badge + Close button */}
+          <div
+            key={pos.id}
+            className={`border-border/30 flex flex-col gap-1 border-b px-3 py-2 ${bgColor}`}
+          >
+            {/* Row 1: Symbol + Side badge + PnL + Close button */}
             <div className="flex items-center">
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                <span className={`text-[10px] font-bold ${sideColor}`}>{sideLabel}</span>
-                <span className="text-foreground truncate text-xs font-medium">
-                  {formatSymbol(pos.symbol)}
+                <span
+                  className={`rounded px-1 py-0.5 text-[9px] font-bold text-white ${sideColor}`}
+                >
+                  {pos.side === 'long' ? 'L' : 'S'}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => onSelectSymbol(pos.symbol)}
+                  className="text-foreground hover:text-accent cursor-pointer truncate text-xs font-medium transition-colors"
+                >
+                  {formatSymbol(pos.symbol)}
+                </button>
                 <span className="text-foreground-secondary text-[10px]">{pos.leverage}x</span>
               </div>
+              <span className={`font-mono-num text-xs font-medium ${pnlColor}`}>
+                {sign}${formatPrice(Math.abs(pos.unrealizedPnl))}
+              </span>
               <button
                 type="button"
                 onClick={() => onClose(pos.symbol, pos.currentPrice, pos.quantity)}
-                className="text-foreground-tertiary hover:text-sell cursor-pointer text-[10px] transition-colors"
+                className="text-foreground-tertiary hover:bg-sell/10 hover:text-sell ml-2 cursor-pointer rounded px-1.5 py-0.5 text-[10px] font-medium transition-all"
               >
                 Close
               </button>
             </div>
 
-            {/* Row 2: Entry price + Unrealized PnL */}
+            {/* Row 1.5: ROE percentage */}
+            <div className="flex items-center justify-between">
+              <span className={`font-mono-num text-[10px] ${pnlColor}`}>
+                ROE: {sign}
+                {pos.roe.toFixed(2)}%
+              </span>
+              <span className="text-foreground-secondary font-mono-num text-[10px]">
+                Notional: ${formatPrice(pos.notionalValue)}
+              </span>
+            </div>
+
+            {/* Row 2: Entry price + Margin */}
             <div className="flex items-center justify-between">
               <span className="text-foreground-secondary font-mono-num text-[10px]">
                 Entry: {formatPrice(pos.entryPrice)}
               </span>
-              <span className={`font-mono-num text-[10px] ${pnlColor}`}>
-                {sign}${formatPrice(Math.abs(pos.unrealizedPnl))} ({sign}
-                {pos.roe.toFixed(1)}%)
+              <span className="text-foreground-secondary font-mono-num text-[10px]">
+                Margin: ${formatPrice(pos.margin)}
               </span>
             </div>
 
-            {/* Row 3: Liquidation price + Margin */}
+            {/* Row 3: Liquidation price + TP/SL */}
             <div className="flex items-center justify-between">
               <span className="text-foreground-secondary font-mono-num text-[10px]">
                 Liq:{' '}
@@ -155,9 +254,18 @@ const PositionsTab = memo(function PositionsTab({ positions, onClose }: Position
                   ? '\u2014'
                   : formatPrice(pos.liquidationPrice)}
               </span>
-              <span className="text-foreground-secondary font-mono-num text-[10px]">
-                Margin: ${formatPrice(pos.margin)}
-              </span>
+              <div className="flex items-center gap-2">
+                {pos.takeProfitPrice !== null && (
+                  <span className="text-buy font-mono-num text-[10px]">
+                    TP: {formatPrice(pos.takeProfitPrice)}
+                  </span>
+                )}
+                {pos.stopLossPrice !== null && (
+                  <span className="text-sell font-mono-num text-[10px]">
+                    SL: {formatPrice(pos.stopLossPrice)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -177,17 +285,22 @@ interface HistoryTabProps {
 const HistoryTab = memo(function HistoryTab({ trades }: HistoryTabProps) {
   if (trades.length === 0) {
     return (
-      <div className="text-foreground-secondary flex h-full items-center justify-center text-xs">
-        No trades yet
+      <div className="flex flex-col items-center justify-center gap-1 py-6">
+        <span className="text-foreground-tertiary text-lg">&#9783;</span>
+        <span className="text-foreground-secondary text-xs">No trades yet</span>
+        <span className="text-foreground-tertiary text-[10px]">
+          Your trade history will appear here
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col overflow-y-auto">
+    <div className="flex flex-col">
       {trades.map((t) => {
-        const sideColor = t.side === 'long' ? 'text-buy' : 'text-sell';
+        const sideColor = t.side === 'long' ? 'bg-buy' : 'bg-sell';
         const actionLabel = t.action === 'open' ? 'OPEN' : 'CLOSE';
+        const actionColor = t.action === 'open' ? 'text-foreground-secondary' : 'text-foreground';
         const timeStr = new Date(t.timestamp).toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',
@@ -200,35 +313,49 @@ const HistoryTab = memo(function HistoryTab({ trades }: HistoryTabProps) {
               ? 'text-sell'
               : 'text-foreground-secondary';
         const pnlSign = t.realizedPnl > 0 ? '+' : '';
+        const badge = getCloseReasonBadge(t.closeReason);
 
         return (
-          <div key={t.id} className="border-border/30 flex items-center border-b px-3 py-1.5">
-            <div className="flex min-w-0 flex-1 flex-col">
+          <div key={t.id} className="border-border/30 flex items-center border-b px-3 py-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <div className="flex items-center gap-1.5">
-                <span className={`text-[10px] font-medium uppercase ${sideColor}`}>
+                <span
+                  className={`rounded px-1 py-0.5 text-[9px] font-bold text-white ${sideColor}`}
+                >
                   {t.side === 'long' ? 'L' : 'S'}
                 </span>
-                <span className="text-foreground-secondary text-[10px]">{actionLabel}</span>
-                <span className="text-foreground text-xs">{formatSymbol(t.symbol)}</span>
+                <span className={`text-[10px] font-medium ${actionColor}`}>{actionLabel}</span>
+                <span className="text-foreground text-xs font-medium">
+                  {formatSymbol(t.symbol)}
+                </span>
                 <span className="text-foreground-secondary text-[10px]">{t.leverage}x</span>
               </div>
-              <span className="text-foreground-secondary font-mono-num text-[10px]">
-                {parseFloat(t.quantity.toFixed(8))} @ {formatPrice(t.price)}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-foreground-secondary font-mono-num text-[10px]">
+                  {parseFloat(t.quantity.toFixed(8))} @ {formatPrice(t.price)}
+                </span>
+                {t.fee > 0 && (
+                  <span className="text-foreground-tertiary font-mono-num text-[10px]">
+                    Fee: ${formatPrice(t.fee)}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="flex flex-col items-end">
+            <div className="flex flex-col items-end gap-0.5">
               {showPnl ? (
-                <span className={`font-mono-num text-xs ${pnlColor}`}>
+                <span className={`font-mono-num text-xs font-medium ${pnlColor}`}>
                   {pnlSign}${formatPrice(Math.abs(t.realizedPnl))}
                 </span>
               ) : (
-                <span className="text-foreground-secondary text-xs">{'\u2014'}</span>
+                <span className="text-foreground-tertiary text-xs">{'\u2014'}</span>
               )}
               <div className="flex items-center gap-1">
-                {t.closeReason === 'liquidated' && (
-                  <span className="text-sell text-[9px] font-bold">LIQ</span>
+                {badge && (
+                  <span className={`rounded px-1 py-0.5 text-[8px] ${badge.className}`}>
+                    {badge.label}
+                  </span>
                 )}
-                <span className="text-foreground-secondary text-[10px]">{timeStr}</span>
+                <span className="text-foreground-tertiary text-[10px]">{timeStr}</span>
               </div>
             </div>
           </div>
@@ -246,10 +373,13 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isResetConfirming, setIsResetConfirming] = useState(false);
+  const [fundingRate, setFundingRate] = useState<number | null>(null);
+  const fundingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Store selectors
   const theme = useUiStore((state) => state.theme);
   const symbol = useUiStore((state) => state.symbol);
+  const setSymbol = useUiStore((state) => state.setSymbol);
   const walletBalance = usePortfolioStore((state) => state.walletBalance);
   const positions = usePortfolioStore((state) => state.positions);
   const trades = usePortfolioStore((state) => state.trades);
@@ -259,7 +389,7 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
   const setActiveTab = usePortfolioStore((state) => state.setActiveTab);
   const openPosition = usePortfolioStore((state) => state.openPosition);
   const closePosition = usePortfolioStore((state) => state.closePosition);
-  const checkLiquidations = usePortfolioStore((state) => state.checkLiquidations);
+  const checkAutoClose = usePortfolioStore((state) => state.checkAutoClose);
   const resetPortfolio = usePortfolioStore((state) => state.resetPortfolio);
   const tickers = useWatchlistStore((state) => state.tickers);
   const addToast = useToastStore((state) => state.addToast);
@@ -314,7 +444,7 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
     renderer.markDirty();
   }, [theme, rendererRef]);
 
-  // Auto-liquidation check
+  // Auto-close check (liquidation + TP + SL)
   useEffect(() => {
     if (positions.size === 0) return;
 
@@ -323,11 +453,47 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
       priceMap.set(sym, ticker.price);
     }
 
-    const liquidated = checkLiquidations(priceMap);
-    for (const sym of liquidated) {
-      addToast(`${formatSymbol(sym)} position liquidated!`, 'error', 6000);
+    const results = checkAutoClose(priceMap);
+    for (const result of results) {
+      const label = formatSymbol(result.symbol);
+      if (result.reason === 'liquidated') {
+        addToast(`${label} position liquidated!`, 'error', 6000);
+      } else if (result.reason === 'take-profit') {
+        addToast(`${label} take profit triggered!`, 'success', 4000);
+      } else if (result.reason === 'stop-loss') {
+        addToast(`${label} stop loss triggered!`, 'warning', 4000);
+      }
     }
-  }, [tickers, positions, checkLiquidations, addToast]);
+  }, [tickers, positions, checkAutoClose, addToast]);
+
+  // Funding rate polling (60s interval)
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchRate = async () => {
+      try {
+        const data = await fetchFundingRate(symbol);
+        if (!cancelled) {
+          setFundingRate(parseFloat(data.lastFundingRate));
+        }
+      } catch {
+        if (!cancelled) {
+          setFundingRate(null);
+        }
+      }
+    };
+
+    fetchRate();
+    fundingIntervalRef.current = setInterval(fetchRate, 60_000);
+
+    return () => {
+      cancelled = true;
+      if (fundingIntervalRef.current !== null) {
+        clearInterval(fundingIntervalRef.current);
+        fundingIntervalRef.current = null;
+      }
+    };
+  }, [symbol]);
 
   // Callbacks
   const handleOpenPosition = useCallback(
@@ -419,69 +585,76 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
 
   return (
     <WidgetWrapper title="Futures" headerActions={headerActions}>
-      <div className="flex h-full flex-col">
+      <div className="flex h-full flex-col overflow-y-auto">
         {/* Summary bar */}
         <SummaryBar
           totalEquity={summary.totalEquity}
           availableBalance={summary.availableBalance}
           totalPnl={summary.totalUnrealizedPnl}
           totalPnlPercent={summary.totalUnrealizedPnlPercent}
+          marginRatio={summary.marginRatio}
+          marginRatioPercent={summary.marginRatioPercent}
+          positionCount={summary.positionCount}
         />
 
-        {/* Middle section: chart + tabs */}
-        <div className="flex min-h-0 flex-1 flex-col">
-          {/* Donut chart */}
-          <div ref={containerRef} className="h-32 w-full shrink-0">
-            <canvas ref={canvasRef} className="block h-full w-full" />
-          </div>
+        {/* Donut chart */}
+        <div ref={containerRef} className="h-32 w-full shrink-0">
+          <canvas ref={canvasRef} className="block h-full w-full" />
+        </div>
 
-          {/* Tab buttons */}
-          <div className="border-border flex shrink-0 border-b">
-            <button
-              type="button"
-              onClick={handleTabPositions}
-              className={`flex-1 cursor-pointer py-1.5 text-xs transition-colors ${
-                activeTab === 'positions'
-                  ? 'border-accent text-accent border-b-2 font-medium'
-                  : 'text-foreground-secondary hover:text-foreground'
-              }`}
-            >
-              Positions ({summary.positionCount})
-            </button>
-            <button
-              type="button"
-              onClick={handleTabHistory}
-              className={`flex-1 cursor-pointer py-1.5 text-xs transition-colors ${
-                activeTab === 'history'
-                  ? 'border-accent text-accent border-b-2 font-medium'
-                  : 'text-foreground-secondary hover:text-foreground'
-              }`}
-            >
-              History ({trades.length})
-            </button>
-          </div>
+        {/* Tab buttons — sticky so tabs remain visible while scrolling */}
+        <div className="border-border bg-background-secondary sticky top-0 z-10 flex shrink-0 border-b">
+          <button
+            type="button"
+            onClick={handleTabPositions}
+            className={`flex-1 cursor-pointer py-2 text-xs transition-all ${
+              activeTab === 'positions'
+                ? 'border-accent text-accent border-b-2 font-semibold'
+                : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'
+            }`}
+          >
+            Positions{summary.positionCount > 0 ? ` (${summary.positionCount})` : ''}
+          </button>
+          <button
+            type="button"
+            onClick={handleTabHistory}
+            className={`flex-1 cursor-pointer py-2 text-xs transition-all ${
+              activeTab === 'history'
+                ? 'border-accent text-accent border-b-2 font-semibold'
+                : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'
+            }`}
+          >
+            History{trades.length > 0 ? ` (${trades.length})` : ''}
+          </button>
+        </div>
 
-          {/* Tab content */}
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {activeTab === 'positions' ? (
-              <PositionsTab positions={positionsWithPnl} onClose={handleClosePosition} />
-            ) : (
-              <HistoryTab trades={trades} />
-            )}
-          </div>
+        {/* Tab content — no flex-1/overflow-hidden, just renders its natural height */}
+        <div className="shrink-0">
+          {activeTab === 'positions' ? (
+            <PositionsTab
+              positions={positionsWithPnl}
+              onClose={handleClosePosition}
+              onSelectSymbol={setSymbol}
+            />
+          ) : (
+            <HistoryTab trades={trades} />
+          )}
         </div>
 
         {/* Trade panel */}
-        <TradePanel
-          symbol={symbol}
-          currentPrice={currentPrice}
-          availableBalance={summary.availableBalance}
-          defaultLeverage={defaultLeverage}
-          defaultMarginType={defaultMarginType}
-          existingPosition={existingPosition}
-          onOpenPosition={handleOpenPosition}
-          onClosePosition={handleClosePosition}
-        />
+        <div className="shrink-0">
+          <TradePanel
+            symbol={symbol}
+            currentPrice={currentPrice}
+            availableBalance={summary.availableBalance}
+            defaultLeverage={defaultLeverage}
+            defaultMarginType={defaultMarginType}
+            existingPosition={existingPosition}
+            onOpenPosition={handleOpenPosition}
+            onClosePosition={handleClosePosition}
+            fundingRate={fundingRate}
+          />
+        </div>
       </div>
     </WidgetWrapper>
   );
