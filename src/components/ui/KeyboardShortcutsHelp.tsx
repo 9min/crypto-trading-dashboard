@@ -38,6 +38,7 @@ const SHORTCUTS: readonly ShortcutEntry[] = [
   { id: 'search-ctrl-k', keys: ['Ctrl', 'K'], description: 'Open symbol search' },
   { id: 'exchange', keys: ['E'], description: 'Toggle exchange (Binance / Upbit)' },
   { id: 'theme', keys: ['T'], description: 'Toggle theme (dark / light)' },
+  { id: 'settings', keys: ['S'], description: 'Open settings' },
   { id: 'help', keys: ['?'], description: 'Show this help' },
   { id: 'close', keys: ['Esc'], description: 'Close modal' },
 ] as const;

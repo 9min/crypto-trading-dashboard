@@ -68,7 +68,7 @@ const RemoveButton = memo(function RemoveButton({ symbol, onRemove }: RemoveButt
     <button
       type="button"
       onClick={handleClick}
-      className="text-foreground-tertiary hover:text-sell ml-1 shrink-0 cursor-pointer rounded p-0.5 opacity-0 transition-all group-hover:opacity-100 focus:opacity-100"
+      className="text-foreground-tertiary hover:text-sell ml-1 shrink-0 cursor-pointer rounded p-1 opacity-100 transition-all sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
       aria-label={`Remove ${symbol}`}
     >
       <svg

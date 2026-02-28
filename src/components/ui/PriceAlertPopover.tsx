@@ -39,14 +39,14 @@ const ToggleSwitch = memo(function ToggleSwitch({ checked, onChange }: ToggleSwi
       role="switch"
       aria-checked={checked}
       onClick={onChange}
-      className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
         checked ? 'bg-buy' : 'bg-foreground-tertiary'
       }`}
       aria-label={checked ? 'Disable alert' : 'Enable alert'}
     >
       <span
-        className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
-          checked ? 'translate-x-3.5' : 'translate-x-0.5'
+        className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
+          checked ? 'translate-x-4' : 'translate-x-0.5'
         }`}
       />
     </button>
@@ -60,6 +60,7 @@ const ToggleSwitch = memo(function ToggleSwitch({ checked, onChange }: ToggleSwi
 export const PriceAlertPopover = memo(function PriceAlertPopover() {
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const alerts = useAlertStore((state) => state.alerts);
   const addAlert = useAlertStore((state) => state.addAlert);
@@ -94,6 +95,31 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  // Adjust popover horizontal position to prevent viewport overflow
+  useEffect(() => {
+    if (!isOpen) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const rafId = requestAnimationFrame(() => {
+      const rect = panel.getBoundingClientRect();
+      const margin = 8; // 0.5rem
+      if (rect.left < margin) {
+        // Shift right to keep within viewport
+        const shift = margin - rect.left;
+        panel.style.transform = `translateX(${shift}px)`;
+      } else if (rect.right > window.innerWidth - margin) {
+        const shift = rect.right - (window.innerWidth - margin);
+        panel.style.transform = `translateX(-${shift}px)`;
+      } else {
+        panel.style.transform = '';
+      }
+    });
+    return () => {
+      cancelAnimationFrame(rafId);
     };
   }, [isOpen]);
 
@@ -145,7 +171,7 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
       <button
         type="button"
         onClick={handleToggle}
-        className="text-foreground-secondary hover:bg-background-tertiary hover:text-foreground relative flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors"
+        className="text-foreground-secondary hover:bg-background-tertiary hover:text-foreground relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-md transition-colors"
         aria-label="Price alerts"
       >
         <svg
@@ -169,7 +195,10 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
       </button>
 
       {isOpen && (
-        <div className="border-border bg-background-secondary absolute top-full right-0 z-50 mt-2 w-96 overflow-hidden rounded-lg border shadow-xl">
+        <div
+          ref={panelRef}
+          className="border-border bg-background-secondary absolute top-full right-0 z-[70] mt-2 w-96 max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border shadow-xl"
+        >
           {/* Header */}
           <div className="border-border flex items-center justify-between border-b px-4 py-2.5">
             <div className="flex items-center gap-2">
@@ -349,7 +378,7 @@ export const PriceAlertPopover = memo(function PriceAlertPopover() {
                     <button
                       type="button"
                       onClick={handleAlertRemove(alert.id)}
-                      className="text-foreground-tertiary hover:text-sell cursor-pointer rounded p-0.5 opacity-0 transition-all group-hover:opacity-100 focus:opacity-100"
+                      className="text-foreground-tertiary hover:text-sell cursor-pointer rounded p-1 opacity-100 transition-all sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                       aria-label="Remove alert"
                     >
                       <svg

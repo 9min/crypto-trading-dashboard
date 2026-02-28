@@ -335,6 +335,36 @@ body {
 }
 
 /* =============================================================================
+   Settings Panel Animations
+   ============================================================================= */
+
+@keyframes settings-slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes settings-slide-in-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-settings-slide-right {
+  animation: settings-slide-in-right 0.2s ease-out;
+}
+
+.animate-settings-slide-up {
+  animation: settings-slide-in-up 0.2s ease-out;
+}
+
+/* =============================================================================
    Focus Visible — Keyboard Accessibility
    ============================================================================= */
 
@@ -359,6 +389,11 @@ body {
 
   .animate-modal-backdrop,
   .animate-modal-content {
+    animation: none;
+  }
+
+  .animate-settings-slide-right,
+  .animate-settings-slide-up {
     animation: none;
   }
 

@@ -24,6 +24,7 @@ describe('uiStore', () => {
       activeMobileTab: 'chart',
       isSymbolSearchOpen: false,
       isShortcutsHelpOpen: false,
+      isSettingsOpen: false,
     });
     vi.clearAllMocks();
   });
@@ -39,6 +40,7 @@ describe('uiStore', () => {
     expect(state.activeMobileTab).toBe('chart');
     expect(state.isSymbolSearchOpen).toBe(false);
     expect(state.isShortcutsHelpOpen).toBe(false);
+    expect(state.isSettingsOpen).toBe(false);
   });
 
   describe('setTheme', () => {
@@ -187,16 +189,31 @@ describe('uiStore', () => {
     });
   });
 
+  describe('setSettingsOpen', () => {
+    it('opens the settings panel', () => {
+      useUiStore.getState().setSettingsOpen(true);
+      expect(useUiStore.getState().isSettingsOpen).toBe(true);
+    });
+
+    it('closes the settings panel', () => {
+      useUiStore.getState().setSettingsOpen(true);
+      useUiStore.getState().setSettingsOpen(false);
+      expect(useUiStore.getState().isSettingsOpen).toBe(false);
+    });
+  });
+
   describe('closeAllOverlays', () => {
-    it('closes both modals when both are open', () => {
+    it('closes all overlays when all are open', () => {
       useUiStore.getState().setSymbolSearchOpen(true);
       useUiStore.getState().setShortcutsHelpOpen(true);
+      useUiStore.getState().setSettingsOpen(true);
 
       useUiStore.getState().closeAllOverlays();
 
       const state = useUiStore.getState();
       expect(state.isSymbolSearchOpen).toBe(false);
       expect(state.isShortcutsHelpOpen).toBe(false);
+      expect(state.isSettingsOpen).toBe(false);
     });
 
     it('is safe to call when no overlays are open', () => {
@@ -205,6 +222,7 @@ describe('uiStore', () => {
       const state = useUiStore.getState();
       expect(state.isSymbolSearchOpen).toBe(false);
       expect(state.isShortcutsHelpOpen).toBe(false);
+      expect(state.isSettingsOpen).toBe(false);
     });
   });
 });

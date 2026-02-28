@@ -83,6 +83,15 @@ export const useKlineStore = create<KlineStore>()((set) => ({
 
   addCandle: (candle: CandleData): void => {
     set((state) => {
+      const len = state.candles.length;
+      // If the last candle has the same timestamp (in-progress → closed transition),
+      // replace it instead of appending a duplicate. This prevents the
+      // "data must be asc ordered by time" assertion from Lightweight Charts.
+      if (len > 0 && state.candles[len - 1].time === candle.time) {
+        const updated = state.candles.slice(0, -1);
+        updated.push(candle);
+        return { candles: updated };
+      }
       const next = [...state.candles, candle];
       // If over capacity, remove oldest candles from the front via slice
       return {

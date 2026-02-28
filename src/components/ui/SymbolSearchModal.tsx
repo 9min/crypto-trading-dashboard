@@ -110,7 +110,7 @@ const SymbolSearchContent = memo(function SymbolSearchContent({
 
   return (
     <div
-      className="animate-modal-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[15vh]"
+      className="animate-modal-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[8vh] sm:pt-[15vh]"
       onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
@@ -151,7 +151,7 @@ const SymbolSearchContent = memo(function SymbolSearchContent({
         </div>
 
         {/* Results list */}
-        <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
+        <div ref={listRef} className="max-h-[50vh] overflow-y-auto py-1 sm:max-h-64">
           {results.length === 0 ? (
             <div className="text-foreground-tertiary px-4 py-6 text-center text-sm">
               No symbols found
@@ -168,7 +168,7 @@ const SymbolSearchContent = memo(function SymbolSearchContent({
                   key={symbol}
                   type="button"
                   onClick={() => handleSelect(symbol)}
-                  className={`flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-left text-sm transition-colors ${
+                  className={`flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors sm:py-2 ${
                     index === selectedIndex
                       ? 'bg-background-tertiary text-foreground'
                       : 'text-foreground-secondary hover:bg-background-tertiary'
@@ -183,7 +183,7 @@ const SymbolSearchContent = memo(function SymbolSearchContent({
         </div>
 
         {/* Footer hint */}
-        <div className="border-border text-foreground-tertiary flex items-center gap-3 border-t px-4 py-2 text-[10px]">
+        <div className="border-border text-foreground-tertiary hidden items-center gap-3 border-t px-4 py-2 text-[10px] sm:flex">
           <span>
             <kbd className="border-border rounded border px-1 py-0.5">↑↓</kbd> navigate
           </span>

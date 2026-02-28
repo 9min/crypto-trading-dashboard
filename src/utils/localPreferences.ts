@@ -24,6 +24,7 @@ const WATCHLIST_KEY = 'dashboard-watchlist';
 const EXCHANGE_KEY = 'dashboard-exchange';
 const MOBILE_TAB_KEY = 'dashboard-mobile-tab';
 const WHALE_THRESHOLD_KEY = 'dashboard-whale-threshold';
+const WHALE_ALERT_ENABLED_KEY = 'dashboard-whale-alert-enabled';
 
 /** Mobile tab identifiers for the bottom tab bar — derived from runtime array */
 const MOBILE_TABS = ['chart', 'orderbook', 'trade', 'portfolio', 'more'] as const;
@@ -226,6 +227,38 @@ export function loadWhaleThreshold(): number {
 }
 
 // -----------------------------------------------------------------------------
+// Whale Alert Enabled
+// -----------------------------------------------------------------------------
+
+/** Saves the whale alert enabled preference to localStorage. */
+export function saveWhaleAlertEnabled(enabled: boolean): void {
+  try {
+    localStorage.setItem(WHALE_ALERT_ENABLED_KEY, String(enabled));
+  } catch (error) {
+    console.error('[localPreferences] Failed to save whale alert enabled', {
+      timestamp: Date.now(),
+      error,
+    });
+  }
+}
+
+/** Loads the whale alert enabled preference from localStorage. Defaults to `false`. */
+export function loadWhaleAlertEnabled(): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    const raw = localStorage.getItem(WHALE_ALERT_ENABLED_KEY);
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+  } catch (error) {
+    console.error('[localPreferences] Failed to load whale alert enabled', {
+      timestamp: Date.now(),
+      error,
+    });
+  }
+  return false;
+}
+
+// -----------------------------------------------------------------------------
 // Exports
 // -----------------------------------------------------------------------------
 
@@ -236,4 +269,5 @@ export {
   EXCHANGE_KEY,
   MOBILE_TAB_KEY,
   WHALE_THRESHOLD_KEY,
+  WHALE_ALERT_ENABLED_KEY,
 };

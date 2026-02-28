@@ -111,6 +111,44 @@ describe('klineStore', () => {
       expect(state.candles).toHaveLength(1);
       expect(state.candles[0].time).toBe(42);
     });
+
+    it('replaces the last candle when timestamps match (in-progress → closed transition)', () => {
+      useKlineStore
+        .getState()
+        .setCandles([createCandle({ time: 1 }), createCandle({ time: 2, close: 200 })]);
+
+      // Simulate closed kline arriving with same timestamp as in-progress candle
+      useKlineStore.getState().addCandle(createCandle({ time: 2, close: 250 }));
+      const state = useKlineStore.getState();
+
+      expect(state.candles).toHaveLength(2);
+      expect(state.candles[1].time).toBe(2);
+      expect(state.candles[1].close).toBe(250);
+    });
+
+    it('does not create duplicate timestamps after updateLastCandle + addCandle', () => {
+      // Start with candle at time=1 (closed) and time=2 (in-progress)
+      useKlineStore
+        .getState()
+        .setCandles([createCandle({ time: 1 }), createCandle({ time: 2, close: 100 })]);
+
+      // Simulate: WebSocket sends in-progress update (same time=2)
+      useKlineStore.getState().updateLastCandle(createCandle({ time: 2, close: 120 }));
+      // Then kline closes: addCandle with same time=2
+      useKlineStore.getState().addCandle(createCandle({ time: 2, close: 150 }));
+
+      const state = useKlineStore.getState();
+      // Should have exactly 2 candles (time=1, time=2), NOT 3
+      expect(state.candles).toHaveLength(2);
+      expect(state.candles[0].time).toBe(1);
+      expect(state.candles[1].time).toBe(2);
+      expect(state.candles[1].close).toBe(150);
+
+      // Verify all timestamps are strictly ascending
+      for (let i = 1; i < state.candles.length; i++) {
+        expect(state.candles[i].time).toBeGreaterThan(state.candles[i - 1].time);
+      }
+    });
   });
 
   // ---------------------------------------------------------------------------
