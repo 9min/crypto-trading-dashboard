@@ -1,15 +1,16 @@
 'use client';
 
 // =============================================================================
-// PortfolioWidget Component
+// PortfolioWidget Component — Futures Paper Trading
 // =============================================================================
-// Paper trading portfolio widget. Shows:
-// - Summary bar: 2-row grid (Total Value + Cash / PnL highlight)
-// - Canvas donut chart for allocation (left) + holdings/history tabs (right)
+// Futures paper trading portfolio widget. Shows:
+// - Summary bar: Total Equity + Available Balance / Unrealized PnL
+// - Canvas donut chart for margin allocation (left) + positions/history tabs
 // - Inline reset confirmation dialog
-// - TradePanel with Buy/Sell tabs for market orders
+// - TradePanel with Long/Short tabs for market orders
+// - Auto-liquidation check via useEffect on price changes
 //
-// Data flow: watchlistStore.tickers + portfolioStore.holdings → useMemo →
+// Data flow: watchlistStore.tickers + portfolioStore.positions → useMemo →
 // renderer.updateSlices()
 // =============================================================================
 
@@ -22,9 +23,10 @@ import {
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useUiStore } from '@/stores/uiStore';
+import { useToastStore } from '@/stores/toastStore';
 import {
-  calculatePortfolioSummary,
-  calculateHoldingsWithPnl,
+  calculateFuturesSummary,
+  calculatePositionsWithPnl,
   calculateAllocationSlices,
   tradesToCsv,
   downloadCsv,
@@ -33,23 +35,24 @@ import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol } from '@/utils/formatSymbol';
 import { TradePanel } from '@/components/ui/TradePanel';
 import { WidgetWrapper } from './WidgetWrapper';
+import type { FuturesTrade, PositionWithPnl } from '@/types/portfolio';
 
 // -----------------------------------------------------------------------------
 // Sub-Components
 // -----------------------------------------------------------------------------
 
 interface SummaryBarProps {
-  totalValue: number;
+  totalEquity: number;
+  availableBalance: number;
   totalPnl: number;
   totalPnlPercent: number;
-  cashBalance: number;
 }
 
 const SummaryBar = memo(function SummaryBar({
-  totalValue,
+  totalEquity,
+  availableBalance,
   totalPnl,
   totalPnlPercent,
-  cashBalance,
 }: SummaryBarProps) {
   const pnlColor =
     totalPnl > 0 ? 'text-buy' : totalPnl < 0 ? 'text-sell' : 'text-foreground-secondary';
@@ -57,19 +60,21 @@ const SummaryBar = memo(function SummaryBar({
 
   return (
     <div className="border-border grid grid-cols-2 gap-x-3 gap-y-0.5 border-b px-3 py-2">
-      {/* Row 1 left: Total Value */}
+      {/* Row 1 left: Total Equity */}
       <div className="flex flex-col">
-        <span className="text-foreground-secondary text-[10px]">Total Value</span>
+        <span className="text-foreground-secondary text-[10px]">Total Equity</span>
         <span className="font-mono-num text-foreground text-sm font-semibold">
-          ${formatPrice(totalValue)}
+          ${formatPrice(totalEquity)}
         </span>
       </div>
-      {/* Row 1 right: Cash */}
+      {/* Row 1 right: Available Balance */}
       <div className="flex flex-col items-end">
-        <span className="text-foreground-secondary text-[10px]">Cash</span>
-        <span className="font-mono-num text-foreground text-xs">${formatPrice(cashBalance)}</span>
+        <span className="text-foreground-secondary text-[10px]">Available</span>
+        <span className="font-mono-num text-foreground text-xs">
+          ${formatPrice(availableBalance)}
+        </span>
       </div>
-      {/* Row 2: PnL spanning full width */}
+      {/* Row 2: Unrealized PnL spanning full width */}
       <div className="col-span-2">
         <span className={`font-mono-num text-xs font-medium ${pnlColor}`}>
           {pnlSign}${formatPrice(Math.abs(totalPnl))} ({pnlSign}
@@ -81,78 +86,77 @@ const SummaryBar = memo(function SummaryBar({
 });
 
 // -----------------------------------------------------------------------------
-// Holdings Tab
+// Positions Tab
 // -----------------------------------------------------------------------------
 
-interface HoldingsTabProps {
-  holdings: Map<
-    string,
-    { symbol: string; quantity: number; avgEntryPrice: number; costBasis: number }
-  >;
-  tickers: Map<string, { price: number }>;
-  cashBalance: number;
+interface PositionsTabProps {
+  positions: PositionWithPnl[];
+  onClose: (symbol: string, price: number, quantity: number) => boolean;
 }
 
-const HoldingsTab = memo(function HoldingsTab({
-  holdings,
-  tickers,
-  cashBalance,
-}: HoldingsTabProps) {
-  const enriched = useMemo(
-    () => calculateHoldingsWithPnl(holdings, tickers, cashBalance),
-    [holdings, tickers, cashBalance],
-  );
-
-  if (enriched.length === 0) {
+const PositionsTab = memo(function PositionsTab({ positions, onClose }: PositionsTabProps) {
+  if (positions.length === 0) {
     return (
       <div className="text-foreground-secondary flex h-full items-center justify-center text-xs">
-        No holdings yet
+        No open positions
       </div>
     );
   }
 
   return (
     <div className="flex flex-col overflow-y-auto">
-      {enriched.map((h) => {
+      {positions.map((pos) => {
         const pnlColor =
-          h.unrealizedPnl > 0
+          pos.unrealizedPnl > 0
             ? 'text-buy'
-            : h.unrealizedPnl < 0
+            : pos.unrealizedPnl < 0
               ? 'text-sell'
               : 'text-foreground-secondary';
-        const sign = h.unrealizedPnl > 0 ? '+' : '';
-        const alloc = h.allocationPercent;
+        const sign = pos.unrealizedPnl > 0 ? '+' : '';
+        const sideLabel = pos.side === 'long' ? 'LONG' : 'SHORT';
+        const sideColor = pos.side === 'long' ? 'text-buy' : 'text-sell';
+
         return (
-          <div key={h.symbol} className="border-border/30 flex flex-col border-b px-3 py-1.5">
+          <div key={pos.id} className="border-border/30 flex flex-col gap-0.5 border-b px-3 py-1.5">
+            {/* Row 1: Symbol + Side badge + Close button */}
             <div className="flex items-center">
-              <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span className={`text-[10px] font-bold ${sideColor}`}>{sideLabel}</span>
                 <span className="text-foreground truncate text-xs font-medium">
-                  {formatSymbol(h.symbol)}
+                  {formatSymbol(pos.symbol)}
                 </span>
-                <span className="text-foreground-secondary font-mono-num text-[10px]">
-                  {parseFloat(h.quantity.toFixed(8))} @ {formatPrice(h.avgEntryPrice)}
-                </span>
+                <span className="text-foreground-secondary text-[10px]">{pos.leverage}x</span>
               </div>
-              <div className="flex flex-col items-end">
-                <span className="font-mono-num text-foreground text-xs">
-                  ${formatPrice(h.marketValue)}
-                </span>
-                <span className={`font-mono-num text-[10px] ${pnlColor}`}>
-                  {sign}${formatPrice(Math.abs(h.unrealizedPnl))} ({sign}
-                  {h.unrealizedPnlPercent.toFixed(1)}%)
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={() => onClose(pos.symbol, pos.currentPrice, pos.quantity)}
+                className="text-foreground-tertiary hover:text-sell cursor-pointer text-[10px] transition-colors"
+              >
+                Close
+              </button>
             </div>
-            {/* Allocation progress bar */}
-            <div className="mt-0.5 flex items-center gap-1.5">
-              <div className="bg-background-tertiary h-1 flex-1 overflow-hidden rounded-full">
-                <div
-                  className="bg-accent h-full rounded-full transition-all"
-                  style={{ width: `${Math.min(alloc, 100)}%` }}
-                />
-              </div>
-              <span className="text-foreground-secondary font-mono-num w-8 text-right text-[9px]">
-                {alloc.toFixed(1)}%
+
+            {/* Row 2: Entry price + Unrealized PnL */}
+            <div className="flex items-center justify-between">
+              <span className="text-foreground-secondary font-mono-num text-[10px]">
+                Entry: {formatPrice(pos.entryPrice)}
+              </span>
+              <span className={`font-mono-num text-[10px] ${pnlColor}`}>
+                {sign}${formatPrice(Math.abs(pos.unrealizedPnl))} ({sign}
+                {pos.roe.toFixed(1)}%)
+              </span>
+            </div>
+
+            {/* Row 3: Liquidation price + Margin */}
+            <div className="flex items-center justify-between">
+              <span className="text-foreground-secondary font-mono-num text-[10px]">
+                Liq:{' '}
+                {pos.liquidationPrice === 0 || pos.liquidationPrice === Infinity
+                  ? '\u2014'
+                  : formatPrice(pos.liquidationPrice)}
+              </span>
+              <span className="text-foreground-secondary font-mono-num text-[10px]">
+                Margin: ${formatPrice(pos.margin)}
               </span>
             </div>
           </div>
@@ -167,15 +171,7 @@ const HoldingsTab = memo(function HoldingsTab({
 // -----------------------------------------------------------------------------
 
 interface HistoryTabProps {
-  trades: Array<{
-    id: string;
-    symbol: string;
-    side: 'buy' | 'sell';
-    price: number;
-    quantity: number;
-    notional: number;
-    timestamp: number;
-  }>;
+  trades: FuturesTrade[];
 }
 
 const HistoryTab = memo(function HistoryTab({ trades }: HistoryTabProps) {
@@ -190,27 +186,50 @@ const HistoryTab = memo(function HistoryTab({ trades }: HistoryTabProps) {
   return (
     <div className="flex flex-col overflow-y-auto">
       {trades.map((t) => {
-        const sideColor = t.side === 'buy' ? 'text-buy' : 'text-sell';
+        const sideColor = t.side === 'long' ? 'text-buy' : 'text-sell';
+        const actionLabel = t.action === 'open' ? 'OPEN' : 'CLOSE';
         const timeStr = new Date(t.timestamp).toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',
         });
+        const showPnl = t.action === 'close';
+        const pnlColor =
+          t.realizedPnl > 0
+            ? 'text-buy'
+            : t.realizedPnl < 0
+              ? 'text-sell'
+              : 'text-foreground-secondary';
+        const pnlSign = t.realizedPnl > 0 ? '+' : '';
+
         return (
           <div key={t.id} className="border-border/30 flex items-center border-b px-3 py-1.5">
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex items-center gap-1.5">
-                <span className={`text-[10px] font-medium uppercase ${sideColor}`}>{t.side}</span>
+                <span className={`text-[10px] font-medium uppercase ${sideColor}`}>
+                  {t.side === 'long' ? 'L' : 'S'}
+                </span>
+                <span className="text-foreground-secondary text-[10px]">{actionLabel}</span>
                 <span className="text-foreground text-xs">{formatSymbol(t.symbol)}</span>
+                <span className="text-foreground-secondary text-[10px]">{t.leverage}x</span>
               </div>
               <span className="text-foreground-secondary font-mono-num text-[10px]">
                 {parseFloat(t.quantity.toFixed(8))} @ {formatPrice(t.price)}
               </span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="font-mono-num text-foreground text-xs">
-                ${formatPrice(t.notional)}
-              </span>
-              <span className="text-foreground-secondary text-[10px]">{timeStr}</span>
+              {showPnl ? (
+                <span className={`font-mono-num text-xs ${pnlColor}`}>
+                  {pnlSign}${formatPrice(Math.abs(t.realizedPnl))}
+                </span>
+              ) : (
+                <span className="text-foreground-secondary text-xs">{'\u2014'}</span>
+              )}
+              <div className="flex items-center gap-1">
+                {t.closeReason === 'liquidated' && (
+                  <span className="text-sell text-[9px] font-bold">LIQ</span>
+                )}
+                <span className="text-foreground-secondary text-[10px]">{timeStr}</span>
+              </div>
             </div>
           </div>
         );
@@ -231,32 +250,42 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
   // Store selectors
   const theme = useUiStore((state) => state.theme);
   const symbol = useUiStore((state) => state.symbol);
-  const cashBalance = usePortfolioStore((state) => state.cashBalance);
-  const holdings = usePortfolioStore((state) => state.holdings);
+  const walletBalance = usePortfolioStore((state) => state.walletBalance);
+  const positions = usePortfolioStore((state) => state.positions);
   const trades = usePortfolioStore((state) => state.trades);
   const activeTab = usePortfolioStore((state) => state.activeTab);
+  const defaultLeverage = usePortfolioStore((state) => state.defaultLeverage);
+  const defaultMarginType = usePortfolioStore((state) => state.defaultMarginType);
   const setActiveTab = usePortfolioStore((state) => state.setActiveTab);
-  const executeBuy = usePortfolioStore((state) => state.executeBuy);
-  const executeSell = usePortfolioStore((state) => state.executeSell);
+  const openPosition = usePortfolioStore((state) => state.openPosition);
+  const closePosition = usePortfolioStore((state) => state.closePosition);
+  const checkLiquidations = usePortfolioStore((state) => state.checkLiquidations);
   const resetPortfolio = usePortfolioStore((state) => state.resetPortfolio);
   const tickers = useWatchlistStore((state) => state.tickers);
+  const addToast = useToastStore((state) => state.addToast);
 
   // Current symbol price for TradePanel
   const currentPrice = useMemo(() => tickers.get(symbol)?.price ?? 0, [tickers, symbol]);
 
-  // Current holding quantity for TradePanel
-  const holdingQuantity = useMemo(() => holdings.get(symbol)?.quantity ?? 0, [holdings, symbol]);
+  // Existing position on current symbol
+  const existingPosition = useMemo(() => positions.get(symbol) ?? null, [positions, symbol]);
 
   // Summary calculation
   const summary = useMemo(
-    () => calculatePortfolioSummary(holdings, tickers, cashBalance),
-    [holdings, tickers, cashBalance],
+    () => calculateFuturesSummary(positions, tickers, walletBalance),
+    [positions, tickers, walletBalance],
+  );
+
+  // Positions with PnL for PositionsTab
+  const positionsWithPnl = useMemo(
+    () => calculatePositionsWithPnl(positions, tickers, walletBalance),
+    [positions, tickers, walletBalance],
   );
 
   // Allocation slices for donut chart
   const allocationSlices = useMemo(
-    () => calculateAllocationSlices(holdings, tickers, cashBalance),
-    [holdings, tickers, cashBalance],
+    () => calculateAllocationSlices(positions, tickers, walletBalance),
+    [positions, tickers, walletBalance],
   );
 
   // Canvas renderer
@@ -285,20 +314,35 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
     renderer.markDirty();
   }, [theme, rendererRef]);
 
+  // Auto-liquidation check
+  useEffect(() => {
+    if (positions.size === 0) return;
+
+    const priceMap = new Map<string, number>();
+    for (const [sym, ticker] of tickers) {
+      priceMap.set(sym, ticker.price);
+    }
+
+    const liquidated = checkLiquidations(priceMap);
+    for (const sym of liquidated) {
+      addToast(`${formatSymbol(sym)} position liquidated!`, 'error', 6000);
+    }
+  }, [tickers, positions, checkLiquidations, addToast]);
+
   // Callbacks
-  const handleBuy = useCallback(
-    (sym: string, price: number, qty: number) => executeBuy(sym, price, qty),
-    [executeBuy],
+  const handleOpenPosition = useCallback(
+    (params: Parameters<typeof openPosition>[0]) => openPosition(params),
+    [openPosition],
   );
 
-  const handleSell = useCallback(
-    (sym: string, price: number, qty: number) => executeSell(sym, price, qty),
-    [executeSell],
+  const handleClosePosition = useCallback(
+    (sym: string, price: number, qty: number) => closePosition(sym, price, qty),
+    [closePosition],
   );
 
   const handleExportCsv = useCallback(() => {
     const csv = tradesToCsv(trades);
-    downloadCsv(csv, `portfolio-trades-${Date.now()}.csv`);
+    downloadCsv(csv, `futures-trades-${Date.now()}.csv`);
   }, [trades]);
 
   const handleResetClick = useCallback(() => {
@@ -314,7 +358,7 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
     setIsResetConfirming(false);
   }, []);
 
-  const handleTabHoldings = useCallback(() => setActiveTab('holdings'), [setActiveTab]);
+  const handleTabPositions = useCallback(() => setActiveTab('positions'), [setActiveTab]);
   const handleTabHistory = useCallback(() => setActiveTab('history'), [setActiveTab]);
 
   // Header actions
@@ -374,19 +418,19 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
   );
 
   return (
-    <WidgetWrapper title="Portfolio" headerActions={headerActions}>
+    <WidgetWrapper title="Futures" headerActions={headerActions}>
       <div className="flex h-full flex-col">
-        {/* Summary bar — 2-row grid */}
+        {/* Summary bar */}
         <SummaryBar
-          totalValue={summary.totalValue}
+          totalEquity={summary.totalEquity}
+          availableBalance={summary.availableBalance}
           totalPnl={summary.totalUnrealizedPnl}
           totalPnlPercent={summary.totalUnrealizedPnlPercent}
-          cashBalance={cashBalance}
         />
 
         {/* Middle section: chart + tabs */}
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* Donut chart — compact height */}
+          {/* Donut chart */}
           <div ref={containerRef} className="h-32 w-full shrink-0">
             <canvas ref={canvasRef} className="block h-full w-full" />
           </div>
@@ -395,14 +439,14 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
           <div className="border-border flex shrink-0 border-b">
             <button
               type="button"
-              onClick={handleTabHoldings}
+              onClick={handleTabPositions}
               className={`flex-1 cursor-pointer py-1.5 text-xs transition-colors ${
-                activeTab === 'holdings'
+                activeTab === 'positions'
                   ? 'border-accent text-accent border-b-2 font-medium'
                   : 'text-foreground-secondary hover:text-foreground'
               }`}
             >
-              Holdings ({summary.holdingCount})
+              Positions ({summary.positionCount})
             </button>
             <button
               type="button"
@@ -419,8 +463,8 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
 
           {/* Tab content */}
           <div className="min-h-0 flex-1 overflow-hidden">
-            {activeTab === 'holdings' ? (
-              <HoldingsTab holdings={holdings} tickers={tickers} cashBalance={cashBalance} />
+            {activeTab === 'positions' ? (
+              <PositionsTab positions={positionsWithPnl} onClose={handleClosePosition} />
             ) : (
               <HistoryTab trades={trades} />
             )}
@@ -431,10 +475,12 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
         <TradePanel
           symbol={symbol}
           currentPrice={currentPrice}
-          cashBalance={cashBalance}
-          holdingQuantity={holdingQuantity}
-          onBuy={handleBuy}
-          onSell={handleSell}
+          availableBalance={summary.availableBalance}
+          defaultLeverage={defaultLeverage}
+          defaultMarginType={defaultMarginType}
+          existingPosition={existingPosition}
+          onOpenPosition={handleOpenPosition}
+          onClosePosition={handleClosePosition}
         />
       </div>
     </WidgetWrapper>

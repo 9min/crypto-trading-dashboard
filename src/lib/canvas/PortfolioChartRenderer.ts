@@ -207,7 +207,7 @@ export class PortfolioChartRenderer implements CanvasRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = colors.foregroundSecondary;
-    ctx.fillText('Total', centerX, centerY - 2);
+    ctx.fillText('Equity', centerX, centerY - 2);
 
     // Total value
     ctx.font = `bold ${FONT_SIZE_CENTER_VALUE}px ${FONT_FAMILY}`;

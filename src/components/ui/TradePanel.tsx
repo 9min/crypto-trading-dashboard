@@ -1,39 +1,50 @@
 'use client';
 
 // =============================================================================
-// TradePanel Component
+// TradePanel Component — Futures Trading
 // =============================================================================
-// Binance-style Buy/Sell tabbed order panel for paper trading. Provides:
-// - Buy/Sell tab toggle (green/red)
-// - Quantity input with % quick buttons (cash-based for Buy, holding-based for Sell)
-// - Estimated cost / max info
-// - Single execute button that changes color/label per active side
-// - Auto-dismiss feedback messages (3s)
+// Long/Short tabbed order panel for futures paper trading. Provides:
+// - Long/Short tab toggle (green/red)
+// - Leverage preset buttons (1x, 5x, 10x, 25x, 50x, 100x)
+// - Margin type toggle (Cross / Isolated)
+// - Quantity input with % quick buttons
+// - Required margin display
+// - Open Long / Open Short button (open mode)
+// - Close Position button (close mode, when position exists)
 // =============================================================================
 
 import { memo, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol } from '@/utils/formatSymbol';
+import { calculateMargin } from '@/utils/portfolioCalc';
+import type {
+  PositionSide,
+  MarginType,
+  FuturesPosition,
+  OpenPositionParams,
+} from '@/types/portfolio';
 
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
-
-type TradeSide = 'buy' | 'sell';
 
 interface TradePanelProps {
   /** Current trading symbol (e.g., 'BTCUSDT') */
   symbol: string;
   /** Current market price of the symbol */
   currentPrice: number;
-  /** Available cash balance in USDT */
-  cashBalance: number;
-  /** Current quantity held for this symbol (0 if none) */
-  holdingQuantity: number;
-  /** Buy callback — returns true on success */
-  onBuy: (symbol: string, price: number, quantity: number) => boolean;
-  /** Sell callback — returns true on success */
-  onSell: (symbol: string, price: number, quantity: number) => boolean;
+  /** Available balance (walletBalance - totalMarginUsed) */
+  availableBalance: number;
+  /** Default leverage setting from store */
+  defaultLeverage: number;
+  /** Default margin type from store */
+  defaultMarginType: MarginType;
+  /** Existing position on this symbol (null if none) */
+  existingPosition: FuturesPosition | null;
+  /** Open position callback — returns true on success */
+  onOpenPosition: (params: OpenPositionParams) => boolean;
+  /** Close position callback — returns true on success */
+  onClosePosition: (symbol: string, price: number, quantity: number) => boolean;
 }
 
 // -----------------------------------------------------------------------------
@@ -41,6 +52,7 @@ interface TradePanelProps {
 // -----------------------------------------------------------------------------
 
 const QUICK_PERCENT_OPTIONS = [25, 50, 75, 100] as const;
+const LEVERAGE_PRESETS = [1, 5, 10, 25, 50, 100] as const;
 
 // -----------------------------------------------------------------------------
 // Component
@@ -49,17 +61,30 @@ const QUICK_PERCENT_OPTIONS = [25, 50, 75, 100] as const;
 export const TradePanel = memo(function TradePanel({
   symbol,
   currentPrice,
-  cashBalance,
-  holdingQuantity,
-  onBuy,
-  onSell,
+  availableBalance,
+  defaultLeverage,
+  defaultMarginType,
+  existingPosition,
+  onOpenPosition,
+  onClosePosition,
 }: TradePanelProps) {
-  const [activeSide, setActiveSide] = useState<TradeSide>('buy');
+  const [activeSide, setActiveSide] = useState<PositionSide>('long');
+  const [leverage, setLeverage] = useState(defaultLeverage);
+  const [marginType, setMarginType] = useState<MarginType>(defaultMarginType);
   const [quantity, setQuantity] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(
     null,
   );
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync leverage/marginType when defaults change
+  useEffect(() => {
+    setLeverage(defaultLeverage);
+  }, [defaultLeverage]);
+
+  useEffect(() => {
+    setMarginType(defaultMarginType);
+  }, [defaultMarginType]);
 
   // Clear feedback timer on unmount
   useEffect(() => {
@@ -75,17 +100,20 @@ export const TradePanel = memo(function TradePanel({
     return isNaN(val) || val <= 0 ? 0 : val;
   }, [quantity]);
 
-  const estimatedCost = useMemo(
-    () => parsedQuantity * currentPrice,
-    [parsedQuantity, currentPrice],
-  );
-
   const baseAsset = useMemo(() => formatSymbol(symbol).replace(/\/.*$/, ''), [symbol]);
 
-  const maxBuyQuantity = useMemo(
-    () => (currentPrice > 0 ? cashBalance / currentPrice : 0),
-    [cashBalance, currentPrice],
+  const requiredMargin = useMemo(
+    () => (parsedQuantity > 0 ? calculateMargin(currentPrice, parsedQuantity, leverage) : 0),
+    [currentPrice, parsedQuantity, leverage],
   );
+
+  // Max quantity user can open with available balance and leverage
+  const maxOpenQuantity = useMemo(
+    () => (currentPrice > 0 ? (availableBalance * leverage) / currentPrice : 0),
+    [availableBalance, currentPrice, leverage],
+  );
+
+  const isCloseMode = existingPosition !== null;
 
   // Auto-dismiss feedback after 3 seconds
   const showFeedback = useCallback((fb: { type: 'success' | 'error'; message: string }) => {
@@ -109,85 +137,212 @@ export const TradePanel = memo(function TradePanel({
 
   const handleQuickPercent = useCallback(
     (percent: number) => {
-      if (activeSide === 'buy') {
-        if (currentPrice <= 0) return;
-        const qty = (cashBalance * (percent / 100)) / currentPrice;
+      if (isCloseMode && existingPosition) {
+        const qty = existingPosition.quantity * (percent / 100);
         setQuantity(qty > 0 ? parseFloat(qty.toFixed(8)).toString() : '');
       } else {
-        const qty = holdingQuantity * (percent / 100);
+        if (currentPrice <= 0) return;
+        const qty = maxOpenQuantity * (percent / 100);
         setQuantity(qty > 0 ? parseFloat(qty.toFixed(8)).toString() : '');
       }
       setFeedback(null);
     },
-    [activeSide, cashBalance, currentPrice, holdingQuantity],
+    [isCloseMode, existingPosition, currentPrice, maxOpenQuantity],
   );
 
-  const handleExecute = useCallback(() => {
+  const handleOpenPosition = useCallback(() => {
     if (parsedQuantity <= 0 || currentPrice <= 0) return;
-    if (activeSide === 'buy') {
-      const success = onBuy(symbol, currentPrice, parsedQuantity);
-      if (success) {
-        setQuantity('');
-        showFeedback({ type: 'success', message: `Bought ${parsedQuantity} ${baseAsset}` });
-      } else {
-        showFeedback({ type: 'error', message: 'Insufficient cash' });
-      }
+
+    const success = onOpenPosition({
+      symbol,
+      side: activeSide,
+      price: currentPrice,
+      quantity: parsedQuantity,
+      leverage,
+      marginType,
+    });
+
+    if (success) {
+      setQuantity('');
+      const sideLabel = activeSide === 'long' ? 'Long' : 'Short';
+      showFeedback({
+        type: 'success',
+        message: `Opened ${sideLabel} ${parsedQuantity} ${baseAsset} @ ${leverage}x`,
+      });
     } else {
-      const success = onSell(symbol, currentPrice, parsedQuantity);
-      if (success) {
-        setQuantity('');
-        showFeedback({ type: 'success', message: `Sold ${parsedQuantity} ${baseAsset}` });
-      } else {
-        showFeedback({ type: 'error', message: 'Insufficient holdings' });
-      }
+      showFeedback({ type: 'error', message: 'Insufficient balance or position exists' });
     }
-  }, [activeSide, parsedQuantity, currentPrice, symbol, onBuy, onSell, baseAsset, showFeedback]);
+  }, [
+    activeSide,
+    parsedQuantity,
+    currentPrice,
+    symbol,
+    leverage,
+    marginType,
+    onOpenPosition,
+    baseAsset,
+    showFeedback,
+  ]);
 
-  const handleTabBuy = useCallback(() => {
-    setActiveSide('buy');
+  const handleClosePosition = useCallback(() => {
+    if (parsedQuantity <= 0 || currentPrice <= 0) return;
+
+    const success = onClosePosition(symbol, currentPrice, parsedQuantity);
+
+    if (success) {
+      setQuantity('');
+      showFeedback({
+        type: 'success',
+        message: `Closed ${parsedQuantity} ${baseAsset}`,
+      });
+    } else {
+      showFeedback({ type: 'error', message: 'Close failed' });
+    }
+  }, [parsedQuantity, currentPrice, symbol, onClosePosition, baseAsset, showFeedback]);
+
+  const handleTabLong = useCallback(() => {
+    setActiveSide('long');
     setQuantity('');
     setFeedback(null);
   }, []);
 
-  const handleTabSell = useCallback(() => {
-    setActiveSide('sell');
+  const handleTabShort = useCallback(() => {
+    setActiveSide('short');
     setQuantity('');
     setFeedback(null);
   }, []);
 
-  const canExecute = useMemo(() => {
+  const handleLeverageSelect = useCallback((lev: number) => {
+    setLeverage(lev);
+    setQuantity('');
+  }, []);
+
+  const handleMarginTypeToggle = useCallback(() => {
+    setMarginType((prev) => (prev === 'isolated' ? 'cross' : 'isolated'));
+  }, []);
+
+  const canOpen = useMemo(() => {
     if (parsedQuantity <= 0 || currentPrice <= 0) return false;
-    if (activeSide === 'buy') return estimatedCost <= cashBalance;
-    return parsedQuantity <= holdingQuantity;
-  }, [activeSide, parsedQuantity, currentPrice, estimatedCost, cashBalance, holdingQuantity]);
+    return requiredMargin <= availableBalance;
+  }, [parsedQuantity, currentPrice, requiredMargin, availableBalance]);
 
-  const isBuy = activeSide === 'buy';
+  const canClose = useMemo(() => {
+    if (!existingPosition) return false;
+    if (parsedQuantity <= 0 || currentPrice <= 0) return false;
+    return parsedQuantity <= existingPosition.quantity;
+  }, [existingPosition, parsedQuantity, currentPrice]);
 
+  const isLong = activeSide === 'long';
+
+  // ----- Close Mode UI -----
+  if (isCloseMode && existingPosition) {
+    const positionSideLabel = existingPosition.side === 'long' ? 'LONG' : 'SHORT';
+    const positionSideColor = existingPosition.side === 'long' ? 'text-buy' : 'text-sell';
+
+    return (
+      <div className="border-border flex flex-col gap-2 border-t p-3">
+        {/* Position info header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className={`text-[10px] font-bold ${positionSideColor}`}>
+              {positionSideLabel}
+            </span>
+            <span className="text-foreground text-xs font-medium">{baseAsset}</span>
+            <span className="text-foreground-secondary text-[10px]">
+              {existingPosition.leverage}x
+            </span>
+          </div>
+          <span className="font-mono-num text-foreground-secondary text-[10px]">
+            Entry: {formatPrice(existingPosition.entryPrice)}
+          </span>
+        </div>
+
+        {/* Quantity input */}
+        <div className="flex flex-col gap-1">
+          <label className="text-foreground-secondary text-xs" htmlFor="close-quantity">
+            Close Qty ({baseAsset})
+          </label>
+          <input
+            id="close-quantity"
+            type="text"
+            inputMode="decimal"
+            value={quantity}
+            onChange={handleQuantityChange}
+            placeholder="0.00"
+            className="bg-background border-border text-foreground font-mono-num focus:border-accent rounded border px-2 py-1.5 text-xs outline-none"
+          />
+        </div>
+
+        {/* Quick percent buttons */}
+        <div className="flex gap-1">
+          {QUICK_PERCENT_OPTIONS.map((pct) => (
+            <button
+              key={pct}
+              type="button"
+              onClick={() => handleQuickPercent(pct)}
+              className="bg-background-tertiary text-foreground-secondary hover:text-sell flex-1 cursor-pointer rounded px-1 py-0.5 text-[10px] transition-colors"
+            >
+              {pct}%
+            </button>
+          ))}
+        </div>
+
+        {/* Position quantity info */}
+        <div className="text-foreground-secondary flex items-center justify-between text-[10px]">
+          <span>Position Qty</span>
+          <span className="font-mono-num">
+            {parseFloat(existingPosition.quantity.toFixed(8))} {baseAsset}
+          </span>
+        </div>
+
+        {/* Close button */}
+        <button
+          type="button"
+          onClick={handleClosePosition}
+          disabled={!canClose}
+          className="bg-sell hover:bg-sell/90 cursor-pointer rounded py-1.5 text-xs font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Close Position
+        </button>
+
+        {/* Feedback */}
+        {feedback && (
+          <div
+            className={`text-center text-[10px] ${feedback.type === 'success' ? 'text-buy' : 'text-sell'}`}
+          >
+            {feedback.message}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ----- Open Mode UI -----
   return (
     <div className="border-border flex flex-col gap-2 border-t p-3">
-      {/* Buy / Sell tab buttons */}
+      {/* Long / Short tab buttons */}
       <div className="flex">
         <button
           type="button"
-          onClick={handleTabBuy}
+          onClick={handleTabLong}
           className={`flex-1 cursor-pointer py-1 text-xs font-medium transition-colors ${
-            isBuy
+            isLong
               ? 'border-buy text-buy border-b-2'
               : 'text-foreground-secondary hover:text-foreground border-b border-transparent'
           }`}
         >
-          Buy
+          Long
         </button>
         <button
           type="button"
-          onClick={handleTabSell}
+          onClick={handleTabShort}
           className={`flex-1 cursor-pointer py-1 text-xs font-medium transition-colors ${
-            !isBuy
+            !isLong
               ? 'border-sell text-sell border-b-2'
               : 'text-foreground-secondary hover:text-foreground border-b border-transparent'
           }`}
         >
-          Sell
+          Short
         </button>
       </div>
 
@@ -199,98 +354,96 @@ export const TradePanel = memo(function TradePanel({
         </span>
       </div>
 
-      {/* Sell tab: show holding info or "no holdings" */}
-      {!isBuy && (
-        <div className="text-foreground-secondary flex items-center justify-between text-[10px]">
-          <span>Holding</span>
-          <span className="font-mono-num">
-            {holdingQuantity > 0
-              ? `${parseFloat(holdingQuantity.toFixed(8))} ${baseAsset}`
-              : `0 ${baseAsset}`}
-          </span>
+      {/* Leverage presets */}
+      <div className="flex flex-col gap-1">
+        <span className="text-foreground-secondary text-[10px]">Leverage</span>
+        <div className="flex gap-1">
+          {LEVERAGE_PRESETS.map((lev) => (
+            <button
+              key={lev}
+              type="button"
+              onClick={() => handleLeverageSelect(lev)}
+              className={`flex-1 cursor-pointer rounded px-1 py-0.5 text-[10px] font-medium transition-colors ${
+                leverage === lev
+                  ? 'bg-accent text-white'
+                  : 'bg-background-tertiary text-foreground-secondary hover:text-foreground'
+              }`}
+            >
+              {lev}x
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
-      {/* No holdings message for sell tab */}
-      {!isBuy && holdingQuantity === 0 ? (
-        <div className="text-foreground-secondary bg-background-tertiary rounded py-3 text-center text-xs">
-          No {baseAsset} holdings to sell
-        </div>
-      ) : (
-        <>
-          {/* Quantity input */}
-          <div className="flex flex-col gap-1">
-            <label className="text-foreground-secondary text-xs" htmlFor="trade-quantity">
-              Quantity ({baseAsset})
-            </label>
-            <input
-              id="trade-quantity"
-              type="text"
-              inputMode="decimal"
-              value={quantity}
-              onChange={handleQuantityChange}
-              placeholder="0.00"
-              className="bg-background border-border text-foreground font-mono-num focus:border-accent rounded border px-2 py-1.5 text-xs outline-none"
-            />
-          </div>
+      {/* Margin type toggle */}
+      <div className="flex items-center justify-between">
+        <span className="text-foreground-secondary text-[10px]">Margin</span>
+        <button
+          type="button"
+          onClick={handleMarginTypeToggle}
+          className="text-foreground-secondary bg-background-tertiary hover:text-foreground cursor-pointer rounded px-2 py-0.5 text-[10px] transition-colors"
+        >
+          {marginType === 'isolated' ? 'Isolated' : 'Cross'}
+        </button>
+      </div>
 
-          {/* Quick percent buttons */}
-          <div className="flex gap-1">
-            {QUICK_PERCENT_OPTIONS.map((pct) => (
-              <button
-                key={pct}
-                type="button"
-                onClick={() => handleQuickPercent(pct)}
-                className={`bg-background-tertiary text-foreground-secondary flex-1 cursor-pointer rounded px-1 py-0.5 text-[10px] transition-colors ${
-                  isBuy ? 'hover:text-buy' : 'hover:text-sell'
-                }`}
-              >
-                {pct}%
-              </button>
-            ))}
-          </div>
+      {/* Quantity input */}
+      <div className="flex flex-col gap-1">
+        <label className="text-foreground-secondary text-xs" htmlFor="trade-quantity">
+          Quantity ({baseAsset})
+        </label>
+        <input
+          id="trade-quantity"
+          type="text"
+          inputMode="decimal"
+          value={quantity}
+          onChange={handleQuantityChange}
+          placeholder="0.00"
+          className="bg-background border-border text-foreground font-mono-num focus:border-accent rounded border px-2 py-1.5 text-xs outline-none"
+        />
+      </div>
 
-          {/* Context info: Est. Cost (buy) or Max Sell (sell) */}
-          {isBuy ? (
-            <>
-              <div className="text-foreground-secondary flex items-center justify-between text-[10px]">
-                <span>Est. Cost</span>
-                <span className="font-mono-num">
-                  {estimatedCost > 0 ? `$${formatPrice(estimatedCost)}` : '\u2014'}
-                </span>
-              </div>
-              <div className="text-foreground-secondary flex items-center justify-between text-[10px]">
-                <span>Max Buy</span>
-                <span className="font-mono-num">
-                  {maxBuyQuantity > 0 ? parseFloat(maxBuyQuantity.toFixed(8)).toString() : '0'}{' '}
-                  {baseAsset}
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="text-foreground-secondary flex items-center justify-between text-[10px]">
-              <span>Est. Proceeds</span>
-              <span className="font-mono-num">
-                {estimatedCost > 0 ? `$${formatPrice(estimatedCost)}` : '\u2014'}
-              </span>
-            </div>
-          )}
-
-          {/* Execute button */}
+      {/* Quick percent buttons */}
+      <div className="flex gap-1">
+        {QUICK_PERCENT_OPTIONS.map((pct) => (
           <button
+            key={pct}
             type="button"
-            onClick={handleExecute}
-            disabled={!canExecute}
-            className={`cursor-pointer rounded py-1.5 text-xs font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-              isBuy ? 'bg-buy hover:bg-buy/90' : 'bg-sell hover:bg-sell/90'
+            onClick={() => handleQuickPercent(pct)}
+            className={`bg-background-tertiary text-foreground-secondary flex-1 cursor-pointer rounded px-1 py-0.5 text-[10px] transition-colors ${
+              isLong ? 'hover:text-buy' : 'hover:text-sell'
             }`}
           >
-            {isBuy ? 'Buy' : 'Sell'} {baseAsset}
+            {pct}%
           </button>
-        </>
-      )}
+        ))}
+      </div>
 
-      {/* Feedback message (auto-dismiss after 3s) */}
+      {/* Margin info */}
+      <div className="text-foreground-secondary flex items-center justify-between text-[10px]">
+        <span>Required Margin</span>
+        <span className="font-mono-num">
+          {requiredMargin > 0 ? `$${formatPrice(requiredMargin)}` : '\u2014'}
+        </span>
+      </div>
+      <div className="text-foreground-secondary flex items-center justify-between text-[10px]">
+        <span>Available</span>
+        <span className="font-mono-num">${formatPrice(availableBalance)}</span>
+      </div>
+
+      {/* Open button */}
+      <button
+        type="button"
+        onClick={handleOpenPosition}
+        disabled={!canOpen}
+        className={`cursor-pointer rounded py-1.5 text-xs font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+          isLong ? 'bg-buy hover:bg-buy/90' : 'bg-sell hover:bg-sell/90'
+        }`}
+      >
+        Open {isLong ? 'Long' : 'Short'} {baseAsset}
+      </button>
+
+      {/* Feedback message */}
       {feedback && (
         <div
           className={`text-center text-[10px] ${feedback.type === 'success' ? 'text-buy' : 'text-sell'}`}

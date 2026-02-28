@@ -1,46 +1,79 @@
 // =============================================================================
-// Portfolio Store
+// Futures Portfolio Store
 // =============================================================================
-// Manages the mock (paper trading) portfolio: cash balance, holdings, and
-// trade history. Automatically persists to localStorage after every trade.
+// Manages the futures paper trading portfolio: wallet balance, open positions,
+// leverage settings, and trade history. Persists to localStorage after every
+// state-changing action. Supports position opening, closing, and forced
+// liquidation simulation.
 // =============================================================================
 
 import { create } from 'zustand';
-import type { PortfolioHolding, PortfolioTrade, PortfolioTab } from '@/types/portfolio';
-import { INITIAL_CASH_BALANCE, MAX_TRADE_HISTORY, PORTFOLIO_STORAGE_KEY } from '@/types/portfolio';
-import { applyBuyTrade, applySellTrade } from '@/utils/portfolioCalc';
+import type {
+  FuturesPosition,
+  FuturesTrade,
+  PortfolioTab,
+  MarginType,
+  OpenPositionParams,
+} from '@/types/portfolio';
+import {
+  INITIAL_CASH_BALANCE,
+  MAX_TRADE_HISTORY,
+  PORTFOLIO_STORAGE_KEY,
+  MAX_OPEN_POSITIONS,
+  DEFAULT_LEVERAGE,
+  DEFAULT_MARGIN_TYPE,
+} from '@/types/portfolio';
+import {
+  calculateLiquidationPrice,
+  calculateMargin,
+  calculateUnrealizedPnl,
+} from '@/utils/portfolioCalc';
 
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
 
 interface PortfolioStoreState {
-  /** Available cash balance in USDT */
-  cashBalance: number;
-  /** Map of symbol → holding */
-  holdings: Map<string, PortfolioHolding>;
+  /** Wallet balance in USDT (cash not locked in margin) */
+  walletBalance: number;
+  /** Map of symbol → open futures position (1 symbol = 1 position) */
+  positions: Map<string, FuturesPosition>;
   /** Trade history (newest first), capped at MAX_TRADE_HISTORY */
-  trades: PortfolioTrade[];
+  trades: FuturesTrade[];
   /** Active tab in the portfolio widget */
   activeTab: PortfolioTab;
   /** Whether the store has been hydrated from localStorage */
   isHydrated: boolean;
+  /** Default leverage for new positions */
+  defaultLeverage: number;
+  /** Default margin type for new positions */
+  defaultMarginType: MarginType;
 }
 
 interface PortfolioStoreActions {
   /**
-   * Execute a buy order. Deducts cash and adds/updates holding.
-   * Returns true if executed, false if insufficient cash.
+   * Open a new futures position.
+   * Returns true if opened, false if rejected (insufficient balance,
+   * existing position on same symbol, or max positions reached).
    */
-  executeBuy: (symbol: string, price: number, quantity: number) => boolean;
+  openPosition: (params: OpenPositionParams) => boolean;
   /**
-   * Execute a sell order. Adds cash and reduces/removes holding.
-   * Returns true if executed, false if insufficient quantity.
+   * Close a position partially or fully.
+   * Returns true if closed, false if no position or insufficient quantity.
    */
-  executeSell: (symbol: string, price: number, quantity: number) => boolean;
+  closePosition: (symbol: string, price: number, quantity: number) => boolean;
+  /**
+   * Check all positions for liquidation at given prices.
+   * Returns array of liquidated symbols.
+   */
+  checkLiquidations: (prices: Map<string, number>) => string[];
+  /** Set default leverage for new positions */
+  setDefaultLeverage: (leverage: number) => void;
+  /** Set default margin type for new positions */
+  setDefaultMarginType: (marginType: MarginType) => void;
   /** Switch the active tab in the portfolio widget */
   setActiveTab: (tab: PortfolioTab) => void;
-  /** Reset portfolio to initial state ($100k cash, no holdings) */
+  /** Reset portfolio to initial state ($100K, no positions) */
   resetPortfolio: () => void;
   /** Hydrate portfolio from localStorage (SSR-safe) */
   hydratePortfolio: () => void;
@@ -55,18 +88,22 @@ type PortfolioStore = PortfolioStoreState & PortfolioStoreActions;
 // -----------------------------------------------------------------------------
 
 interface PersistedPortfolio {
-  cashBalance: number;
-  holdings: Array<[string, PortfolioHolding]>;
-  trades: PortfolioTrade[];
+  walletBalance: number;
+  positions: Array<[string, FuturesPosition]>;
+  trades: FuturesTrade[];
+  defaultLeverage: number;
+  defaultMarginType: MarginType;
 }
 
 function persistPortfolio(state: PortfolioStoreState): void {
   try {
     if (typeof window === 'undefined') return;
     const data: PersistedPortfolio = {
-      cashBalance: state.cashBalance,
-      holdings: [...state.holdings.entries()],
+      walletBalance: state.walletBalance,
+      positions: [...state.positions.entries()],
       trades: state.trades,
+      defaultLeverage: state.defaultLeverage,
+      defaultMarginType: state.defaultMarginType,
     };
     localStorage.setItem(PORTFOLIO_STORAGE_KEY, JSON.stringify(data));
   } catch (error) {
@@ -75,6 +112,14 @@ function persistPortfolio(state: PortfolioStoreState): void {
       error,
     });
   }
+}
+
+function isValidPositionSide(value: unknown): value is 'long' | 'short' {
+  return value === 'long' || value === 'short';
+}
+
+function isValidMarginType(value: unknown): value is MarginType {
+  return value === 'cross' || value === 'isolated';
 }
 
 function loadPersistedPortfolio(): Partial<PortfolioStoreState> | null {
@@ -87,52 +132,71 @@ function loadPersistedPortfolio(): Partial<PortfolioStoreState> | null {
     if (typeof data !== 'object' || data === null) return null;
 
     const obj = data as Record<string, unknown>;
-    if (typeof obj.cashBalance !== 'number') return null;
-    if (!Array.isArray(obj.holdings)) return null;
+    if (typeof obj.walletBalance !== 'number') return null;
+    if (!Array.isArray(obj.positions)) return null;
     if (!Array.isArray(obj.trades)) return null;
 
-    // Validate holdings entries
-    const holdingsMap = new Map<string, PortfolioHolding>();
-    for (const entry of obj.holdings) {
+    // Validate positions entries
+    const positionsMap = new Map<string, FuturesPosition>();
+    for (const entry of obj.positions) {
       if (!Array.isArray(entry) || entry.length !== 2) continue;
-      const [symbol, holding] = entry as [unknown, unknown];
+      const [symbol, position] = entry as [unknown, unknown];
       if (typeof symbol !== 'string') continue;
-      if (typeof holding !== 'object' || holding === null) continue;
-      const h = holding as Record<string, unknown>;
+      if (typeof position !== 'object' || position === null) continue;
+      const p = position as Record<string, unknown>;
       if (
-        typeof h.symbol !== 'string' ||
-        typeof h.quantity !== 'number' ||
-        typeof h.avgEntryPrice !== 'number' ||
-        typeof h.costBasis !== 'number'
+        typeof p.id !== 'string' ||
+        typeof p.symbol !== 'string' ||
+        !isValidPositionSide(p.side) ||
+        typeof p.entryPrice !== 'number' ||
+        typeof p.quantity !== 'number' ||
+        typeof p.leverage !== 'number' ||
+        !isValidMarginType(p.marginType) ||
+        typeof p.margin !== 'number' ||
+        typeof p.liquidationPrice !== 'number' ||
+        typeof p.openedAt !== 'number'
       ) {
         continue;
       }
-      holdingsMap.set(symbol, h as unknown as PortfolioHolding);
+      positionsMap.set(symbol, p as unknown as FuturesPosition);
     }
 
-    // Validate trades (basic check)
-    const trades: PortfolioTrade[] = [];
+    // Validate trades
+    const trades: FuturesTrade[] = [];
     for (const trade of obj.trades) {
       if (typeof trade !== 'object' || trade === null) continue;
       const t = trade as Record<string, unknown>;
       if (
         typeof t.id === 'string' &&
         typeof t.symbol === 'string' &&
-        (t.side === 'buy' || t.side === 'sell') &&
+        isValidPositionSide(t.side) &&
+        (t.action === 'open' || t.action === 'close') &&
         typeof t.price === 'number' &&
         typeof t.quantity === 'number' &&
-        typeof t.notional === 'number' &&
+        typeof t.leverage === 'number' &&
+        typeof t.realizedPnl === 'number' &&
+        (t.closeReason === null || t.closeReason === 'manual' || t.closeReason === 'liquidated') &&
         typeof t.timestamp === 'number'
       ) {
-        trades.push(t as unknown as PortfolioTrade);
+        trades.push(t as unknown as FuturesTrade);
       }
     }
 
-    return {
-      cashBalance: obj.cashBalance,
-      holdings: holdingsMap,
+    const result: Partial<PortfolioStoreState> = {
+      walletBalance: obj.walletBalance,
+      positions: positionsMap,
       trades: trades.slice(0, MAX_TRADE_HISTORY),
     };
+
+    // Optional fields
+    if (typeof obj.defaultLeverage === 'number' && obj.defaultLeverage >= 1) {
+      result.defaultLeverage = obj.defaultLeverage;
+    }
+    if (isValidMarginType(obj.defaultMarginType)) {
+      result.defaultMarginType = obj.defaultMarginType;
+    }
+
+    return result;
   } catch (error) {
     console.error('[portfolioStore] Failed to load portfolio', {
       timestamp: Date.now(),
@@ -148,7 +212,7 @@ function loadPersistedPortfolio(): Partial<PortfolioStoreState> | null {
 
 function generateTradeId(): string {
   const random = Math.random().toString(36).slice(2, 8);
-  return `portfolio-${Date.now()}-${random}`;
+  return `futures-${Date.now()}-${random}`;
 }
 
 // -----------------------------------------------------------------------------
@@ -156,11 +220,13 @@ function generateTradeId(): string {
 // -----------------------------------------------------------------------------
 
 const INITIAL_STATE: PortfolioStoreState = {
-  cashBalance: INITIAL_CASH_BALANCE,
-  holdings: new Map(),
+  walletBalance: INITIAL_CASH_BALANCE,
+  positions: new Map(),
   trades: [],
-  activeTab: 'holdings',
+  activeTab: 'positions',
   isHydrated: false,
+  defaultLeverage: DEFAULT_LEVERAGE,
+  defaultMarginType: DEFAULT_MARGIN_TYPE,
 };
 
 // -----------------------------------------------------------------------------
@@ -172,36 +238,55 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
   ...INITIAL_STATE,
 
   // -- Actions ----------------------------------------------------------------
-  executeBuy: (symbol: string, price: number, quantity: number): boolean => {
+  openPosition: (params: OpenPositionParams): boolean => {
     const state = get();
-    const notional = price * quantity;
+    const { symbol, side, price, quantity, leverage, marginType } = params;
 
-    // Insufficient cash check
-    if (notional > state.cashBalance) return false;
-    if (quantity <= 0 || price <= 0) return false;
+    // Validation
+    if (price <= 0 || quantity <= 0 || leverage < 1) return false;
+    if (state.positions.has(symbol)) return false;
+    if (state.positions.size >= MAX_OPEN_POSITIONS) return false;
 
-    const existing = state.holdings.get(symbol);
-    const updatedHolding = applyBuyTrade(existing, symbol, price, quantity);
+    const margin = calculateMargin(price, quantity, leverage);
+    const totalMarginUsed = [...state.positions.values()].reduce((sum, p) => sum + p.margin, 0);
+    const availableBalance = state.walletBalance - totalMarginUsed;
 
-    const newHoldings = new Map(state.holdings);
-    newHoldings.set(symbol, updatedHolding);
+    if (margin > availableBalance) return false;
 
-    const trade: PortfolioTrade = {
+    const liquidationPrice = calculateLiquidationPrice(price, leverage, side, marginType);
+
+    const position: FuturesPosition = {
       id: generateTradeId(),
       symbol,
-      side: 'buy',
+      side,
+      entryPrice: price,
+      quantity,
+      leverage,
+      marginType,
+      margin,
+      liquidationPrice,
+      openedAt: Date.now(),
+    };
+
+    const trade: FuturesTrade = {
+      id: generateTradeId(),
+      symbol,
+      side,
+      action: 'open',
       price,
       quantity,
-      notional,
+      leverage,
+      realizedPnl: 0,
+      closeReason: null,
       timestamp: Date.now(),
     };
 
+    const newPositions = new Map(state.positions);
+    newPositions.set(symbol, position);
     const newTrades = [trade, ...state.trades].slice(0, MAX_TRADE_HISTORY);
-    const newCash = state.cashBalance - notional;
 
     const newState = {
-      cashBalance: newCash,
-      holdings: newHoldings,
+      positions: newPositions,
       trades: newTrades,
     };
 
@@ -211,41 +296,55 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     return true;
   },
 
-  executeSell: (symbol: string, price: number, quantity: number): boolean => {
+  closePosition: (symbol: string, price: number, quantity: number): boolean => {
     const state = get();
-    const existing = state.holdings.get(symbol);
+    const position = state.positions.get(symbol);
 
-    // Cannot sell what we don't hold
-    if (!existing) return false;
-    if (quantity <= 0 || price <= 0) return false;
-    if (quantity > existing.quantity) return false;
+    if (!position) return false;
+    if (price <= 0 || quantity <= 0) return false;
+    if (quantity > position.quantity) return false;
 
-    const notional = price * quantity;
-    const updatedHolding = applySellTrade(existing, price, quantity);
+    const isFullClose = Math.abs(quantity - position.quantity) < 1e-10;
 
-    const newHoldings = new Map(state.holdings);
-    if (updatedHolding) {
-      newHoldings.set(symbol, updatedHolding);
+    // Calculate realized PnL for the closed quantity
+    const realizedPnl = calculateUnrealizedPnl(position.entryPrice, price, quantity, position.side);
+
+    // Wallet balance change: only add realized PnL.
+    // Margin was never deducted from wallet on open (it's "reserved"),
+    // so we must NOT add it back on close — only the PnL delta matters.
+    const newWalletBalance = state.walletBalance + realizedPnl;
+
+    // Update or remove position
+    const newPositions = new Map(state.positions);
+    if (isFullClose) {
+      newPositions.delete(symbol);
     } else {
-      newHoldings.delete(symbol);
+      const remainingRatio = (position.quantity - quantity) / position.quantity;
+      newPositions.set(symbol, {
+        ...position,
+        quantity: position.quantity - quantity,
+        margin: position.margin * remainingRatio,
+      });
     }
 
-    const trade: PortfolioTrade = {
+    const trade: FuturesTrade = {
       id: generateTradeId(),
       symbol,
-      side: 'sell',
+      side: position.side,
+      action: 'close',
       price,
       quantity,
-      notional,
+      leverage: position.leverage,
+      realizedPnl,
+      closeReason: 'manual',
       timestamp: Date.now(),
     };
 
     const newTrades = [trade, ...state.trades].slice(0, MAX_TRADE_HISTORY);
-    const newCash = state.cashBalance + notional;
 
     const newState = {
-      cashBalance: newCash,
-      holdings: newHoldings,
+      walletBalance: newWalletBalance,
+      positions: newPositions,
       trades: newTrades,
     };
 
@@ -253,6 +352,86 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     persistPortfolio({ ...state, ...newState });
 
     return true;
+  },
+
+  checkLiquidations: (prices: Map<string, number>): string[] => {
+    const state = get();
+    const liquidated: string[] = [];
+
+    for (const [symbol, position] of state.positions) {
+      const currentPrice = prices.get(symbol);
+      if (currentPrice === undefined) continue;
+
+      let shouldLiquidate = false;
+      if (position.marginType === 'isolated') {
+        if (position.side === 'long' && currentPrice <= position.liquidationPrice) {
+          shouldLiquidate = true;
+        } else if (position.side === 'short' && currentPrice >= position.liquidationPrice) {
+          shouldLiquidate = true;
+        }
+      }
+
+      if (shouldLiquidate) {
+        liquidated.push(symbol);
+      }
+    }
+
+    if (liquidated.length === 0) return liquidated;
+
+    // Process liquidations
+    const newPositions = new Map(state.positions);
+    const newTrades = [...state.trades];
+    let newWalletBalance = state.walletBalance;
+
+    for (const symbol of liquidated) {
+      const position = state.positions.get(symbol);
+      if (!position) continue;
+
+      const currentPrice = prices.get(symbol);
+      if (currentPrice === undefined) continue;
+
+      // Liquidation: lose the entire margin
+      newWalletBalance -= position.margin;
+      newPositions.delete(symbol);
+
+      const trade: FuturesTrade = {
+        id: generateTradeId(),
+        symbol,
+        side: position.side,
+        action: 'close',
+        price: currentPrice,
+        quantity: position.quantity,
+        leverage: position.leverage,
+        realizedPnl: -position.margin,
+        closeReason: 'liquidated',
+        timestamp: Date.now(),
+      };
+
+      newTrades.unshift(trade);
+    }
+
+    const cappedTrades = newTrades.slice(0, MAX_TRADE_HISTORY);
+    const newState = {
+      walletBalance: newWalletBalance,
+      positions: newPositions,
+      trades: cappedTrades,
+    };
+
+    set(newState);
+    persistPortfolio({ ...state, ...newState });
+
+    return liquidated;
+  },
+
+  setDefaultLeverage: (leverage: number): void => {
+    if (leverage < 1) return;
+    set({ defaultLeverage: leverage });
+    persistPortfolio(get());
+  },
+
+  setDefaultMarginType: (marginType: MarginType): void => {
+    set({ defaultMarginType: marginType });
+    persistPortfolio(get());
   },
 
   setActiveTab: (tab: PortfolioTab): void => {
@@ -261,8 +440,8 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
 
   resetPortfolio: (): void => {
     set({
-      cashBalance: INITIAL_CASH_BALANCE,
-      holdings: new Map(),
+      walletBalance: INITIAL_CASH_BALANCE,
+      positions: new Map(),
       trades: [],
     });
 
@@ -286,11 +465,13 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
 
   reset: (): void => {
     set({
-      cashBalance: INITIAL_CASH_BALANCE,
-      holdings: new Map(),
+      walletBalance: INITIAL_CASH_BALANCE,
+      positions: new Map(),
       trades: [],
-      activeTab: 'holdings',
+      activeTab: 'positions',
       isHydrated: false,
+      defaultLeverage: DEFAULT_LEVERAGE,
+      defaultMarginType: DEFAULT_MARGIN_TYPE,
     });
   },
 }));

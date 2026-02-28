@@ -25,6 +25,7 @@ const config = {
         'premium',
         'alert',
         'portfolio',
+        'futures',
       ],
     ],
     'scope-empty': [2, 'never'],

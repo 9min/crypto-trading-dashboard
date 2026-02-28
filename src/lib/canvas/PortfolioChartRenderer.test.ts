@@ -49,8 +49,8 @@ function createMockCtx(): CanvasRenderingContext2D {
 
 function makeSlices(): AllocationSlice[] {
   return [
-    { label: 'BTC', value: 50000, percent: 50, color: '#f7931a' },
-    { label: 'ETH', value: 30000, percent: 30, color: '#627eea' },
+    { label: 'BTC 10x L', value: 50000, percent: 50, color: '#f7931a' },
+    { label: 'ETH 20x S', value: 30000, percent: 30, color: '#627eea' },
     { label: 'Cash', value: 20000, percent: 20, color: '#848e9c' },
   ];
 }

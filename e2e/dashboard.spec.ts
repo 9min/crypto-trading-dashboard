@@ -43,7 +43,7 @@ test.describe('Dashboard', () => {
       'Kimchi Premium',
       'Depth Chart',
       'Performance',
-      'Portfolio',
+      'Futures',
     ];
 
     for (const title of expectedTitles) {

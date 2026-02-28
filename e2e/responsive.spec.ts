@@ -27,7 +27,7 @@ test.describe('Responsive layout', () => {
       'Kimchi Premium',
       'Depth Chart',
       'Performance',
-      'Portfolio',
+      'Futures',
     ];
 
     for (const title of titles) {
