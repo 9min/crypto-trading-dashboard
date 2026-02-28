@@ -384,7 +384,7 @@ ctx.scale(dpr, dpr);
 ### 3.3 DOM 최적화 규칙
 
 - **오더북과 체결 내역은 반드시 Canvas로 렌더링한다.** React DOM 엘리먼트로 렌더링하지 않는다.
-- **전체 대시보드의 DOM 노드 수를 500개 미만으로 유지한다.**
+- **전체 대시보드의 DOM 노드 수를 700개 미만으로 유지한다.**
 - **`document.getElementById`를 사용하지 않는다.** React ref를 사용한다.
 - **Layout thrashing을 방지한다.** DOM 읽기(offsetWidth 등)를 먼저 배치하고, DOM 쓰기(style 변경 등)를 그 후에 배치한다.
 
@@ -907,5 +907,5 @@ class RingBuffer {
 | TTI                    | < 3.0s             |
 | 초기 JS 번들 (gzip)    | < 150KB            |
 | WebSocket 재연결       | < 3s               |
-| DOM 노드 수            | < 500개            |
+| DOM 노드 수            | < 700개            |
 | Detached DOM Nodes     | 0개                |

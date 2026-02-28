@@ -197,7 +197,7 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
 
   return (
     <WidgetWrapper title="Watchlist" headerActions={headerActions}>
-      <div className="flex flex-col overflow-y-auto">
+      <div className="flex h-full flex-col overflow-y-auto">
         {symbols.map((symbol) => (
           <SymbolRow
             key={symbol}

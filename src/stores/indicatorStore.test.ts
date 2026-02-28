@@ -26,10 +26,14 @@ describe('indicatorStore', () => {
       expect(indicatorOrder).toHaveLength(7);
     });
 
-    it('all default indicators start as hidden', () => {
+    it('all default indicators start as hidden except volume', () => {
       const { indicators } = useIndicatorStore.getState();
       for (const config of Object.values(indicators)) {
-        expect(config.visible).toBe(false);
+        if (config.id === 'volume') {
+          expect(config.visible).toBe(true);
+        } else {
+          expect(config.visible).toBe(false);
+        }
       }
     });
 
@@ -232,7 +236,11 @@ describe('indicatorStore', () => {
       expect(Object.keys(indicators)).toHaveLength(7);
       expect(indicatorOrder).toHaveLength(7);
       for (const config of Object.values(indicators)) {
-        expect(config.visible).toBe(false);
+        if (config.id === 'volume') {
+          expect(config.visible).toBe(true);
+        } else {
+          expect(config.visible).toBe(false);
+        }
       }
     });
   });
@@ -253,6 +261,7 @@ describe('indicatorStore', () => {
       expect(indicatorOrder).toHaveLength(7);
       expect(indicators['sma-20'].visible).toBe(false);
       expect(indicators['volume']).toBeDefined();
+      expect(indicators['volume'].visible).toBe(true);
     });
   });
 });

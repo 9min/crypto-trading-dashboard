@@ -126,8 +126,10 @@ describe('useIndicatorSeries', () => {
     vi.clearAllMocks();
     chartMock = createChartMock();
 
-    // Reset stores
+    // Reset stores — volume is visible by default, hide it so tests
+    // start with all indicators hidden (individual tests toggle as needed)
     useIndicatorStore.getState().reset();
+    useIndicatorStore.getState().toggleIndicator('volume');
     useKlineStore.setState({ candles: sampleCandles });
 
     // Each addSeries call returns a fresh mock with its own setData

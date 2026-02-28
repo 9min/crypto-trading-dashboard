@@ -6,6 +6,7 @@ import {
   MAX_TRADE_HISTORY,
   DEFAULT_LEVERAGE,
   DEFAULT_MARGIN_TYPE,
+  positionKey,
 } from '@/types/portfolio';
 import { calculateFee } from '@/utils/portfolioCalc';
 
@@ -71,7 +72,7 @@ describe('openPosition', () => {
 
     expect(success).toBe(true);
 
-    const pos = usePortfolioStore.getState().positions.get('BTCUSDT');
+    const pos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
     expect(pos).toBeDefined();
     expect(pos?.side).toBe('long');
     expect(pos?.entryPrice).toBe(50000);
@@ -98,7 +99,7 @@ describe('openPosition', () => {
       marginType: 'isolated',
     });
 
-    const pos = usePortfolioStore.getState().positions.get('BTCUSDT');
+    const pos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'short'));
     expect(pos?.liquidationPrice).toBeCloseTo(55000, 5); // 50000 * (1 + 1/10)
   });
 
@@ -114,7 +115,7 @@ describe('openPosition', () => {
       stopLossPrice: 48000,
     });
 
-    const pos = usePortfolioStore.getState().positions.get('BTCUSDT');
+    const pos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
     expect(pos?.takeProfitPrice).toBe(60000);
     expect(pos?.stopLossPrice).toBe(48000);
   });
@@ -169,7 +170,7 @@ describe('openPosition', () => {
     expect(success).toBe(true);
 
     const fee2 = calculateFee(60000, 1);
-    const pos = usePortfolioStore.getState().positions.get('BTCUSDT');
+    const pos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
     expect(pos).toBeDefined();
     expect(pos?.quantity).toBe(2);
     // avgEntry = (50000*1 + 60000*1) / 2 = 55000
@@ -180,8 +181,8 @@ describe('openPosition', () => {
     expect(usePortfolioStore.getState().walletBalance).toBe(INITIAL_CASH_BALANCE - fee1 - fee2);
   });
 
-  it('rejects opposite direction on same symbol', () => {
-    usePortfolioStore.getState().openPosition({
+  it('allows hedge mode: long and short on same symbol simultaneously', () => {
+    const success1 = usePortfolioStore.getState().openPosition({
       symbol: 'BTCUSDT',
       side: 'long',
       price: 50000,
@@ -190,7 +191,7 @@ describe('openPosition', () => {
       marginType: 'isolated',
     });
 
-    const success = usePortfolioStore.getState().openPosition({
+    const success2 = usePortfolioStore.getState().openPosition({
       symbol: 'BTCUSDT',
       side: 'short',
       price: 50000,
@@ -199,8 +200,15 @@ describe('openPosition', () => {
       marginType: 'isolated',
     });
 
-    expect(success).toBe(false);
-    expect(usePortfolioStore.getState().positions.size).toBe(1);
+    expect(success1).toBe(true);
+    expect(success2).toBe(true);
+    expect(usePortfolioStore.getState().positions.size).toBe(2);
+    expect(
+      usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long')),
+    ).toBeDefined();
+    expect(
+      usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'short')),
+    ).toBeDefined();
   });
 
   it('returns false for insufficient available balance', () => {
@@ -305,7 +313,7 @@ describe('openPosition', () => {
       marginType: 'cross',
     });
 
-    const pos = usePortfolioStore.getState().positions.get('BTCUSDT');
+    const pos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
     expect(pos?.marginType).toBe('cross');
     expect(pos?.liquidationPrice).toBe(0); // Cross long = 0
   });
@@ -354,10 +362,10 @@ describe('closePosition', () => {
 
   it('closes fully with profit and adds realized pnl minus fee', () => {
     const balanceAfterOpen = usePortfolioStore.getState().walletBalance;
-    const success = usePortfolioStore.getState().closePosition('BTCUSDT', 55000, 2);
+    const success = usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 55000, 2);
 
     expect(success).toBe(true);
-    expect(usePortfolioStore.getState().positions.has('BTCUSDT')).toBe(false);
+    expect(usePortfolioStore.getState().positions.has(positionKey('BTCUSDT', 'long'))).toBe(false);
 
     // pnl = (55000 - 50000) * 2 = 10000
     // fee = 55000 * 2 * 0.0004 = 44
@@ -368,7 +376,7 @@ describe('closePosition', () => {
 
   it('closes fully with loss', () => {
     const balanceAfterOpen = usePortfolioStore.getState().walletBalance;
-    usePortfolioStore.getState().closePosition('BTCUSDT', 48000, 2);
+    usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 48000, 2);
 
     // pnl = (48000 - 50000) * 2 = -4000
     // fee = 48000 * 2 * 0.0004 = 38.4
@@ -381,16 +389,16 @@ describe('closePosition', () => {
   });
 
   it('closes partially and reduces position proportionally', () => {
-    usePortfolioStore.getState().closePosition('BTCUSDT', 55000, 1);
+    usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 55000, 1);
 
-    const pos = usePortfolioStore.getState().positions.get('BTCUSDT');
+    const pos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
     expect(pos).toBeDefined();
     expect(pos?.quantity).toBe(1);
     expect(pos?.margin).toBe(5000); // Half of original 10000
   });
 
   it('records close trade with realized pnl and fee', () => {
-    usePortfolioStore.getState().closePosition('BTCUSDT', 55000, 2);
+    usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 55000, 2);
 
     const trades = usePortfolioStore.getState().trades;
     const closeTrade = trades[0];
@@ -404,27 +412,27 @@ describe('closePosition', () => {
   });
 
   it('returns false when closing symbol not held', () => {
-    const success = usePortfolioStore.getState().closePosition('ETHUSDT', 3000, 1);
+    const success = usePortfolioStore.getState().closePosition('ETHUSDT', 'long', 3000, 1);
     expect(success).toBe(false);
   });
 
   it('returns false when closing more than held', () => {
-    const success = usePortfolioStore.getState().closePosition('BTCUSDT', 55000, 3);
+    const success = usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 55000, 3);
     expect(success).toBe(false);
   });
 
   it('returns false for zero quantity', () => {
-    const success = usePortfolioStore.getState().closePosition('BTCUSDT', 55000, 0);
+    const success = usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 55000, 0);
     expect(success).toBe(false);
   });
 
   it('returns false for zero price', () => {
-    const success = usePortfolioStore.getState().closePosition('BTCUSDT', 0, 1);
+    const success = usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 0, 1);
     expect(success).toBe(false);
   });
 
   it('persists to localstorage after close', () => {
-    usePortfolioStore.getState().closePosition('BTCUSDT', 55000, 2);
+    usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 55000, 2);
 
     const stored = localStorage.getItem(PORTFOLIO_STORAGE_KEY);
     expect(stored).toBeTruthy();
@@ -443,7 +451,7 @@ describe('closePosition', () => {
     });
 
     const balanceAfterOpen = usePortfolioStore.getState().walletBalance;
-    usePortfolioStore.getState().closePosition('BTCUSDT', 45000, 1);
+    usePortfolioStore.getState().closePosition('BTCUSDT', 'short', 45000, 1);
 
     // Short PnL = (50000 - 45000) * 1 = 5000 (profit)
     // fee = 45000 * 1 * 0.0004 = 18
@@ -470,7 +478,7 @@ describe('closePosition', () => {
     });
 
     // Close at a huge loss
-    usePortfolioStore.getState().closePosition('BTCUSDT', 1, 1);
+    usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 1, 1);
 
     // Wallet should be clamped to 0, not negative
     expect(usePortfolioStore.getState().walletBalance).toBeGreaterThanOrEqual(0);
@@ -496,8 +504,8 @@ describe('checkAutoClose', () => {
     const prices = new Map([['BTCUSDT', 45000]]);
     const results = usePortfolioStore.getState().checkAutoClose(prices);
 
-    expect(results).toEqual([{ symbol: 'BTCUSDT', reason: 'liquidated' }]);
-    expect(usePortfolioStore.getState().positions.has('BTCUSDT')).toBe(false);
+    expect(results).toEqual([{ symbol: 'BTCUSDT', side: 'long', reason: 'liquidated' }]);
+    expect(usePortfolioStore.getState().positions.has(positionKey('BTCUSDT', 'long'))).toBe(false);
 
     // Liquidation: lose entire margin
     expect(usePortfolioStore.getState().walletBalance).toBe(Math.max(0, balanceAfterOpen - 5000));
@@ -517,7 +525,7 @@ describe('checkAutoClose', () => {
     const prices = new Map([['BTCUSDT', 55001]]);
     const results = usePortfolioStore.getState().checkAutoClose(prices);
 
-    expect(results).toEqual([{ symbol: 'BTCUSDT', reason: 'liquidated' }]);
+    expect(results).toEqual([{ symbol: 'BTCUSDT', side: 'short', reason: 'liquidated' }]);
   });
 
   it('records liquidation trade with correct details', () => {
@@ -556,7 +564,7 @@ describe('checkAutoClose', () => {
     const results = usePortfolioStore.getState().checkAutoClose(prices);
 
     expect(results).toEqual([]);
-    expect(usePortfolioStore.getState().positions.has('BTCUSDT')).toBe(true);
+    expect(usePortfolioStore.getState().positions.has(positionKey('BTCUSDT', 'long'))).toBe(true);
   });
 
   it('does not liquidate cross margin positions', () => {
@@ -631,8 +639,8 @@ describe('checkAutoClose', () => {
     const prices = new Map([['BTCUSDT', 55000]]);
     const results = usePortfolioStore.getState().checkAutoClose(prices);
 
-    expect(results).toEqual([{ symbol: 'BTCUSDT', reason: 'take-profit' }]);
-    expect(usePortfolioStore.getState().positions.has('BTCUSDT')).toBe(false);
+    expect(results).toEqual([{ symbol: 'BTCUSDT', side: 'long', reason: 'take-profit' }]);
+    expect(usePortfolioStore.getState().positions.has(positionKey('BTCUSDT', 'long'))).toBe(false);
 
     // Check trade recorded correctly
     const closeTrade = usePortfolioStore.getState().trades[0];
@@ -655,8 +663,8 @@ describe('checkAutoClose', () => {
     const prices = new Map([['BTCUSDT', 47000]]);
     const results = usePortfolioStore.getState().checkAutoClose(prices);
 
-    expect(results).toEqual([{ symbol: 'BTCUSDT', reason: 'stop-loss' }]);
-    expect(usePortfolioStore.getState().positions.has('BTCUSDT')).toBe(false);
+    expect(results).toEqual([{ symbol: 'BTCUSDT', side: 'long', reason: 'stop-loss' }]);
+    expect(usePortfolioStore.getState().positions.has(positionKey('BTCUSDT', 'long'))).toBe(false);
 
     const closeTrade = usePortfolioStore.getState().trades[0];
     expect(closeTrade.closeReason).toBe('stop-loss');
@@ -676,7 +684,7 @@ describe('checkAutoClose', () => {
     const prices = new Map([['BTCUSDT', 44000]]);
     const results = usePortfolioStore.getState().checkAutoClose(prices);
 
-    expect(results).toEqual([{ symbol: 'BTCUSDT', reason: 'take-profit' }]);
+    expect(results).toEqual([{ symbol: 'BTCUSDT', side: 'short', reason: 'take-profit' }]);
   });
 
   it('triggers short stop-loss when price rises above sl', () => {
@@ -693,7 +701,7 @@ describe('checkAutoClose', () => {
     const prices = new Map([['BTCUSDT', 53000]]);
     const results = usePortfolioStore.getState().checkAutoClose(prices);
 
-    expect(results).toEqual([{ symbol: 'BTCUSDT', reason: 'stop-loss' }]);
+    expect(results).toEqual([{ symbol: 'BTCUSDT', side: 'short', reason: 'stop-loss' }]);
   });
 
   it('liquidation takes priority over tp/sl', () => {
@@ -712,7 +720,7 @@ describe('checkAutoClose', () => {
     const prices = new Map([['BTCUSDT', 44000]]);
     const results = usePortfolioStore.getState().checkAutoClose(prices);
 
-    expect(results).toEqual([{ symbol: 'BTCUSDT', reason: 'liquidated' }]);
+    expect(results).toEqual([{ symbol: 'BTCUSDT', side: 'long', reason: 'liquidated' }]);
   });
 
   it('does not trigger tp/sl when not set (null)', () => {
@@ -764,10 +772,10 @@ describe('updatePositionTpSl', () => {
       marginType: 'isolated',
     });
 
-    const result = usePortfolioStore.getState().updatePositionTpSl('BTCUSDT', 60000, 48000);
+    const result = usePortfolioStore.getState().updatePositionTpSl('BTCUSDT', 'long', 60000, 48000);
     expect(result).toBe(true);
 
-    const pos = usePortfolioStore.getState().positions.get('BTCUSDT');
+    const pos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
     expect(pos?.takeProfitPrice).toBe(60000);
     expect(pos?.stopLossPrice).toBe(48000);
   });
@@ -784,15 +792,15 @@ describe('updatePositionTpSl', () => {
       stopLossPrice: 48000,
     });
 
-    usePortfolioStore.getState().updatePositionTpSl('BTCUSDT', null, null);
+    usePortfolioStore.getState().updatePositionTpSl('BTCUSDT', 'long', null, null);
 
-    const pos = usePortfolioStore.getState().positions.get('BTCUSDT');
+    const pos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
     expect(pos?.takeProfitPrice).toBeNull();
     expect(pos?.stopLossPrice).toBeNull();
   });
 
   it('returns false for non-existent position', () => {
-    const result = usePortfolioStore.getState().updatePositionTpSl('ETHUSDT', 5000, 2000);
+    const result = usePortfolioStore.getState().updatePositionTpSl('ETHUSDT', 'long', 5000, 2000);
     expect(result).toBe(false);
   });
 
@@ -806,7 +814,7 @@ describe('updatePositionTpSl', () => {
       marginType: 'isolated',
     });
 
-    usePortfolioStore.getState().updatePositionTpSl('BTCUSDT', 60000, null);
+    usePortfolioStore.getState().updatePositionTpSl('BTCUSDT', 'long', 60000, null);
 
     const stored = JSON.parse(localStorage.getItem(PORTFOLIO_STORAGE_KEY) as string);
     const pos = stored.positions[0][1];
@@ -949,8 +957,12 @@ describe('hydratePortfolio', () => {
     expect(usePortfolioStore.getState().isHydrated).toBe(true);
     expect(usePortfolioStore.getState().walletBalance).toBeCloseTo(savedBalance, 2);
     expect(usePortfolioStore.getState().positions.size).toBe(2);
-    expect(usePortfolioStore.getState().positions.get('BTCUSDT')?.side).toBe('long');
-    expect(usePortfolioStore.getState().positions.get('ETHUSDT')?.side).toBe('short');
+    expect(usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'))?.side).toBe(
+      'long',
+    );
+    expect(usePortfolioStore.getState().positions.get(positionKey('ETHUSDT', 'short'))?.side).toBe(
+      'short',
+    );
     expect(usePortfolioStore.getState().trades).toHaveLength(2);
   });
 
@@ -1063,7 +1075,7 @@ describe('hydratePortfolio', () => {
     localStorage.setItem(PORTFOLIO_STORAGE_KEY, JSON.stringify(oldData));
     usePortfolioStore.getState().hydratePortfolio();
 
-    const pos = usePortfolioStore.getState().positions.get('BTCUSDT');
+    const pos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
     expect(pos?.takeProfitPrice).toBeNull();
     expect(pos?.stopLossPrice).toBeNull();
 
@@ -1148,8 +1160,12 @@ describe('multiple symbols', () => {
     });
 
     expect(usePortfolioStore.getState().positions.size).toBe(2);
-    expect(usePortfolioStore.getState().positions.get('BTCUSDT')?.side).toBe('long');
-    expect(usePortfolioStore.getState().positions.get('ETHUSDT')?.side).toBe('short');
+    expect(usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'))?.side).toBe(
+      'long',
+    );
+    expect(usePortfolioStore.getState().positions.get(positionKey('ETHUSDT', 'short'))?.side).toBe(
+      'short',
+    );
   });
 
   it('closing one position does not affect another', () => {
@@ -1170,9 +1186,166 @@ describe('multiple symbols', () => {
       marginType: 'isolated',
     });
 
-    usePortfolioStore.getState().closePosition('BTCUSDT', 55000, 1);
+    usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 55000, 1);
 
-    expect(usePortfolioStore.getState().positions.has('BTCUSDT')).toBe(false);
-    expect(usePortfolioStore.getState().positions.get('ETHUSDT')?.quantity).toBe(5);
+    expect(usePortfolioStore.getState().positions.has(positionKey('BTCUSDT', 'long'))).toBe(false);
+    expect(
+      usePortfolioStore.getState().positions.get(positionKey('ETHUSDT', 'short'))?.quantity,
+    ).toBe(5);
+  });
+});
+
+// =============================================================================
+// Hedge Mode (Long + Short on same symbol)
+// =============================================================================
+
+describe('hedge mode', () => {
+  it('opens long and short on same symbol simultaneously', () => {
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'long',
+      price: 50000,
+      quantity: 1,
+      leverage: 10,
+      marginType: 'isolated',
+    });
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'short',
+      price: 50000,
+      quantity: 0.5,
+      leverage: 20,
+      marginType: 'isolated',
+    });
+
+    expect(usePortfolioStore.getState().positions.size).toBe(2);
+    const longPos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
+    const shortPos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'short'));
+    expect(longPos?.side).toBe('long');
+    expect(longPos?.leverage).toBe(10);
+    expect(shortPos?.side).toBe('short');
+    expect(shortPos?.leverage).toBe(20);
+  });
+
+  it('closing one side keeps the other', () => {
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'long',
+      price: 50000,
+      quantity: 1,
+      leverage: 10,
+      marginType: 'isolated',
+    });
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'short',
+      price: 50000,
+      quantity: 0.5,
+      leverage: 20,
+      marginType: 'isolated',
+    });
+
+    usePortfolioStore.getState().closePosition('BTCUSDT', 'long', 55000, 1);
+
+    expect(usePortfolioStore.getState().positions.size).toBe(1);
+    expect(usePortfolioStore.getState().positions.has(positionKey('BTCUSDT', 'long'))).toBe(false);
+    expect(
+      usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'short'))?.quantity,
+    ).toBe(0.5);
+  });
+
+  it('each side has independent tp/sl', () => {
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'long',
+      price: 50000,
+      quantity: 1,
+      leverage: 10,
+      marginType: 'isolated',
+    });
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'short',
+      price: 50000,
+      quantity: 1,
+      leverage: 10,
+      marginType: 'isolated',
+    });
+
+    usePortfolioStore.getState().updatePositionTpSl('BTCUSDT', 'long', 60000, 48000);
+    usePortfolioStore.getState().updatePositionTpSl('BTCUSDT', 'short', 45000, 52000);
+
+    const longPos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
+    const shortPos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'short'));
+    expect(longPos?.takeProfitPrice).toBe(60000);
+    expect(longPos?.stopLossPrice).toBe(48000);
+    expect(shortPos?.takeProfitPrice).toBe(45000);
+    expect(shortPos?.stopLossPrice).toBe(52000);
+  });
+
+  it('auto-closes both sides independently', () => {
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'long',
+      price: 50000,
+      quantity: 1,
+      leverage: 10,
+      marginType: 'isolated',
+      takeProfitPrice: 55000,
+    });
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'short',
+      price: 50000,
+      quantity: 1,
+      leverage: 10,
+      marginType: 'isolated',
+      stopLossPrice: 52000,
+    });
+
+    // Price goes to 55000: long TP hit, short SL hit (52000 < 55000)
+    const prices = new Map([['BTCUSDT', 55000]]);
+    const results = usePortfolioStore.getState().checkAutoClose(prices);
+
+    expect(results).toHaveLength(2);
+    expect(results).toContainEqual({ symbol: 'BTCUSDT', side: 'long', reason: 'take-profit' });
+    expect(results).toContainEqual({ symbol: 'BTCUSDT', side: 'short', reason: 'stop-loss' });
+    expect(usePortfolioStore.getState().positions.size).toBe(0);
+  });
+
+  it('averages into existing same-side position in hedge mode', () => {
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'long',
+      price: 50000,
+      quantity: 1,
+      leverage: 10,
+      marginType: 'isolated',
+    });
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'short',
+      price: 50000,
+      quantity: 1,
+      leverage: 10,
+      marginType: 'isolated',
+    });
+
+    // Add to long position
+    usePortfolioStore.getState().openPosition({
+      symbol: 'BTCUSDT',
+      side: 'long',
+      price: 60000,
+      quantity: 1,
+      leverage: 10,
+      marginType: 'isolated',
+    });
+
+    const longPos = usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'long'));
+    expect(longPos?.quantity).toBe(2);
+    expect(longPos?.entryPrice).toBe(55000); // averaged
+    expect(
+      usePortfolioStore.getState().positions.get(positionKey('BTCUSDT', 'short'))?.quantity,
+    ).toBe(1);
   });
 });

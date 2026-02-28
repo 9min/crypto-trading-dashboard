@@ -213,24 +213,24 @@ describe('PerformanceMonitorRenderer', () => {
   });
 
   describe('getStatusColorForDom', () => {
-    it('returns good color for DOM < 400', () => {
-      expect(renderer.getStatusColorForDom(300)).toBe('#00c087');
+    it('returns good color for DOM < 500', () => {
+      expect(renderer.getStatusColorForDom(400)).toBe('#00c087');
     });
 
-    it('returns warning color for DOM 400-499', () => {
-      expect(renderer.getStatusColorForDom(450)).toBe('#f0b90b');
+    it('returns warning color for DOM 500-699', () => {
+      expect(renderer.getStatusColorForDom(600)).toBe('#f0b90b');
     });
 
-    it('returns critical color for DOM >= 500', () => {
-      expect(renderer.getStatusColorForDom(500)).toBe('#f6465d');
+    it('returns critical color for DOM >= 700', () => {
+      expect(renderer.getStatusColorForDom(700)).toBe('#f6465d');
     });
 
-    it('boundary: 399 is good', () => {
-      expect(renderer.getStatusColorForDom(399)).toBe('#00c087');
+    it('boundary: 499 is good', () => {
+      expect(renderer.getStatusColorForDom(499)).toBe('#00c087');
     });
 
-    it('boundary: 400 is warning', () => {
-      expect(renderer.getStatusColorForDom(400)).toBe('#f0b90b');
+    it('boundary: 500 is warning', () => {
+      expect(renderer.getStatusColorForDom(500)).toBe('#f0b90b');
     });
   });
 

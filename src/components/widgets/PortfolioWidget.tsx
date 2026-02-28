@@ -9,9 +9,8 @@
 // - Position rows with PnL color coding, TP/SL display, notional value
 // - History rows with fee display and close reason badges
 // - Inline reset confirmation dialog
-// - TradePanel with Long/Short tabs, leverage slider, TP/SL, cost preview
 // - Auto-close check (liquidation + TP/SL) via useEffect on price changes
-// - Funding rate polling from Binance Futures API
+// Trade panel is rendered separately in TradePanelWidget.
 // =============================================================================
 
 import { memo, useRef, useState, useCallback, useEffect, useMemo } from 'react';
@@ -33,10 +32,8 @@ import {
 } from '@/utils/portfolioCalc';
 import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol } from '@/utils/formatSymbol';
-import { fetchFundingRate } from '@/lib/binance/restApi';
-import { TradePanel } from '@/components/ui/TradePanel';
 import { WidgetWrapper } from './WidgetWrapper';
-import type { FuturesTrade, PositionWithPnl, CloseReason } from '@/types/portfolio';
+import type { FuturesTrade, PositionWithPnl, CloseReason, PositionSide } from '@/types/portfolio';
 
 // -----------------------------------------------------------------------------
 // Margin Ratio Bar
@@ -156,7 +153,7 @@ function getCloseReasonBadge(reason: CloseReason | null): {
 
 interface PositionsTabProps {
   positions: PositionWithPnl[];
-  onClose: (symbol: string, price: number, quantity: number) => boolean;
+  onClose: (symbol: string, side: PositionSide, price: number, quantity: number) => boolean;
   onSelectSymbol: (symbol: string) => void;
 }
 
@@ -171,7 +168,7 @@ const PositionsTab = memo(function PositionsTab({
         <span className="text-foreground-tertiary text-lg">&#9746;</span>
         <span className="text-foreground-secondary text-xs">No open positions</span>
         <span className="text-foreground-tertiary text-[10px]">
-          Open a position using the panel below
+          Open a position using the Trade Panel
         </span>
       </div>
     );
@@ -218,7 +215,7 @@ const PositionsTab = memo(function PositionsTab({
               </span>
               <button
                 type="button"
-                onClick={() => onClose(pos.symbol, pos.currentPrice, pos.quantity)}
+                onClick={() => onClose(pos.symbol, pos.side, pos.currentPrice, pos.quantity)}
                 className="text-foreground-tertiary hover:bg-sell/10 hover:text-sell ml-2 cursor-pointer rounded px-1.5 py-0.5 text-[10px] font-medium transition-all"
               >
                 Close
@@ -373,32 +370,20 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isResetConfirming, setIsResetConfirming] = useState(false);
-  const [fundingRate, setFundingRate] = useState<number | null>(null);
-  const fundingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Store selectors
   const theme = useUiStore((state) => state.theme);
-  const symbol = useUiStore((state) => state.symbol);
   const setSymbol = useUiStore((state) => state.setSymbol);
   const walletBalance = usePortfolioStore((state) => state.walletBalance);
   const positions = usePortfolioStore((state) => state.positions);
   const trades = usePortfolioStore((state) => state.trades);
   const activeTab = usePortfolioStore((state) => state.activeTab);
-  const defaultLeverage = usePortfolioStore((state) => state.defaultLeverage);
-  const defaultMarginType = usePortfolioStore((state) => state.defaultMarginType);
   const setActiveTab = usePortfolioStore((state) => state.setActiveTab);
-  const openPosition = usePortfolioStore((state) => state.openPosition);
   const closePosition = usePortfolioStore((state) => state.closePosition);
   const checkAutoClose = usePortfolioStore((state) => state.checkAutoClose);
   const resetPortfolio = usePortfolioStore((state) => state.resetPortfolio);
   const tickers = useWatchlistStore((state) => state.tickers);
   const addToast = useToastStore((state) => state.addToast);
-
-  // Current symbol price for TradePanel
-  const currentPrice = useMemo(() => tickers.get(symbol)?.price ?? 0, [tickers, symbol]);
-
-  // Existing position on current symbol
-  const existingPosition = useMemo(() => positions.get(symbol) ?? null, [positions, symbol]);
 
   // Summary calculation
   const summary = useMemo(
@@ -456,53 +441,21 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
     const results = checkAutoClose(priceMap);
     for (const result of results) {
       const label = formatSymbol(result.symbol);
+      const sideLabel = result.side === 'long' ? 'Long' : 'Short';
       if (result.reason === 'liquidated') {
-        addToast(`${label} position liquidated!`, 'error', 6000);
+        addToast(`${label} ${sideLabel} position liquidated!`, 'error', 6000);
       } else if (result.reason === 'take-profit') {
-        addToast(`${label} take profit triggered!`, 'success', 4000);
+        addToast(`${label} ${sideLabel} take profit triggered!`, 'success', 4000);
       } else if (result.reason === 'stop-loss') {
-        addToast(`${label} stop loss triggered!`, 'warning', 4000);
+        addToast(`${label} ${sideLabel} stop loss triggered!`, 'warning', 4000);
       }
     }
   }, [tickers, positions, checkAutoClose, addToast]);
 
-  // Funding rate polling (60s interval)
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchRate = async () => {
-      try {
-        const data = await fetchFundingRate(symbol);
-        if (!cancelled) {
-          setFundingRate(parseFloat(data.lastFundingRate));
-        }
-      } catch {
-        if (!cancelled) {
-          setFundingRate(null);
-        }
-      }
-    };
-
-    fetchRate();
-    fundingIntervalRef.current = setInterval(fetchRate, 60_000);
-
-    return () => {
-      cancelled = true;
-      if (fundingIntervalRef.current !== null) {
-        clearInterval(fundingIntervalRef.current);
-        fundingIntervalRef.current = null;
-      }
-    };
-  }, [symbol]);
-
   // Callbacks
-  const handleOpenPosition = useCallback(
-    (params: Parameters<typeof openPosition>[0]) => openPosition(params),
-    [openPosition],
-  );
-
   const handleClosePosition = useCallback(
-    (sym: string, price: number, qty: number) => closePosition(sym, price, qty),
+    (sym: string, side: PositionSide, price: number, qty: number) =>
+      closePosition(sym, side, price, qty),
     [closePosition],
   );
 
@@ -585,7 +538,7 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
 
   return (
     <WidgetWrapper title="Futures" headerActions={headerActions}>
-      <div className="flex h-full flex-col overflow-y-auto">
+      <div className="flex h-full flex-col">
         {/* Summary bar */}
         <SummaryBar
           totalEquity={summary.totalEquity}
@@ -602,8 +555,8 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
           <canvas ref={canvasRef} className="block h-full w-full" />
         </div>
 
-        {/* Tab buttons — sticky so tabs remain visible while scrolling */}
-        <div className="border-border bg-background-secondary sticky top-0 z-10 flex shrink-0 border-b">
+        {/* Tab buttons — always visible above scrollable content */}
+        <div className="border-border bg-background-secondary flex shrink-0 border-b">
           <button
             type="button"
             onClick={handleTabPositions}
@@ -628,8 +581,8 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
           </button>
         </div>
 
-        {/* Tab content — no flex-1/overflow-hidden, just renders its natural height */}
-        <div className="shrink-0">
+        {/* Tab content — only this area scrolls */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {activeTab === 'positions' ? (
             <PositionsTab
               positions={positionsWithPnl}
@@ -639,21 +592,6 @@ export const PortfolioWidget = memo(function PortfolioWidget() {
           ) : (
             <HistoryTab trades={trades} />
           )}
-        </div>
-
-        {/* Trade panel */}
-        <div className="shrink-0">
-          <TradePanel
-            symbol={symbol}
-            currentPrice={currentPrice}
-            availableBalance={summary.availableBalance}
-            defaultLeverage={defaultLeverage}
-            defaultMarginType={defaultMarginType}
-            existingPosition={existingPosition}
-            onOpenPosition={handleOpenPosition}
-            onClosePosition={handleClosePosition}
-            fundingRate={fundingRate}
-          />
         </div>
       </div>
     </WidgetWrapper>

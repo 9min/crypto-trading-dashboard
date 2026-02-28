@@ -14,6 +14,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { CandlestickWidget } from '@/components/widgets/CandlestickWidget';
 import { TradesFeedWidget } from '@/components/widgets/TradesFeedWidget';
 import { PortfolioWidget } from '@/components/widgets/PortfolioWidget';
+import { TradePanelWidget } from '@/components/widgets/TradePanelWidget';
 import { PerformanceMonitorWidget } from '@/components/widgets/PerformanceMonitorWidget';
 import { MobileMorePanel } from './MobileMorePanel';
 
@@ -34,7 +35,10 @@ export const MobileWidgetContainer = memo(function MobileWidgetContainer() {
     case 'portfolio':
       return (
         <ErrorBoundary widgetName="Portfolio">
-          <PortfolioWidget />
+          <div className="flex flex-col">
+            <PortfolioWidget />
+            <TradePanelWidget />
+          </div>
         </ErrorBoundary>
       );
     case 'trades':

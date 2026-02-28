@@ -144,8 +144,15 @@ interface AllocationSlice {
 interface AutoCloseResult {
   /** Symbol that was auto-closed */
   symbol: string;
+  /** Side of the auto-closed position */
+  side: PositionSide;
   /** Reason for auto-close */
   reason: CloseReason;
+}
+
+/** Creates a composite Map key: symbol_side (e.g., 'BTCUSDT_long') */
+function positionKey(symbol: string, side: PositionSide): string {
+  return `${symbol}_${side}`;
 }
 
 // -----------------------------------------------------------------------------
@@ -208,6 +215,7 @@ export {
   DEFAULT_MARGIN_TYPE,
   MAX_OPEN_POSITIONS,
   TAKER_FEE_RATE,
+  positionKey,
 };
 export type {
   PositionSide,
