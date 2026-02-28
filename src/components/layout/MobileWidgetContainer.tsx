@@ -34,12 +34,14 @@ export const MobileWidgetContainer = memo(function MobileWidgetContainer() {
       );
     case 'portfolio':
       return (
-        <ErrorBoundary widgetName="Portfolio">
-          <div className="flex flex-col">
+        <div className="flex flex-col">
+          <ErrorBoundary widgetName="Portfolio">
             <PortfolioWidget />
+          </ErrorBoundary>
+          <ErrorBoundary widgetName="Trade Panel">
             <TradePanelWidget />
-          </div>
-        </ErrorBoundary>
+          </ErrorBoundary>
+        </div>
       );
     case 'trades':
       return (

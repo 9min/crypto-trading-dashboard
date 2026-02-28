@@ -22,6 +22,7 @@ import {
   MAX_TRADE_HISTORY,
   PORTFOLIO_STORAGE_KEY,
   MAX_OPEN_POSITIONS,
+  MAX_LEVERAGE,
   DEFAULT_LEVERAGE,
   DEFAULT_MARGIN_TYPE,
   positionKey,
@@ -278,7 +279,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     const stopLossPrice = params.stopLossPrice ?? null;
 
     // Validation
-    if (price <= 0 || quantity <= 0 || leverage < 1) return false;
+    if (price <= 0 || quantity <= 0 || leverage < 1 || leverage > MAX_LEVERAGE) return false;
 
     const key = positionKey(symbol, side);
     const existing = state.positions.get(key);
@@ -618,7 +619,7 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
   },
 
   setDefaultLeverage: (leverage: number): void => {
-    if (leverage < 1) return;
+    if (leverage < 1 || leverage > MAX_LEVERAGE) return;
     set({ defaultLeverage: leverage });
     persistPortfolio(get());
   },

@@ -65,9 +65,14 @@ export const TradePanelWidget = memo(function TradePanelWidget() {
         if (!cancelled) {
           setFundingRate(parseFloat(data.lastFundingRate));
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
           setFundingRate(null);
+          console.error('[TradePanelWidget] Failed to fetch funding rate', {
+            symbol,
+            timestamp: Date.now(),
+            error,
+          });
         }
       }
     };
