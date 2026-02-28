@@ -119,7 +119,7 @@ const SPOT_FEE_RATE = 0.0005;
 const SPOT_STORAGE_KEY = 'dashboard-spot';
 
 /** Maximum number of trade records to persist */
-const SPOT_MAX_TRADE_HISTORY = 500;
+const SPOT_MAX_TRADE_HISTORY = 200;
 
 /** Maximum number of distinct holdings */
 const SPOT_MAX_HOLDINGS = 20;

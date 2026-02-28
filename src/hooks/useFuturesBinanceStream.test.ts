@@ -6,7 +6,7 @@
 // =============================================================================
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -79,12 +79,33 @@ class MockWebSocket {
 
 let mockWebSocketInstances: MockWebSocket[] = [];
 
-// Install mock WebSocket
+// Visibility state mock
+let mockVisibilityState: DocumentVisibilityState = 'visible';
+const visibilityListeners: Set<() => void> = new Set();
+
+// Install mock WebSocket + visibility
 const originalWebSocket = globalThis.WebSocket;
 beforeEach(() => {
   mockWebSocketInstances = [];
+  mockVisibilityState = 'visible';
+  visibilityListeners.clear();
   // @ts-expect-error — replacing WebSocket for testing
   globalThis.WebSocket = MockWebSocket;
+
+  Object.defineProperty(document, 'visibilityState', {
+    get: () => mockVisibilityState,
+    configurable: true,
+  });
+  vi.spyOn(document, 'addEventListener').mockImplementation((type: string, handler: unknown) => {
+    if (type === 'visibilitychange') {
+      visibilityListeners.add(handler as () => void);
+    }
+  });
+  vi.spyOn(document, 'removeEventListener').mockImplementation((type: string, handler: unknown) => {
+    if (type === 'visibilitychange') {
+      visibilityListeners.delete(handler as () => void);
+    }
+  });
 });
 
 afterEach(() => {
@@ -99,6 +120,13 @@ import { useFuturesBinanceStream } from './useFuturesBinanceStream';
 
 function createTickerResponse(symbol: string, price: string, change: string, volume: string) {
   return { symbol, lastPrice: price, priceChangePercent: change, quoteVolume: volume };
+}
+
+function simulateVisibilityChange(state: DocumentVisibilityState): void {
+  mockVisibilityState = state;
+  for (const listener of visibilityListeners) {
+    listener();
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -163,8 +191,6 @@ describe('useFuturesBinanceStream', () => {
     });
 
     it('updates binancePrices on WebSocket miniTicker message', () => {
-      const updateBinanceTickerSpy = vi.spyOn(useWatchlistStore.getState(), 'updateBinanceTicker');
-
       renderHook(() => useFuturesBinanceStream({ enabled: true }));
 
       const ws = mockWebSocketInstances[0];
@@ -185,13 +211,89 @@ describe('useFuturesBinanceStream', () => {
 
       ws.simulateMessage(message);
 
-      expect(updateBinanceTickerSpy).toHaveBeenCalledWith(
-        'BTCUSDT',
+      // Verify store was updated directly
+      const binancePrices = useWatchlistStore.getState().binancePrices;
+      expect(binancePrices.get('BTCUSDT')).toEqual(
         expect.objectContaining({
           price: 65000,
           volume: 6500000,
         }),
       );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Stable deps: does not reconnect when symbols are the same
+  // ---------------------------------------------------------------------------
+
+  describe('stable symbol tracking', () => {
+    it('does not create a new WebSocket when symbol set is unchanged', () => {
+      const { rerender } = renderHook(() => useFuturesBinanceStream({ enabled: true }));
+
+      const initialWsCount = mockWebSocketInstances.length;
+
+      // Trigger a rerender with the same symbol state
+      act(() => {
+        useUiStore.getState().setSymbol('BTCUSDT'); // same symbol
+      });
+      rerender();
+
+      expect(mockWebSocketInstances.length).toBe(initialWsCount);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Page Visibility
+  // ---------------------------------------------------------------------------
+
+  describe('page visibility', () => {
+    it('registers visibilitychange listener', () => {
+      renderHook(() => useFuturesBinanceStream({ enabled: true }));
+
+      expect(visibilityListeners.size).toBe(1);
+    });
+
+    it('closes WebSocket when tab becomes hidden', () => {
+      renderHook(() => useFuturesBinanceStream({ enabled: true }));
+
+      const ws = mockWebSocketInstances[0];
+      expect(ws).toBeDefined();
+
+      act(() => simulateVisibilityChange('hidden'));
+
+      expect(ws.readyState).toBe(3); // CLOSED
+    });
+
+    it('creates a new WebSocket when tab becomes visible again', () => {
+      renderHook(() => useFuturesBinanceStream({ enabled: true }));
+
+      const initialCount = mockWebSocketInstances.length;
+
+      act(() => simulateVisibilityChange('hidden'));
+      act(() => simulateVisibilityChange('visible'));
+
+      expect(mockWebSocketInstances.length).toBeGreaterThan(initialCount);
+    });
+
+    it('re-fetches REST tickers when tab becomes visible', () => {
+      renderHook(() => useFuturesBinanceStream({ enabled: true }));
+
+      mockFetch24hrTickers.mockClear();
+
+      act(() => simulateVisibilityChange('hidden'));
+      act(() => simulateVisibilityChange('visible'));
+
+      expect(mockFetch24hrTickers).toHaveBeenCalledWith(expect.arrayContaining(['BTCUSDT']));
+    });
+
+    it('removes visibilitychange listener on unmount', () => {
+      const { unmount } = renderHook(() => useFuturesBinanceStream({ enabled: true }));
+
+      expect(visibilityListeners.size).toBe(1);
+
+      unmount();
+
+      expect(visibilityListeners.size).toBe(0);
     });
   });
 

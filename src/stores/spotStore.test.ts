@@ -604,8 +604,8 @@ describe('reset', () => {
 
 describe('trade history capping', () => {
   it('caps trades at SPOT_MAX_TRADE_HISTORY', () => {
-    // Buy many times
-    for (let i = 0; i < 510; i++) {
+    // Buy many times (exceeds 200 cap)
+    for (let i = 0; i < 210; i++) {
       useSpotStore.getState().buyAsset({
         symbol: 'BTCUSDT',
         price: 1_000,
@@ -613,7 +613,7 @@ describe('trade history capping', () => {
       });
     }
 
-    expect(useSpotStore.getState().trades.length).toBeLessThanOrEqual(500);
+    expect(useSpotStore.getState().trades.length).toBeLessThanOrEqual(200);
   });
 
   it('newest trades are first', () => {
