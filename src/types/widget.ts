@@ -111,7 +111,7 @@ const WIDGET_METADATA: Record<WidgetType, WidgetMeta> = {
   premium: { label: 'Kimchi Premium', minW: 2, minH: 6, defaultW: 2, defaultH: 10 },
   depth: { label: 'Depth Chart', minW: 2, minH: 6, defaultW: 2, defaultH: 10 },
   perf: { label: 'Performance', minW: 2, minH: 6, defaultW: 3, defaultH: 10 },
-  portfolio: { label: 'Portfolio', minW: 3, minH: 8, defaultW: 4, defaultH: 12 },
+  portfolio: { label: 'Futures', minW: 3, minH: 8, defaultW: 4, defaultH: 12 },
   tradepanel: { label: 'Trade Panel', minW: 2, minH: 8, defaultW: 3, defaultH: 14 },
 } as const;
 

@@ -66,7 +66,7 @@ const GRID_MARGIN: [number, number] = [8, 8];
 // Default layouts for each breakpoint (exported for reset functionality)
 export const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
   lg: [
-    // Row 1: Chart(7) + Portfolio(3) + TradePanel(2)
+    // Row 1: Chart(7) + Futures(3) + TradePanel(2)
     { i: 'candlestick', x: 0, y: 0, w: 7, h: 14 },
     { i: 'portfolio', x: 7, y: 0, w: 3, h: 14 },
     { i: 'tradepanel', x: 10, y: 0, w: 2, h: 14 },
@@ -79,7 +79,7 @@ export const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
     { i: 'premium', x: 10, y: 14, w: 2, h: 10 },
   ],
   md: [
-    // Row 1: Chart(5) + Portfolio(5)
+    // Row 1: Chart(5) + Futures(5)
     { i: 'candlestick', x: 0, y: 0, w: 5, h: 12 },
     { i: 'portfolio', x: 5, y: 0, w: 5, h: 12 },
     // Row 2: TradePanel(4) + Trades(3) + OrderBook(3)
@@ -156,7 +156,7 @@ export const DashboardGrid = memo(function DashboardGrid() {
       { key: 'premium', title: 'Kimchi Premium', component: <KimchiPremiumWidget /> },
       { key: 'depth', title: 'Depth Chart', component: <DepthChartWidget /> },
       { key: 'perf', title: 'Performance', component: <PerformanceMonitorWidget /> },
-      { key: 'portfolio', title: 'Portfolio', component: <PortfolioWidget /> },
+      { key: 'portfolio', title: 'Futures', component: <PortfolioWidget /> },
       { key: 'tradepanel', title: 'Trade Panel', component: <TradePanelWidget /> },
     ],
     [],

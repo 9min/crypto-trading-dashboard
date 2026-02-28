@@ -18,7 +18,7 @@ const VERSION_KEY = 'dashboard-layout-version';
  * Bump this number whenever DEFAULT_LAYOUTS in DashboardGrid changes.
  * Stale saved layouts with a different version are automatically discarded.
  */
-export const LAYOUT_VERSION = 15;
+export const LAYOUT_VERSION = 16;
 
 /** Widget keys that every breakpoint must contain for a saved layout to be valid. */
 export const REQUIRED_WIDGET_KEYS = [
