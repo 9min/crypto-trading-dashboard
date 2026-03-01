@@ -67,6 +67,13 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
   // -- Trade handler: updates trade feed + builds live candles --
   const handleTrade = useCallback(
     (event: UpbitTradeEvent): void => {
+      // Only process trades for the active symbol. The UpbitWebSocketManager is
+      // a singleton and its merged subscription may include symbols from other
+      // consumers (e.g., multi-chart panels). Without this guard, trades for
+      // foreign symbols (e.g., KRW-ETH at ~4M) corrupt the main chart's candle
+      // data (e.g., KRW-BTC at ~96M), causing the Y-axis to span 0–120M.
+      if (!symbol || event.code !== symbol) return;
+
       // 1. Update trades feed (existing behavior)
       addTrade({
         id: event.sequential_id,
@@ -109,12 +116,15 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
       }
       // candleOpenTimeSec < lastCandle.time → stale/out-of-order trade, ignore
     },
-    [addTrade, addCandle, updateLastCandle, interval],
+    [addTrade, addCandle, updateLastCandle, interval, symbol],
   );
 
   // -- OrderBook handler: full snapshot each time (Upbit sends complete book) --
   const handleOrderBook = useCallback(
     (event: UpbitOrderBookEvent): void => {
+      // Same guard as handleTrade — only process orderbook for the active symbol.
+      if (!symbol || event.code !== symbol) return;
+
       const units = event.orderbook_units;
       const bids: PriceLevel[] = [];
       const asks: PriceLevel[] = [];
@@ -125,7 +135,7 @@ export function useUpbitStream(params: UseUpbitStreamParams): void {
 
       setDepthSnapshot(bids, asks, event.timestamp);
     },
-    [setDepthSnapshot],
+    [setDepthSnapshot, symbol],
   );
 
   // -- Main Effect --

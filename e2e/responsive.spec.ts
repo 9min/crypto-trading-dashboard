@@ -10,13 +10,13 @@ test.describe('Responsive layout', () => {
     await setupMocks(page);
   });
 
-  test('desktop (1400x900): all 9 widgets visible', async ({ page }) => {
+  test('desktop (1400x900): all 10 widgets visible', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 900 });
     await page.goto('/');
     await page.waitForSelector('[data-testid="widget-title"]', { timeout: 15000 });
 
     const widgetTitles = page.getByTestId('widget-title');
-    await expect(widgetTitles).toHaveCount(9);
+    await expect(widgetTitles).toHaveCount(10);
 
     // All widgets should be visible without scrolling
     const titles = [
@@ -29,6 +29,7 @@ test.describe('Responsive layout', () => {
       'Performance',
       'Futures',
       'Trade',
+      'Multi Chart',
     ];
 
     for (const title of titles) {
@@ -38,13 +39,13 @@ test.describe('Responsive layout', () => {
     }
   });
 
-  test('tablet (768x1024): all 9 widgets present and visible', async ({ page }) => {
+  test('tablet (768x1024): all 10 widgets present and visible', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.goto('/');
     await page.waitForSelector('[data-testid="widget-title"]', { timeout: 15000 });
 
     const widgetTitles = page.getByTestId('widget-title');
-    await expect(widgetTitles).toHaveCount(9);
+    await expect(widgetTitles).toHaveCount(10);
 
     // Widgets should all be in the DOM
     for (const title of ['Chart', 'Order Book', 'Watchlist']) {

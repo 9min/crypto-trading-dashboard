@@ -428,6 +428,39 @@ describe('usePositionPriceLines', () => {
     expect(entryLine.applyOptions).toHaveBeenCalledWith(expect.objectContaining({ price: 48000 }));
   });
 
+  // ---- Exchange Switch Force-Clear ----
+
+  it('force-clears all lines on exchange switch even if removePriceLine throws', () => {
+    const series = createMockSeries();
+    const seriesRef = createSeriesRef(series);
+    const pos = makeFuturesPosition();
+    mockPositions.set('BTCUSDT_long', pos);
+
+    const { rerender } = renderHook(() => usePositionPriceLines({ seriesRef, isChartReady: true }));
+
+    // Entry + liquidation = 2 lines
+    expect(series.createPriceLine).toHaveBeenCalledTimes(2);
+
+    // Make removePriceLine throw for the first call (entry line)
+    // to verify liquidation line is still removed independently
+    let callCount = 0;
+    series.removePriceLine.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) throw new Error('simulated error');
+    });
+
+    // Switch to upbit with a holding
+    mockExchange = 'upbit';
+    const holding = makeSpotHolding();
+    mockHoldings.set('BTCUSDT', holding);
+    rerender();
+
+    // Both entry and liquidation removals were attempted (even though first threw)
+    expect(series.removePriceLine).toHaveBeenCalledTimes(2);
+    // Spot avg buy line created after force-clear
+    expect(series.createPriceLine).toHaveBeenCalledTimes(3);
+  });
+
   // ---- No Series Ref ----
 
   it('does not create lines when seriesRef.current is null', () => {

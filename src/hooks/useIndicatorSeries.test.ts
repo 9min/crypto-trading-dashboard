@@ -206,6 +206,48 @@ describe('useIndicatorSeries', () => {
 
       expect(mockAddSeries).not.toHaveBeenCalled();
     });
+
+    it('removes all existing series when candles become empty', async () => {
+      useIndicatorStore.getState().toggleIndicator('volume');
+
+      const chartRef = createChartRef(chartMock.chart);
+      const { rerender } = await renderAndWaitForModule(chartRef);
+
+      // Volume creates 2 series (histogram + MA)
+      expect(mockAddSeries).toHaveBeenCalledTimes(2);
+      mockRemoveSeries.mockClear();
+
+      // Simulate exchange switch: candles become empty
+      useKlineStore.setState({ candles: [] });
+      rerender();
+
+      // Series should be REMOVED (not just cleared) to prevent LWC pane issues
+      expect(mockRemoveSeries).toHaveBeenCalledTimes(2);
+    });
+
+    it('recreates series on correct panes after candles return', async () => {
+      useIndicatorStore.getState().toggleIndicator('volume');
+
+      const chartRef = createChartRef(chartMock.chart);
+      const { rerender } = await renderAndWaitForModule(chartRef);
+
+      // Volume created on pane 1
+      expect(mockAddSeries.mock.calls[0][2]).toBe(1);
+      mockAddSeries.mockClear();
+
+      // Clear candles (exchange switch) → series removed
+      useKlineStore.setState({ candles: [] });
+      rerender();
+
+      // New candles arrive → series recreated
+      useKlineStore.setState({ candles: sampleCandles });
+      rerender();
+
+      // Should recreate volume histogram and MA on pane 1
+      expect(mockAddSeries).toHaveBeenCalledTimes(2);
+      expect(mockAddSeries.mock.calls[0][2]).toBe(1);
+      expect(mockAddSeries.mock.calls[1][2]).toBe(1);
+    });
   });
 
   // ---------------------------------------------------------------------------

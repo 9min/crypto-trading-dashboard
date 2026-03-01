@@ -119,6 +119,7 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
   const seriesRef = useRef<CandlestickSeriesApi | null>(null);
   const prevCandleCountRef = useRef(0);
   const prevFirstTimeRef = useRef(0);
+  const prevExchangeRef = useRef('');
   const colorsRef = useRef<ChartColors>(DARK_COLORS);
 
   // State flag to signal that the async chart init has completed and
@@ -128,6 +129,7 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
   const candles = useKlineStore((state) => state.candles);
   const isLoading = useKlineStore((state) => state.isLoading);
   const theme = useUiStore((state) => state.theme);
+  const exchange = useUiStore((state) => state.exchange);
 
   const colors = useMemo(() => getColorsForTheme(theme), [theme]);
 
@@ -251,13 +253,14 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
     const series = seriesRef.current;
     if (!isChartReady || !series) return;
 
-    // When candles are cleared (symbol/interval change via resetKlineData),
-    // reset tracking refs so the next data arrival triggers a full setData.
-    if (candles.length === 0) {
+    // Force clear on exchange switch to prevent stale data from the
+    // previous exchange's price scale (USDT vs KRW) lingering on the chart.
+    const exchangeChanged = prevExchangeRef.current !== '' && prevExchangeRef.current !== exchange;
+    prevExchangeRef.current = exchange;
+
+    if (exchangeChanged || candles.length === 0) {
       prevCandleCountRef.current = 0;
       prevFirstTimeRef.current = 0;
-      // Clear Lightweight Charts internal buffers so the previous symbol's
-      // data and price scale do not linger until new candles arrive.
       series.setData([]);
       return;
     }
@@ -302,7 +305,7 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
 
     prevCandleCountRef.current = candles.length;
     prevFirstTimeRef.current = firstTime;
-  }, [candles, isChartReady]);
+  }, [candles, isChartReady, exchange]);
 
   return (
     <WidgetWrapper title="Chart" headerActions={<IndicatorToggle />}>

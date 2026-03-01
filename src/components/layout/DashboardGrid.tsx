@@ -45,6 +45,7 @@ import { PortfolioWidget } from '@/components/widgets/PortfolioWidget';
 import { TradePanelWidget } from '@/components/widgets/TradePanelWidget';
 import { SpotPortfolioWidget } from '@/components/widgets/SpotPortfolioWidget';
 import { SpotTradePanelWidget } from '@/components/widgets/SpotTradePanelWidget';
+import { MultiChartWidget } from '@/components/widgets/MultiChartWidget';
 import { useUiStore } from '@/stores/uiStore';
 
 // -----------------------------------------------------------------------------
@@ -80,6 +81,8 @@ export const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
     { i: 'trades', x: 6, y: 14, w: 2, h: 10 },
     { i: 'perf', x: 8, y: 14, w: 2, h: 10 },
     { i: 'premium', x: 10, y: 14, w: 2, h: 10 },
+    // Row 3: Multi Chart
+    { i: 'multichart', x: 0, y: 24, w: 9, h: 14 },
   ],
   md: [
     // Row 1: Chart(5) + Futures(5)
@@ -94,6 +97,8 @@ export const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
     { i: 'depth', x: 2, y: 24, w: 3, h: 10 },
     { i: 'premium', x: 5, y: 24, w: 2, h: 10 },
     { i: 'perf', x: 7, y: 24, w: 3, h: 10 },
+    // Row 4: Multi Chart
+    { i: 'multichart', x: 0, y: 34, w: 10, h: 14 },
   ],
   sm: [
     // Single column stack — ordered by priority
@@ -106,6 +111,7 @@ export const DEFAULT_LAYOUTS: ResponsiveLayouts<'lg' | 'md' | 'sm'> = {
     { i: 'depth', x: 0, y: 62, w: 6, h: 8 },
     { i: 'premium', x: 0, y: 70, w: 6, h: 8 },
     { i: 'perf', x: 0, y: 78, w: 6, h: 8 },
+    { i: 'multichart', x: 0, y: 86, w: 6, h: 14 },
   ],
 };
 
@@ -170,6 +176,7 @@ export const DashboardGrid = memo(function DashboardGrid() {
         title: 'Trade Panel',
         component: exchange === 'upbit' ? <SpotTradePanelWidget /> : <TradePanelWidget />,
       },
+      { key: 'multichart', title: 'Multi Chart', component: <MultiChartWidget /> },
     ],
     [exchange],
   );

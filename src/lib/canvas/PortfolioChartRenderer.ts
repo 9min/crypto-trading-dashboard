@@ -80,8 +80,7 @@ export class PortfolioChartRenderer implements CanvasRenderer {
   setSize(width: number, height: number): void {
     this.width = width;
     this.height = height;
-    this.draw();
-    this.isDirty = false;
+    this.isDirty = true;
   }
 
   onFrame(): void {
