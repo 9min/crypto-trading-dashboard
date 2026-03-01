@@ -88,7 +88,8 @@ export class ChartSyncHub {
    * Unregister all panels and clear all subscriptions.
    */
   destroy(): void {
-    for (const [id] of this.panels) {
+    const ids = [...this.panels.keys()];
+    for (const id of ids) {
       this.unregister(id);
     }
   }

@@ -291,7 +291,7 @@ export function usePositionPriceLines({
               });
             }
           } else if (existing.liquidationLine) {
-            series.removePriceLine(existing.liquidationLine);
+            safeRemovePriceLine(series, existing.liquidationLine);
             existing.liquidationLine = null;
           }
 
@@ -310,7 +310,7 @@ export function usePositionPriceLines({
               });
             }
           } else if (existing.takeProfitLine) {
-            series.removePriceLine(existing.takeProfitLine);
+            safeRemovePriceLine(series, existing.takeProfitLine);
             existing.takeProfitLine = null;
           }
 
@@ -329,7 +329,7 @@ export function usePositionPriceLines({
               });
             }
           } else if (existing.stopLossLine) {
-            series.removePriceLine(existing.stopLossLine);
+            safeRemovePriceLine(series, existing.stopLossLine);
             existing.stopLossLine = null;
           }
         } else {

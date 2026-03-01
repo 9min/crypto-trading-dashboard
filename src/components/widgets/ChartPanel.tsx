@@ -150,7 +150,7 @@ export const ChartPanel = memo(function ChartPanel({
 
   // Auto-reset symbol when switching to upbit if current symbol has no mapping
   useEffect(() => {
-    if (exchange === 'upbit' && !BINANCE_TO_UPBIT_MAP.has(symbol)) {
+    if (exchange === 'upbit' && !BINANCE_TO_UPBIT_MAP.has(symbol) && availableSymbols.length > 0) {
       setPanelSymbol(panelId, availableSymbols[0]);
     }
   }, [exchange, symbol, panelId, setPanelSymbol, availableSymbols]);

@@ -13,7 +13,7 @@
 //   - '2x2': Four charts in a 2x2 grid
 // =============================================================================
 
-import { memo, useMemo, useCallback } from 'react';
+import { memo, useMemo, useCallback, useEffect } from 'react';
 import { useMultiChartStore } from '@/stores/multiChartStore';
 import { ChartSyncHub } from '@/lib/chart/ChartSyncHub';
 import { ChartPanel } from './ChartPanel';
@@ -76,6 +76,13 @@ export const MultiChartWidget = memo(function MultiChartWidget() {
 
   // Single hub instance per widget mount — shared across all panels
   const syncHub = useMemo(() => new ChartSyncHub(), []);
+
+  // Cleanup ChartSyncHub on unmount to unsubscribe all crosshair listeners
+  useEffect(() => {
+    return () => {
+      syncHub.destroy();
+    };
+  }, [syncHub]);
 
   const gridStyle = useMemo(() => GRID_STYLES[layout], [layout]);
 
