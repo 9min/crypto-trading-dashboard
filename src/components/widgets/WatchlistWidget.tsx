@@ -17,7 +17,6 @@
 import { memo, useCallback, useMemo } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
-import { useExchangeWatchlistStream } from '@/hooks/useExchangeWatchlistStream';
 import { useSparklineData } from '@/hooks/useSparklineData';
 import { formatPrice } from '@/utils/formatPrice';
 import { formatSymbol, formatUpbitSymbol } from '@/utils/formatSymbol';
@@ -166,8 +165,6 @@ export const WatchlistWidget = memo(function WatchlistWidget() {
       exchange === 'upbit' ? allSymbols.filter((s) => BINANCE_TO_UPBIT_MAP.has(s)) : allSymbols,
     [exchange, allSymbols],
   );
-
-  useExchangeWatchlistStream();
 
   const handleSelect = useCallback(
     (symbol: string) => {
