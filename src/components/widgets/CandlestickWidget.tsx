@@ -20,6 +20,7 @@ import type { Theme } from '@/stores/uiStore';
 import { WidgetWrapper } from './WidgetWrapper';
 import { useIndicatorSeries } from '@/hooks/useIndicatorSeries';
 import { useHistoricalLoader } from '@/hooks/useHistoricalLoader';
+import { usePositionPriceLines } from '@/hooks/usePositionPriceLines';
 import { IndicatorToggle } from '@/components/ui/IndicatorToggle';
 
 // -----------------------------------------------------------------------------
@@ -135,6 +136,9 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
 
   // Historical candle loading on left-edge scroll
   useHistoricalLoader({ chartRef, isChartReady });
+
+  // Position price lines on chart (entry, liquidation, TP/SL)
+  usePositionPriceLines({ seriesRef, isChartReady });
 
   // Keep colorsRef in sync so the mount effect can read current colors
   colorsRef.current = colors;
