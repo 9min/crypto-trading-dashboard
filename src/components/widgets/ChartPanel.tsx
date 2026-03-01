@@ -173,53 +173,62 @@ export const ChartPanel = memo(function ChartPanel({
     const container = containerRef.current;
     if (!container) return;
 
-    import('lightweight-charts').then(({ createChart, CandlestickSeries }) => {
-      if (disposed) return;
+    import('lightweight-charts')
+      .then(({ createChart, CandlestickSeries }) => {
+        if (disposed) return;
 
-      const c = colorsRef.current;
+        const c = colorsRef.current;
 
-      const chart = createChart(container, {
-        autoSize: true,
-        layout: {
-          background: { color: c.background },
-          textColor: c.text,
-          panes: {
-            separatorColor: c.separator,
-            separatorHoverColor: c.separatorHover,
+        const chart = createChart(container, {
+          autoSize: true,
+          layout: {
+            background: { color: c.background },
+            textColor: c.text,
+            panes: {
+              separatorColor: c.separator,
+              separatorHoverColor: c.separatorHover,
+            },
           },
-        },
-        grid: {
-          vertLines: { color: c.grid },
-          horzLines: { color: c.grid },
-        },
-        crosshair: {
-          vertLine: { color: c.crosshair, labelBackgroundColor: c.crosshair },
-          horzLine: { color: c.crosshair, labelBackgroundColor: c.crosshair },
-        },
-        rightPriceScale: {
-          borderColor: c.border,
-        },
-        timeScale: {
-          borderColor: c.border,
-          timeVisible: true,
-          secondsVisible: false,
-        },
-      });
+          grid: {
+            vertLines: { color: c.grid },
+            horzLines: { color: c.grid },
+          },
+          crosshair: {
+            vertLine: { color: c.crosshair, labelBackgroundColor: c.crosshair },
+            horzLine: { color: c.crosshair, labelBackgroundColor: c.crosshair },
+          },
+          rightPriceScale: {
+            borderColor: c.border,
+          },
+          timeScale: {
+            borderColor: c.border,
+            timeVisible: true,
+            secondsVisible: false,
+          },
+        });
 
-      const series = chart.addSeries(CandlestickSeries, {
-        upColor: c.upColor,
-        downColor: c.downColor,
-        borderVisible: false,
-        wickUpColor: c.wickUpColor,
-        wickDownColor: c.wickDownColor,
-      });
+        const series = chart.addSeries(CandlestickSeries, {
+          upColor: c.upColor,
+          downColor: c.downColor,
+          borderVisible: false,
+          wickUpColor: c.wickUpColor,
+          wickDownColor: c.wickDownColor,
+        });
 
-      chartRef.current = chart;
-      seriesRef.current = series;
-      prevCandleCountRef.current = 0;
-      prevFirstTimeRef.current = 0;
-      setIsChartReady(true);
-    });
+        chartRef.current = chart;
+        seriesRef.current = series;
+        prevCandleCountRef.current = 0;
+        prevFirstTimeRef.current = 0;
+        setIsChartReady(true);
+      })
+      .catch((error: unknown) => {
+        if (disposed) return;
+        console.error('[ChartPanel] Failed to load lightweight-charts', {
+          panelId,
+          timestamp: Date.now(),
+          error,
+        });
+      });
 
     return () => {
       disposed = true;
@@ -230,7 +239,7 @@ export const ChartPanel = memo(function ChartPanel({
       }
       setIsChartReady(false);
     };
-  }, []);
+  }, [panelId]);
 
   // Apply theme changes
   useEffect(() => {
