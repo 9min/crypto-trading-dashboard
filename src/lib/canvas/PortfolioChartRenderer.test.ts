@@ -89,10 +89,14 @@ describe('PortfolioChartRenderer', () => {
 
   // -- setSize ----------------------------------------------------------------
 
-  it('setsize triggers a draw (fillrect called)', () => {
+  it('setsize marks dirty so next onframe draws', () => {
     renderer.updateSlices(makeSlices());
     renderer.setSize(400, 300);
 
+    // setSize only marks dirty — draw happens on next onFrame
+    expect(ctx.fillRect).not.toHaveBeenCalled();
+
+    renderer.onFrame();
     expect(ctx.fillRect).toHaveBeenCalled();
   });
 
@@ -105,6 +109,7 @@ describe('PortfolioChartRenderer', () => {
 
   it('onframe does not draw when not dirty', () => {
     renderer.setSize(400, 300);
+    renderer.onFrame(); // drain dirty flag from setSize
     vi.mocked(ctx.fillRect).mockClear();
 
     renderer.onFrame();

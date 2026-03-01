@@ -1,38 +1,46 @@
 'use client';
 
 // =============================================================================
-// CandlestickWidget Component
+// ChartPanel Component
 // =============================================================================
-// Integrates TradingView Lightweight Charts (v5) to display real-time
-// candlestick data from klineStore. Uses autoSize for responsive resizing.
+// Individual chart panel for the multi-chart widget. Each panel manages its
+// own lightweight-charts instance and WebSocket connection, independent of
+// the global klineStore and CandlestickWidget.
 //
-// - On mount: creates chart + candlestick series, sets initial data
-// - On candle updates: calls series.update() for live candles
-// - On theme change: applies matching chart options
-// - On unmount: calls chart.remove() for complete cleanup
+// Features:
+//   - Local kline data via useChartPanelStream
+//   - Crosshair synchronization via useChartSync + ChartSyncHub
+//   - Theme-aware chart colors
+//   - Symbol selector dropdown (POPULAR_USDT_SYMBOLS)
+//   - Interval selector per panel
 // =============================================================================
 
-import { memo, useEffect, useRef, useMemo, useState } from 'react';
-import { useKlineStore } from '@/stores/klineStore';
+import { memo, useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import { useUiStore } from '@/stores/uiStore';
-import type { CandleData } from '@/types/chart';
+import { useMultiChartStore } from '@/stores/multiChartStore';
+import { useChartPanelStream } from '@/hooks/useChartPanelStream';
+import { useChartSync } from '@/hooks/useChartSync';
+import { POPULAR_USDT_SYMBOLS } from '@/utils/symbolSearch';
+import { BINANCE_TO_UPBIT_MAP } from '@/utils/symbolMap';
+import type { ChartSyncHub, ChartLike, SeriesLike } from '@/lib/chart/ChartSyncHub';
+import type { CandleData, KlineInterval } from '@/types/chart';
+import { KLINE_INTERVALS } from '@/types/chart';
 import type { Theme } from '@/stores/uiStore';
-import { WidgetWrapper } from './WidgetWrapper';
-import { useIndicatorSeries } from '@/hooks/useIndicatorSeries';
-import { useHistoricalLoader } from '@/hooks/useHistoricalLoader';
-import { usePositionPriceLines } from '@/hooks/usePositionPriceLines';
-import { IndicatorToggle } from '@/components/ui/IndicatorToggle';
 
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
 
-// We use dynamic import for lightweight-charts to avoid SSR issues.
-// These type aliases are inferred from the dynamic import so we don't need
-// to import the types statically — they're only used for ref typing.
 type LWC = typeof import('lightweight-charts');
 type ChartApi = ReturnType<LWC['createChart']>;
 type CandlestickSeriesApi = ReturnType<ChartApi['addSeries']>;
+
+interface ChartPanelProps {
+  panelId: string;
+  symbol: string;
+  interval: KlineInterval;
+  syncHub: ChartSyncHub;
+}
 
 interface ChartColors {
   background: string;
@@ -88,11 +96,6 @@ function getColorsForTheme(theme: Theme): ChartColors {
   return theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
 }
 
-/**
- * Converts CandleData to the format expected by lightweight-charts.
- * UTCTimestamp is a branded number type, so we cast via `as unknown as UTCTimestamp`.
- * We return the OHLC shape inline typed to avoid importing the branded type.
- */
 function toOhlcData(candle: CandleData): {
   time: number;
   open: number;
@@ -113,45 +116,63 @@ function toOhlcData(candle: CandleData): {
 // Component
 // -----------------------------------------------------------------------------
 
-export const CandlestickWidget = memo(function CandlestickWidget() {
+export const ChartPanel = memo(function ChartPanel({
+  panelId,
+  symbol,
+  interval,
+  syncHub,
+}: ChartPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ChartApi | null>(null);
   const seriesRef = useRef<CandlestickSeriesApi | null>(null);
   const prevCandleCountRef = useRef(0);
   const prevFirstTimeRef = useRef(0);
-  const prevExchangeRef = useRef('');
   const colorsRef = useRef<ChartColors>(DARK_COLORS);
 
-  // State flag to signal that the async chart init has completed and
-  // seriesRef is ready. This triggers the candle data effect to run.
   const [isChartReady, setIsChartReady] = useState(false);
 
-  const candles = useKlineStore((state) => state.candles);
-  const isLoading = useKlineStore((state) => state.isLoading);
   const theme = useUiStore((state) => state.theme);
   const exchange = useUiStore((state) => state.exchange);
+  const setPanelSymbol = useMultiChartStore((state) => state.setPanelSymbol);
+  const setPanelInterval = useMultiChartStore((state) => state.setPanelInterval);
 
   const colors = useMemo(() => getColorsForTheme(theme), [theme]);
-
-  // Technical indicator series lifecycle
-  useIndicatorSeries({ chartRef, isChartReady });
-
-  // Historical candle loading on left-edge scroll
-  useHistoricalLoader({ chartRef, isChartReady });
-
-  // Position price lines on chart (entry, liquidation, TP/SL)
-  usePositionPriceLines({ seriesRef, isChartReady });
-
-  // Keep colorsRef in sync so the mount effect can read current colors
   colorsRef.current = colors;
 
-  // Mount / unmount chart — runs once, does NOT depend on colors
+  // Filter symbols to only those available on the active exchange
+  const availableSymbols = useMemo(
+    () =>
+      exchange === 'upbit'
+        ? POPULAR_USDT_SYMBOLS.filter((s) => BINANCE_TO_UPBIT_MAP.has(s))
+        : POPULAR_USDT_SYMBOLS,
+    [exchange],
+  );
+
+  // Auto-reset symbol when switching to upbit if current symbol has no mapping
+  useEffect(() => {
+    if (exchange === 'upbit' && !BINANCE_TO_UPBIT_MAP.has(symbol)) {
+      setPanelSymbol(panelId, availableSymbols[0]);
+    }
+  }, [exchange, symbol, panelId, setPanelSymbol, availableSymbols]);
+
+  // Per-panel data stream
+  const { candles, isLoading } = useChartPanelStream({ panelId, symbol, interval });
+
+  // Crosshair sync (uses refs — no re-render on crosshair move)
+  useChartSync({
+    panelId,
+    chartRef: chartRef as React.MutableRefObject<ChartLike | null>,
+    seriesRef: seriesRef as React.MutableRefObject<SeriesLike | null>,
+    syncHub,
+    isChartReady,
+  });
+
+  // Mount / unmount chart
   useEffect(() => {
     let disposed = false;
     const container = containerRef.current;
     if (!container) return;
 
-    // Dynamically import to avoid SSR issues
     import('lightweight-charts').then(({ createChart, CandlestickSeries }) => {
       if (disposed) return;
 
@@ -211,7 +232,7 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
     };
   }, []);
 
-  // Apply theme changes via applyOptions (no chart recreation)
+  // Apply theme changes
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -248,17 +269,12 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
     }
   }, [colors]);
 
-  // Update candle data — depends on isChartReady to avoid null series
+  // Update candle data
   useEffect(() => {
     const series = seriesRef.current;
     if (!isChartReady || !series) return;
 
-    // Force clear on exchange switch to prevent stale data from the
-    // previous exchange's price scale (USDT vs KRW) lingering on the chart.
-    const exchangeChanged = prevExchangeRef.current !== '' && prevExchangeRef.current !== exchange;
-    prevExchangeRef.current = exchange;
-
-    if (exchangeChanged || candles.length === 0) {
+    if (candles.length === 0) {
       prevCandleCountRef.current = 0;
       prevFirstTimeRef.current = 0;
       series.setData([]);
@@ -267,55 +283,77 @@ export const CandlestickWidget = memo(function CandlestickWidget() {
 
     const firstTime = candles[0].time;
 
-    // Detect historical data prepend: more candles AND earlier first candle time.
-    // This means older candles were loaded via infinite scroll — we must update
-    // the full dataset but NOT call fitContent() to preserve scroll position.
-    const isPrepend =
-      prevCandleCountRef.current > 0 &&
-      candles.length > prevCandleCountRef.current &&
-      firstTime < prevFirstTimeRef.current;
-
-    // Detect when a full setData + fitContent is needed:
-    // - Initial load (prevCandleCountRef === 0)
-    // - Symbol change (length decreased)
-    // - Rolling window shift (first candle's time changed while length stayed the same,
-    //   meaning addCandle triggered slice(-MAX_CANDLES) eviction)
     const needsFullReset =
       prevCandleCountRef.current === 0 ||
       candles.length < prevCandleCountRef.current ||
       (candles.length === prevCandleCountRef.current && prevFirstTimeRef.current !== firstTime);
 
-    if (isPrepend) {
-      // Historical data prepended — update all data but preserve scroll position
-      // @ts-expect-error — lightweight-charts Time is a branded number type,
-      // but our CandleData.time is a plain number (UTC seconds). The values are
-      // compatible at runtime; the branded type just prevents direct assignment.
-      series.setData(candles.map(toOhlcData));
-      // DO NOT call fitContent() — user is browsing historical data
-    } else if (needsFullReset) {
-      // @ts-expect-error — same branded type issue as above
+    if (needsFullReset) {
+      // @ts-expect-error — lightweight-charts Time is a branded number type
       series.setData(candles.map(toOhlcData));
       chartRef.current?.timeScale().fitContent();
     } else {
-      // New candle added or last candle updated in place
       const lastCandle = candles[candles.length - 1];
-      // @ts-expect-error — same branded type issue as above
+      // @ts-expect-error — branded type mismatch
       series.update(toOhlcData(lastCandle));
     }
 
     prevCandleCountRef.current = candles.length;
     prevFirstTimeRef.current = firstTime;
-  }, [candles, isChartReady, exchange]);
+  }, [candles, isChartReady]);
+
+  const handleSymbolChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setPanelSymbol(panelId, e.target.value);
+    },
+    [panelId, setPanelSymbol],
+  );
+
+  const handleIntervalChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setPanelInterval(panelId, e.target.value as KlineInterval);
+    },
+    [panelId, setPanelInterval],
+  );
 
   return (
-    <WidgetWrapper title="Chart" headerActions={<IndicatorToggle />}>
-      <div ref={containerRef} className="h-full w-full">
-        {isLoading && (
-          <div className="bg-background-secondary/80 absolute inset-0 z-10 flex items-center justify-center">
-            <span className="text-foreground-secondary text-xs">Loading chart data...</span>
-          </div>
-        )}
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Chart container */}
+      <div ref={containerRef} className="h-full w-full" />
+
+      {/* Symbol & interval overlay */}
+      <div className="absolute top-1 left-1 z-10 flex items-center gap-1">
+        <select
+          value={symbol}
+          onChange={handleSymbolChange}
+          className="bg-background-tertiary/80 text-foreground hover:bg-background-tertiary h-6 cursor-pointer rounded px-1 text-xs font-semibold backdrop-blur-sm transition-colors"
+        >
+          {availableSymbols.map((s) => (
+            <option key={s} value={s}>
+              {s.replace('USDT', '')}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={interval}
+          onChange={handleIntervalChange}
+          className="bg-background-tertiary/80 text-foreground-secondary hover:bg-background-tertiary h-6 cursor-pointer rounded px-1 text-xs backdrop-blur-sm transition-colors"
+        >
+          {KLINE_INTERVALS.map((iv) => (
+            <option key={iv} value={iv}>
+              {iv}
+            </option>
+          ))}
+        </select>
       </div>
-    </WidgetWrapper>
+
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="bg-background-secondary/80 absolute inset-0 z-10 flex items-center justify-center">
+          <span className="text-foreground-secondary text-xs">Loading...</span>
+        </div>
+      )}
+    </div>
   );
 });

@@ -113,10 +113,28 @@ export function useIndicatorSeries({ chartRef, isChartReady }: UseIndicatorSerie
       }
     }
 
+    // When candles are empty (exchange switch, symbol change), remove ALL
+    // indicator series rather than just clearing data. Clearing via setData([])
+    // can cause LWC to collapse empty panes; when data returns, the series
+    // may render on pane 0 instead of pane 1, mixing volume (~0) with price
+    // data (~96M KRW) and pulling the Y-axis down to 0.
+    if (candles.length === 0) {
+      for (const [, entry] of seriesMap) {
+        for (const s of entry.series) {
+          try {
+            chart.removeSeries(s);
+          } catch {
+            // Series may already be removed if chart was recreated
+          }
+        }
+      }
+      seriesMap.clear();
+      return;
+    }
+
     // -- Create / update series for visible indicators --
     for (const config of Object.values(indicators)) {
       if (!config.visible) continue;
-      if (candles.length === 0) continue;
 
       const existing = seriesMap.get(config.id);
 

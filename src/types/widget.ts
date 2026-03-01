@@ -22,6 +22,7 @@ const WIDGET_TYPES = [
   'perf',
   'portfolio',
   'tradepanel',
+  'multichart',
 ] as const;
 
 /**
@@ -113,6 +114,7 @@ const WIDGET_METADATA: Record<WidgetType, WidgetMeta> = {
   perf: { label: 'Performance', minW: 2, minH: 6, defaultW: 3, defaultH: 10 },
   portfolio: { label: 'Futures', minW: 3, minH: 8, defaultW: 4, defaultH: 12 },
   tradepanel: { label: 'Trade Panel', minW: 2, minH: 8, defaultW: 3, defaultH: 14 },
+  multichart: { label: 'Multi Chart', minW: 6, minH: 10, defaultW: 9, defaultH: 14 },
 } as const;
 
 // -----------------------------------------------------------------------------

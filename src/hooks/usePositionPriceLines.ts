@@ -196,17 +196,26 @@ function createSpotLines(series: CandlestickSeriesApi, holding: SpotHolding): Pr
 }
 
 /**
+ * Safely removes a single price line from the series.
+ * Swallows errors if the line or series is already disposed.
+ */
+function safeRemovePriceLine(series: CandlestickSeriesApi, line: PriceLineApi): void {
+  try {
+    series.removePriceLine(line);
+  } catch {
+    // Line or series may already be removed if chart was recreated
+  }
+}
+
+/**
  * Removes all price lines in a group from the series.
+ * Each removal is independent so one failure doesn't prevent the others.
  */
 function removeLineGroup(series: CandlestickSeriesApi, group: PriceLineGroup): void {
-  try {
-    series.removePriceLine(group.entryLine);
-    if (group.liquidationLine) series.removePriceLine(group.liquidationLine);
-    if (group.takeProfitLine) series.removePriceLine(group.takeProfitLine);
-    if (group.stopLossLine) series.removePriceLine(group.stopLossLine);
-  } catch {
-    // Series or lines may already be removed if chart was recreated
-  }
+  safeRemovePriceLine(series, group.entryLine);
+  if (group.liquidationLine) safeRemovePriceLine(series, group.liquidationLine);
+  if (group.takeProfitLine) safeRemovePriceLine(series, group.takeProfitLine);
+  if (group.stopLossLine) safeRemovePriceLine(series, group.stopLossLine);
 }
 
 // -----------------------------------------------------------------------------
@@ -218,6 +227,7 @@ export function usePositionPriceLines({
   isChartReady,
 }: UsePositionPriceLinesParams): void {
   const activeLinesRef = useRef<Map<string, PriceLineGroup>>(new Map());
+  const prevExchangeRef = useRef<string>('');
 
   const symbol = useUiStore((state) => state.symbol);
   const exchange = useUiStore((state) => state.exchange);
@@ -230,6 +240,19 @@ export function usePositionPriceLines({
     if (!isChartReady || !series) return;
 
     const activeLines = activeLinesRef.current;
+
+    // Force-clear ALL lines on exchange switch to prevent stale USDT lines
+    // appearing on KRW charts (or vice versa). The incremental diff below
+    // handles normal position changes; this block is a safety net for the
+    // exchange transition where price scales differ by orders of magnitude.
+    if (prevExchangeRef.current !== '' && prevExchangeRef.current !== exchange) {
+      for (const [, group] of activeLines) {
+        removeLineGroup(series, group);
+      }
+      activeLines.clear();
+    }
+    prevExchangeRef.current = exchange;
+
     const desired = buildDesiredLines(exchange, symbol, positions, holdings);
 
     // Remove lines for positions that no longer exist
