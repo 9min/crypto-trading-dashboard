@@ -337,7 +337,8 @@ export function usePositionPriceLines({
       }
       activeLines.clear();
     };
-  }, [seriesRef]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount-only cleanup; refs are stable
+  }, []);
 }
 
 // Export types and helpers for testing
