@@ -20,6 +20,7 @@ import { SymbolSearchModal } from '@/components/ui/SymbolSearchModal';
 import { KeyboardShortcutsHelp } from '@/components/ui/KeyboardShortcutsHelp';
 import { SettingsPanel } from '@/components/ui/SettingsPanel';
 import { useExchangeWebSocket } from '@/hooks/useExchangeWebSocket';
+import { useExchangeWatchlistStream } from '@/hooks/useExchangeWatchlistStream';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMobileBreakpoint } from '@/hooks/useMobileBreakpoint';
 import { usePriceAlertMonitor } from '@/hooks/usePriceAlertMonitor';
@@ -103,6 +104,10 @@ export const DashboardShell = memo(function DashboardShell() {
   useSymbolFromUrl();
 
   useExchangeWebSocket(isExchangeHydrated);
+
+  // Watchlist price stream — mounted at shell level so it persists across
+  // mobile tab switches (e.g., Futures tab still receives live prices).
+  useExchangeWatchlistStream();
 
   // Monitor price alerts across all streams and send browser notifications
   usePriceAlertMonitor();
