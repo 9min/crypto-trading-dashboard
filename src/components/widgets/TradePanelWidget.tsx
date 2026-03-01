@@ -34,6 +34,7 @@ export const TradePanelWidget = memo(function TradePanelWidget() {
   const defaultMarginType = usePortfolioStore((state) => state.defaultMarginType);
   const openPosition = usePortfolioStore((state) => state.openPosition);
   const closePosition = usePortfolioStore((state) => state.closePosition);
+  const updatePositionTpSl = usePortfolioStore((state) => state.updatePositionTpSl);
   const binancePrices = useWatchlistStore((state) => state.binancePrices);
 
   // Current symbol price — always uses Binance USDT price for futures trading
@@ -104,6 +105,12 @@ export const TradePanelWidget = memo(function TradePanelWidget() {
     [closePosition],
   );
 
+  const handleUpdateTpSl = useCallback(
+    (sym: string, side: PositionSide, tp: number | null, sl: number | null) =>
+      updatePositionTpSl(sym, side, tp, sl),
+    [updatePositionTpSl],
+  );
+
   return (
     <WidgetWrapper title="Trade">
       <TradePanel
@@ -116,6 +123,7 @@ export const TradePanelWidget = memo(function TradePanelWidget() {
         shortPosition={shortPosition}
         onOpenPosition={handleOpenPosition}
         onClosePosition={handleClosePosition}
+        onUpdateTpSl={handleUpdateTpSl}
         fundingRate={fundingRate}
       />
     </WidgetWrapper>

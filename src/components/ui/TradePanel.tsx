@@ -55,6 +55,13 @@ interface TradePanelProps {
   onOpenPosition: (params: OpenPositionParams) => boolean;
   /** Close position callback — returns true on success */
   onClosePosition: (symbol: string, side: PositionSide, price: number, quantity: number) => boolean;
+  /** Update TP/SL on existing position — returns true on success */
+  onUpdateTpSl: (
+    symbol: string,
+    side: PositionSide,
+    tp: number | null,
+    sl: number | null,
+  ) => boolean;
   /** Current funding rate (null if unavailable) */
   fundingRate: number | null;
 }
@@ -83,6 +90,7 @@ export const TradePanel = memo(function TradePanel({
   shortPosition,
   onOpenPosition,
   onClosePosition,
+  onUpdateTpSl,
   fundingRate,
 }: TradePanelProps) {
   const [activeSide, setActiveSide] = useState<PositionSide>('long');
@@ -98,6 +106,9 @@ export const TradePanel = memo(function TradePanel({
     null,
   );
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showCloseTpSl, setShowCloseTpSl] = useState(false);
+  const [closeTpInput, setCloseTpInput] = useState('');
+  const [closeSlInput, setCloseSlInput] = useState('');
 
   // Sync leverage/marginType when defaults change
   useEffect(() => {
@@ -309,6 +320,45 @@ export const TradePanel = memo(function TradePanel({
     if (val === '' || /^\d*\.?\d*$/.test(val)) setSlInput(val);
   }, []);
 
+  const handleCloseTpSlToggle = useCallback(() => {
+    setShowCloseTpSl((prev) => {
+      if (!prev && activePosition) {
+        setCloseTpInput(
+          activePosition.takeProfitPrice !== null ? String(activePosition.takeProfitPrice) : '',
+        );
+        setCloseSlInput(
+          activePosition.stopLossPrice !== null ? String(activePosition.stopLossPrice) : '',
+        );
+      }
+      return !prev;
+    });
+  }, [activePosition]);
+
+  const handleCloseTpChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === '' || /^\d*\.?\d*$/.test(val)) setCloseTpInput(val);
+  }, []);
+
+  const handleCloseSlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === '' || /^\d*\.?\d*$/.test(val)) setCloseSlInput(val);
+  }, []);
+
+  const handleUpdateTpSl = useCallback(() => {
+    if (!activePosition) return;
+    const tp = closeTpInput === '' ? null : parseFloat(closeTpInput);
+    const sl = closeSlInput === '' ? null : parseFloat(closeSlInput);
+    const parsedTpVal = tp !== null && (isNaN(tp) || tp <= 0) ? null : tp;
+    const parsedSlVal = sl !== null && (isNaN(sl) || sl <= 0) ? null : sl;
+
+    const success = onUpdateTpSl(symbol, activeSide, parsedTpVal, parsedSlVal);
+    if (success) {
+      showFeedback({ type: 'success', message: 'TP/SL updated' });
+    } else {
+      showFeedback({ type: 'error', message: 'Failed to update TP/SL' });
+    }
+  }, [activePosition, closeTpInput, closeSlInput, onUpdateTpSl, symbol, activeSide, showFeedback]);
+
   const canOpen = useMemo(() => {
     if (parsedQuantity <= 0 || currentPrice <= 0) return false;
     return requiredMargin <= availableBalance;
@@ -413,6 +463,84 @@ export const TradePanel = memo(function TradePanel({
                 Entry: {formatPrice(activePosition.entryPrice)}
               </span>
             </div>
+
+            {/* Current TP/SL display + modify */}
+            <div className="text-foreground-secondary flex items-center justify-between text-[10px]">
+              <span>Take Profit</span>
+              <span className="font-mono-num">
+                {activePosition.takeProfitPrice !== null
+                  ? `$${formatPrice(activePosition.takeProfitPrice)}`
+                  : '\u2014'}
+              </span>
+            </div>
+            <div className="text-foreground-secondary flex items-center justify-between text-[10px]">
+              <span>Stop Loss</span>
+              <span className="font-mono-num">
+                {activePosition.stopLossPrice !== null
+                  ? `$${formatPrice(activePosition.stopLossPrice)}`
+                  : '\u2014'}
+              </span>
+            </div>
+
+            {/* Modify TP/SL collapsible */}
+            <button
+              type="button"
+              onClick={handleCloseTpSlToggle}
+              className="bg-background-tertiary hover:bg-background-tertiary/80 text-foreground-secondary hover:text-foreground flex cursor-pointer items-center justify-between rounded px-2.5 py-1.5 text-[10px] transition-all"
+            >
+              <span className="font-medium">Modify TP / SL</span>
+              <svg
+                className={`h-3 w-3 transition-transform ${showCloseTpSl ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showCloseTpSl && (
+              <div className="bg-background-secondary flex flex-col gap-2 rounded-md p-2.5">
+                <div className="flex items-center gap-2">
+                  <label className="text-buy w-10 text-[10px] font-medium" htmlFor="close-tp-input">
+                    TP
+                  </label>
+                  <input
+                    id="close-tp-input"
+                    type="text"
+                    inputMode="decimal"
+                    value={closeTpInput}
+                    onChange={handleCloseTpChange}
+                    placeholder="Take Profit Price"
+                    className="bg-background border-border text-foreground font-mono-num focus:border-buy min-w-0 flex-1 rounded border px-2 py-1.5 text-[10px] transition-colors outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label
+                    className="text-sell w-10 text-[10px] font-medium"
+                    htmlFor="close-sl-input"
+                  >
+                    SL
+                  </label>
+                  <input
+                    id="close-sl-input"
+                    type="text"
+                    inputMode="decimal"
+                    value={closeSlInput}
+                    onChange={handleCloseSlChange}
+                    placeholder="Stop Loss Price"
+                    className="bg-background border-border text-foreground font-mono-num focus:border-sell min-w-0 flex-1 rounded border px-2 py-1.5 text-[10px] transition-colors outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUpdateTpSl}
+                  className="bg-accent hover:bg-accent/90 active:bg-accent/80 w-full cursor-pointer rounded py-1.5 text-[10px] font-semibold text-white transition-all"
+                >
+                  Update TP / SL
+                </button>
+              </div>
+            )}
 
             {/* Quantity input */}
             <div className="flex flex-col gap-1">
@@ -709,6 +837,9 @@ export const TradePanel = memo(function TradePanel({
                   className="bg-background border-border text-foreground font-mono-num focus:border-sell min-w-0 flex-1 rounded border px-2 py-1.5 text-[10px] transition-colors outline-none"
                 />
               </div>
+              <p className="text-foreground-secondary/60 text-[9px]">
+                Applied automatically when position is opened
+              </p>
             </div>
           )}
 
