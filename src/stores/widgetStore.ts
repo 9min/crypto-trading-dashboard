@@ -41,6 +41,13 @@ function allWidgetsSet(): Set<WidgetType> {
   return new Set<WidgetType>(WIDGET_TYPES);
 }
 
+/** Default visible widgets — all except multichart */
+function defaultVisibleSet(): Set<WidgetType> {
+  const set = allWidgetsSet();
+  set.delete('multichart');
+  return set;
+}
+
 function persistSet(widgetSet: Set<WidgetType>): void {
   saveVisibleWidgets([...widgetSet]);
 }
@@ -51,7 +58,7 @@ function persistSet(widgetSet: Set<WidgetType>): void {
 
 export const useWidgetStore = create<WidgetStore>()((set) => ({
   // -- State ------------------------------------------------------------------
-  visibleWidgets: allWidgetsSet(),
+  visibleWidgets: defaultVisibleSet(),
   isHydrated: false,
 
   // -- Actions ----------------------------------------------------------------
@@ -81,7 +88,7 @@ export const useWidgetStore = create<WidgetStore>()((set) => ({
 
   resetWidgets: (): void => {
     clearVisibleWidgets();
-    set({ visibleWidgets: allWidgetsSet() });
+    set({ visibleWidgets: defaultVisibleSet() });
   },
 
   hydrateWidgets: (): void => {

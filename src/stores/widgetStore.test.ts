@@ -5,25 +5,38 @@ vi.mock('@/utils/widgetStorage', () => ({
 }));
 
 import { useWidgetStore } from './widgetStore';
-import { WIDGET_TYPES } from '@/types/widget';
+import { WIDGET_TYPES, type WidgetType } from '@/types/widget';
 import { saveVisibleWidgets, loadVisibleWidgets, clearVisibleWidgets } from '@/utils/widgetStorage';
 
 const mockedLoadVisibleWidgets = vi.mocked(loadVisibleWidgets);
 
+/** Default visible widgets — all except multichart (matches store default) */
+const DEFAULT_HIDDEN: WidgetType[] = ['multichart'];
+
+function defaultVisibleSet(): Set<WidgetType> {
+  const set = new Set<WidgetType>(WIDGET_TYPES);
+  for (const t of DEFAULT_HIDDEN) set.delete(t);
+  return set;
+}
+
 describe('widgetStore', () => {
   beforeEach(() => {
-    // Reset store: all widgets visible, not hydrated
+    // Reset store: default widgets visible (multichart hidden), not hydrated
     useWidgetStore.setState({
-      visibleWidgets: new Set(WIDGET_TYPES),
+      visibleWidgets: defaultVisibleSet(),
       isHydrated: false,
     });
     vi.clearAllMocks();
   });
 
-  it('has all widgets visible initially', () => {
+  it('has default widgets visible initially (multichart hidden)', () => {
     const { visibleWidgets } = useWidgetStore.getState();
     for (const type of WIDGET_TYPES) {
-      expect(visibleWidgets.has(type)).toBe(true);
+      if (DEFAULT_HIDDEN.includes(type)) {
+        expect(visibleWidgets.has(type)).toBe(false);
+      } else {
+        expect(visibleWidgets.has(type)).toBe(true);
+      }
     }
   });
 
@@ -85,7 +98,7 @@ describe('widgetStore', () => {
   });
 
   describe('resetWidgets', () => {
-    it('restores all widgets to visible', () => {
+    it('restores default visible widgets (multichart hidden)', () => {
       useWidgetStore.getState().hideWidget('orderbook');
       useWidgetStore.getState().hideWidget('trades');
 
@@ -93,7 +106,11 @@ describe('widgetStore', () => {
 
       const { visibleWidgets } = useWidgetStore.getState();
       for (const type of WIDGET_TYPES) {
-        expect(visibleWidgets.has(type)).toBe(true);
+        if (DEFAULT_HIDDEN.includes(type)) {
+          expect(visibleWidgets.has(type)).toBe(false);
+        } else {
+          expect(visibleWidgets.has(type)).toBe(true);
+        }
       }
     });
 
@@ -123,7 +140,7 @@ describe('widgetStore', () => {
 
       const { visibleWidgets, isHydrated } = useWidgetStore.getState();
       expect(isHydrated).toBe(true);
-      expect(visibleWidgets.size).toBe(WIDGET_TYPES.length);
+      expect(visibleWidgets.size).toBe(WIDGET_TYPES.length - DEFAULT_HIDDEN.length);
     });
   });
 });
