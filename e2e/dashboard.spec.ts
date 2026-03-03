@@ -31,9 +31,9 @@ test.describe('Dashboard', () => {
     await expect(header).toContainText('BTC/USDT');
   });
 
-  test('should render all 10 widgets', async ({ page }) => {
+  test('should render all 9 default widgets', async ({ page }) => {
     const widgetTitles = page.getByTestId('widget-title');
-    await expect(widgetTitles).toHaveCount(10);
+    await expect(widgetTitles).toHaveCount(9);
 
     const expectedTitles = [
       'Chart',
@@ -45,7 +45,6 @@ test.describe('Dashboard', () => {
       'Performance',
       'Futures',
       'Trade',
-      'Multi Chart',
     ];
 
     for (const title of expectedTitles) {
