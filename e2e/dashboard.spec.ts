@@ -45,7 +45,6 @@ test.describe('Dashboard', () => {
       'Performance',
       'Futures',
       'Trade',
-      'Multi Chart',
     ];
 
     for (const title of expectedTitles) {

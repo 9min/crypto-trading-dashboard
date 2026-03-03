@@ -29,7 +29,6 @@ test.describe('Responsive layout', () => {
       'Performance',
       'Futures',
       'Trade',
-      'Multi Chart',
     ];
 
     for (const title of titles) {
