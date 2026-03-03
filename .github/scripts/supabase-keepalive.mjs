@@ -24,4 +24,4 @@ if (error) {
   process.exit(1);
 }
 
-console.log(`Supabase ping succeeded — ${data.length} row(s) returned`);
+console.warn(`Supabase ping succeeded — ${data.length} row(s) returned`);
