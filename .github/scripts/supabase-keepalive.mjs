@@ -25,20 +25,12 @@ const { error: upsertError } = await supabase
   .upsert({ id: 1, pinged_at: new Date().toISOString() }, { onConflict: 'id' });
 
 if (upsertError) {
-  // keep_alive 테이블이 없으면 SELECT fallback
-  console.warn(`Upsert failed (table may not exist): ${upsertError.message}`);
-  console.warn('Falling back to SELECT query...');
-
-  const { error: selectError } = await supabase.from('user_preferences').select('id').limit(1);
-
-  if (selectError) {
-    console.error('Fallback SELECT also failed:', selectError.message);
-    process.exit(1);
-  }
-
-  console.warn('Fallback SELECT succeeded. Create "keep_alive" table for reliable keep-alive.');
-  console.warn('SQL: CREATE TABLE keep_alive (id int PRIMARY KEY, pinged_at timestamptz);');
-  process.exit(0);
+  console.error(`keep_alive upsert failed: ${upsertError.message}`);
+  console.error('Create the keep_alive table and RLS policy before running this workflow.');
+  console.error(
+    'SQL: CREATE TABLE keep_alive (id int PRIMARY KEY, pinged_at timestamptz NOT NULL DEFAULT now());',
+  );
+  process.exit(1);
 }
 
 console.warn(`Supabase keep-alive UPSERT succeeded at ${new Date().toISOString()}`);
