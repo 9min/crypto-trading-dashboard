@@ -21,6 +21,7 @@ import { KeyboardShortcutsHelp } from '@/components/ui/KeyboardShortcutsHelp';
 import { SettingsPanel } from '@/components/ui/SettingsPanel';
 import { useExchangeWebSocket } from '@/hooks/useExchangeWebSocket';
 import { useExchangeWatchlistStream } from '@/hooks/useExchangeWatchlistStream';
+import { useBrowserTitleSync } from '@/hooks/useBrowserTitleSync';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMobileBreakpoint } from '@/hooks/useMobileBreakpoint';
 import { usePriceAlertMonitor } from '@/hooks/usePriceAlertMonitor';
@@ -111,6 +112,9 @@ export const DashboardShell = memo(function DashboardShell() {
 
   // Monitor price alerts across all streams and send browser notifications
   usePriceAlertMonitor();
+
+  // Dynamic browser tab title: live price + symbol
+  useBrowserTitleSync();
 
   // Global keyboard shortcuts (disabled on mobile)
   useKeyboardShortcuts({ enabled: !isMobile });
